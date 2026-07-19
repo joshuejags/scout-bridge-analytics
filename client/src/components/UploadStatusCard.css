@@ -1,0 +1,16 @@
+.upload-status-card {
+  padding: 18px;
+  border-radius: 14px;
+  border: 2px solid;
+  background: white;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+}
+
+.upload-status-card h4 {
+  margin-bottom: 10px;
+}
+
+.upload-status-card p {
+  margin: 6px 0;
+}

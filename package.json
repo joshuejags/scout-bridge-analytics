@@ -1,0 +1,26 @@
+{
+  "name": "scout-bridge-analytics",
+  "version": "1.0.0",
+  "description": "Sports analytics platform for analyzing player performance from match highlights",
+  "main": "index.js",
+  "scripts": {
+    "install-all": "npm install && npm install --prefix client && npm install --prefix server",
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run start --prefix client\"",
+    "build": "npm run build --prefix client",
+    "server": "npm run dev --prefix server",
+    "client": "npm run start --prefix client"
+  },
+  "keywords": [
+    "sports",
+    "analytics",
+    "computer-vision",
+    "YOLO",
+    "OpenPose",
+    "player-tracking"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.0.0"
+  }
+}

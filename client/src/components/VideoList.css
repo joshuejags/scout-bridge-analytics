@@ -1,0 +1,87 @@
+.video-list {
+  max-width: 1000px;
+  margin: 20px auto;
+  padding: 20px;
+}
+
+.video-list h2 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.video-list table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.video-list th {
+  background-color: #007bff;
+  color: white;
+  padding: 12px;
+  text-align: left;
+  font-weight: bold;
+}
+
+.video-list td {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+}
+
+.video-list tbody tr:hover {
+  background-color: #f5f5f5;
+}
+
+.delete-btn,
+.process-btn,
+.view-report-btn {
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  margin-right: 8px;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.delete-btn {
+  background-color: #dc3545;
+}
+
+.delete-btn:hover {
+  background-color: #c82333;
+}
+
+.process-btn {
+  background-color: #007bff;
+}
+
+.process-btn:hover {
+  background-color: #0056b3;
+}
+
+.view-report-btn {
+  background-color: #28a745;
+}
+
+.view-report-btn:hover {
+  background-color: #218838;
+}
+
+.preview-btn {
+  background-color: #17a2b8;
+}
+
+.preview-btn:hover {
+  background-color: #138496;
+}
+
+button:disabled,
+.view-report-btn:disabled,
+.preview-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}

@@ -1,0 +1,53 @@
+.video-upload {
+  max-width: 500px;
+  margin: 20px auto;
+  padding: 20px;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.video-upload h2 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.video-upload input[type='file'] {
+  display: block;
+  margin: 15px 0;
+  padding: 10px;
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.video-upload button {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.video-upload button:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.video-upload button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.error {
+  color: red;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.success {
+  color: #28a745;
+  margin-top: 10px;
+  font-size: 14px;
+}
