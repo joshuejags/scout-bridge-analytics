@@ -40,7 +40,8 @@ app.get('/api/health', (req, res) => {
 // Import routes
 app.use('/api/videos', require('./routes/videoRoutes'));
 app.use('/api/analysis', require('./routes/analysisRoutes'));
-// app.use('/api/players', require('./routes/playerRoutes'));
+app.use('/api/teams', require('./routes/teamRoutes'));
+app.use('/api/players', require('./routes/playerRoutes'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -1,30 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { poll } from '../utils/polling';
+import Toast from './Toast';
 import './VideoList.css';
 
-const VideoList = () => {
+const VideoList = ({ refreshTrigger = 0 }) => {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [selectedVideoUrl, setSelectedVideoUrl] = useState(null);
   const [selectedVideoName, setSelectedVideoName] = useState('');
+  const [statusMessage, setStatusMessage] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchVideos();
-  }, []);
+  }, [refreshTrigger]);
 
   const fetchVideos = async () => {
     setLoading(true);
+    setStatusMessage(null);
     try {
       const response = await axios.get(`${process.env.REACT_APP_API_URL}/videos`);
       setVideos(response.data);
+      return response.data;
     } catch (error) {
       console.error('Error fetching videos:', error);
       setError('Unable to fetch videos.');
+      return [];
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshVideos = async () => {
+    try {
+      const response = await axios.get(`${process.env.REACT_APP_API_URL}/videos`);
+      setVideos(response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error refreshing videos:', error);
+      return [];
     }
   };
 
@@ -33,6 +50,7 @@ const VideoList = () => {
       try {
         await axios.delete(`${process.env.REACT_APP_API_URL}/videos/${videoId}`);
         setVideos((prevVideos) => prevVideos.filter((v) => v._id !== videoId));
+        setStatusMessage('Video deleted successfully.');
       } catch (error) {
         console.error('Error deleting video:', error);
         setError('Unable to delete video.');
@@ -43,19 +61,63 @@ const VideoList = () => {
   const handleProcess = async (videoId) => {
     setProcessingId(videoId);
     setError(null);
+    setStatusMessage('Processing video...');
+    setVideos((prevVideos) =>
+      prevVideos.map((video) =>
+        video._id === videoId ? { ...video, status: 'processing' } : video
+      )
+    );
 
     try {
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/analysis/${videoId}/process`);
-      setVideos((prevVideos) =>
-        prevVideos.map((video) =>
-          video._id === videoId
-            ? { ...video, status: 'analyzed', analysis: response.data }
-            : video
-        )
-      );
+      if (response.status === 201 || response.status === 200) {
+        setVideos((prevVideos) =>
+          prevVideos.map((video) =>
+            video._id === videoId
+              ? { ...video, status: 'analyzed', analysis: response.data }
+              : video
+          )
+        );
+        setStatusMessage('Video analysis complete. You can view the report.');
+        setError(null);
+        setProcessingId(null);
+        return;
+      }
     } catch (error) {
-      console.error('Error processing video:', error);
-      setError(error.response?.data?.error || 'Video processing failed.');
+      const errorMessage = error.response?.data?.error || 'Video processing failed.';
+      setError(errorMessage);
+      setStatusMessage(null);
+      setProcessingId(null);
+      return;
+    }
+
+    try {
+      const updatedVideo = await poll(async () => {
+        const data = await refreshVideos();
+        const currentVideo = data.find((video) => video._id === videoId);
+        const ready = currentVideo && currentVideo.status !== 'processing';
+        return { ready, data: currentVideo };
+      }, 2000, 10);
+
+      if (updatedVideo) {
+        setVideos((prevVideos) =>
+          prevVideos.map((video) =>
+            video._id === videoId
+              ? { ...video, status: updatedVideo.status, analysis: updatedVideo.analysis }
+              : video
+          )
+        );
+        setStatusMessage(
+          updatedVideo.status === 'analyzed'
+            ? 'Video analysis complete. You can view the report.'
+            : `Video status: ${updatedVideo.status}`
+        );
+        setError(null);
+      }
+    } catch (pollError) {
+      console.error('Polling error:', pollError);
+      setError('Processing timed out. Refresh the page or retry.');
+      setStatusMessage(null);
     } finally {
       setProcessingId(null);
     }
@@ -71,7 +133,8 @@ const VideoList = () => {
   return (
     <div className="video-list">
       <h2>Uploaded Videos</h2>
-      {error && <p className="error">{error}</p>}
+      {statusMessage && <Toast type="info" message={statusMessage} onClose={() => setStatusMessage(null)} />}
+      {error && <Toast type="error" message={error} onClose={() => setError(null)} />}
       {selectedVideoUrl && (
         <div className="video-preview-panel">
           <h3>Preview: {selectedVideoName}</h3>
@@ -121,6 +184,8 @@ const VideoList = () => {
                     >
                       {processingId === video._id || video.status === 'processing'
                         ? 'Processing...'
+                        : video.status === 'failed'
+                        ? 'Retry'
                         : 'Process'}
                     </button>
                   ) : (

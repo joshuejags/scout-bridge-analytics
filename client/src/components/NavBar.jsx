@@ -8,6 +8,8 @@ const NavBar = () => {
       <div className="nav-brand">Scout Bridge Analytics</div>
       <div className="nav-links">
         <Link to="/">Home</Link>
+        <Link to="/teams">Teams</Link>
+        <Link to="/players">Players</Link>
       </div>
     </nav>
   );

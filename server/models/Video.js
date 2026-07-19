@@ -13,6 +13,9 @@ const videoSchema = new mongoose.Schema(
       enum: ['uploaded', 'processing', 'analyzed', 'failed'],
       default: 'uploaded',
     },
+    team: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+    opponentTeam: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+    players: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Player' }],
     progress: { type: Number, default: 0 },
     analysis: { type: mongoose.Schema.Types.ObjectId, ref: 'Analysis' },
     metadata: {

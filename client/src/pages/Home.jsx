@@ -20,7 +20,7 @@ const Home = () => {
       <main>
         <DashboardSummary refreshTrigger={refreshTrigger} />
         <VideoUpload onUploadSuccess={handleUploadSuccess} />
-        <VideoList key={refreshTrigger} />
+        <VideoList refreshTrigger={refreshTrigger} key={refreshTrigger} />
       </main>
     </div>
   );

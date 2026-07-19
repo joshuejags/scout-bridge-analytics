@@ -9,6 +9,12 @@ exports.uploadVideo = async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    const players = Array.isArray(req.body.players)
+      ? req.body.players
+      : req.body.players
+      ? [req.body.players]
+      : [];
+
     const video = new Video({
       filename: req.file.filename,
       originalName: req.file.originalname,
@@ -16,6 +22,9 @@ exports.uploadVideo = async (req, res) => {
       filePath: req.file.path,
       uploadedBy: req.body.uploadedBy || 'anonymous',
       status: 'uploaded',
+      team: req.body.team || null,
+      opponentTeam: req.body.opponentTeam || null,
+      players,
     });
 
     await video.save();
@@ -29,7 +38,11 @@ exports.uploadVideo = async (req, res) => {
 exports.getVideos = async (req, res) => {
   try {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const videos = await Video.find().populate('analysis');
+    const videos = await Video.find()
+      .populate('analysis')
+      .populate('team')
+      .populate('opponentTeam')
+      .populate('players');
     const response = videos.map((video) => ({
       ...video.toObject(),
       url: `${baseUrl}/uploads/${video.filename}`,
@@ -43,7 +56,11 @@ exports.getVideos = async (req, res) => {
 // Get video by ID
 exports.getVideoById = async (req, res) => {
   try {
-    const video = await Video.findById(req.params.id).populate('analysis');
+    const video = await Video.findById(req.params.id)
+      .populate('analysis')
+      .populate('team')
+      .populate('opponentTeam')
+      .populate('players');
     if (!video) {
       return res.status(404).json({ error: 'Video not found' });
     }

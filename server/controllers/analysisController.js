@@ -1,10 +1,13 @@
+const mongoose = require('mongoose');
 const Video = require('../models/Video');
 const Analysis = require('../models/Analysis');
+const Player = require('../models/Player');
 
 exports.processAnalysis = async (req, res) => {
+  let video;
   try {
     const { videoId } = req.params;
-    const video = await Video.findById(videoId);
+    video = await Video.findById(videoId);
 
     if (!video) {
       return res.status(404).json({ error: 'Video not found' });
@@ -14,24 +17,32 @@ exports.processAnalysis = async (req, res) => {
       const existingAnalysis = await Analysis.findOne({ video: video._id });
       if (existingAnalysis) {
         video.status = 'analyzed';
+        video.analysis = existingAnalysis._id;
         await video.save();
-        return res.status(400).json({ error: 'Video has already been analyzed' });
+        return res.status(200).json(existingAnalysis);
       }
       // stale processing state: allow retry
     }
 
     if (video.status === 'analyzed') {
-      return res.status(400).json({ error: 'Video has already been analyzed' });
+      const existingAnalysis = await Analysis.findOne({ video: video._id });
+      if (existingAnalysis) {
+        return res.status(200).json(existingAnalysis);
+      }
+      // If status is analyzed but analysis is missing, fall through and reprocess.
     }
 
     video.status = 'processing';
     await video.save();
 
+    const player = await Player.findOne() || null;
+    const playerRef = player ? player._id : null;
+
     const analysis = new Analysis({
       video: video._id,
       playerData: [
         {
-          playerId: 'player-1',
+          playerId: playerRef,
           trackingData: [
             {
               frameNumber: 1,
@@ -58,7 +69,7 @@ exports.processAnalysis = async (req, res) => {
         ],
         possessionStats: [
           {
-            playerId: 'player-1',
+            playerId: playerRef,
             duration: 38,
             startFrame: 1,
             endFrame: 120,
@@ -68,13 +79,13 @@ exports.processAnalysis = async (req, res) => {
       actions: [
         {
           type: 'pass',
-          playerId: 'player-1',
+          playerId: playerRef,
           frameNumber: 24,
           confidence: 0.85,
         },
         {
           type: 'shot',
-          playerId: 'player-1',
+          playerId: playerRef,
           frameNumber: 120,
           confidence: 0.74,
         },
@@ -112,8 +123,10 @@ exports.processAnalysis = async (req, res) => {
 
     return res.status(201).json(analysis);
   } catch (error) {
-    video.status = 'failed';
-    await video.save();
+    if (video) {
+      video.status = 'failed';
+      await video.save();
+    }
     console.error(error);
     return res.status(500).json({ error: error.message });
   }
@@ -122,7 +135,10 @@ exports.processAnalysis = async (req, res) => {
 exports.getAnalysisByVideo = async (req, res) => {
   try {
     const { videoId } = req.params;
-    const analysis = await Analysis.findOne({ video: videoId }).populate('video');
+    const analysis = await Analysis.findOne({ video: videoId })
+      .populate({ path: 'video', populate: ['team', 'opponentTeam', 'players'] })
+      .populate('playerData.playerId')
+      .populate('actions.playerId');
 
     if (!analysis) {
       return res.status(404).json({ error: 'Analysis not found' });
@@ -130,7 +146,7 @@ exports.getAnalysisByVideo = async (req, res) => {
 
     res.json(analysis);
   } catch (error) {
-    console.error(error);    video.status = 'failed';
-    await video.save();    res.status(500).json({ error: error.message });
+    console.error(error);
+    res.status(500).json({ error: error.message });
   }
 };

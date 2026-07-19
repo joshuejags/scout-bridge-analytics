@@ -16,6 +16,15 @@
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+.status-message {
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background-color: #e7f5ff;
+  color: #0d6efd;
+  font-weight: 600;
+}
+
 .video-list th {
   background-color: #007bff;
   color: white;
