@@ -7,7 +7,8 @@ A comprehensive sports analytics platform built with MERN stack and Computer Vis
 - 📹 **Video Upload**: Upload match highlights in multiple formats (MP4, AVI, MOV, MKV, FLV)
 - 👥 **Player Tracking**: Real-time player detection and tracking using YOLO
 - ⚽ **Ball Detection**: Automatic ball tracking and possession analysis
-- 📊 **Performance Analytics**: Player statistics including distance covered, speed, movements
+- � **Teams & Players**: Manage team rosters, player profiles, positions, and jersey numbers
+- �📊 **Performance Analytics**: Player statistics including distance covered, speed, movements
 - 🔥 **Heatmaps**: Visualize player movement patterns and activity areas
 - 🎯 **Action Detection**: Identify passes, shots, tackles, and other game actions
 - 📈 **Real-time Streaming**: Stream analysis results for live events
@@ -126,6 +127,16 @@ npm run build
 ### Analysis
 - `GET /api/analysis/:videoId` - Get video analysis
 - `POST /api/analysis/:videoId/process` - Start video analysis
+
+### Teams
+- `GET /api/teams` - Get all teams
+- `POST /api/teams` - Create a new team
+- `DELETE /api/teams/:id` - Delete a team
+
+### Players
+- `GET /api/players` - Get all players
+- `POST /api/players` - Create a new player
+- `DELETE /api/players/:id` - Delete a player
 
 ## Environment Variables
 

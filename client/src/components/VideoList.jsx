@@ -3,20 +3,29 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { poll } from '../utils/polling';
 import Toast from './Toast';
+import SearchFilter from './SearchFilter';
+import LoadingSpinner from './LoadingSpinner';
 import './VideoList.css';
 
 const VideoList = ({ refreshTrigger = 0 }) => {
   const [videos, setVideos] = useState([]);
+  const [filteredVideos, setFilteredVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
   const [selectedVideoUrl, setSelectedVideoUrl] = useState(null);
   const [selectedVideoName, setSelectedVideoName] = useState('');
   const [statusMessage, setStatusMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     fetchVideos();
   }, [refreshTrigger]);
+
+  useEffect(() => {
+    filterVideos();
+  }, [videos, searchQuery, statusFilter]);
 
   const fetchVideos = async () => {
     setLoading(true);
@@ -32,6 +41,22 @@ const VideoList = ({ refreshTrigger = 0 }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const filterVideos = () => {
+    let filtered = videos;
+
+    if (searchQuery) {
+      filtered = filtered.filter((v) =>
+        v.originalName.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((v) => v.status === statusFilter);
+    }
+
+    setFilteredVideos(filtered);
   };
 
   const refreshVideos = async () => {
@@ -99,6 +124,7 @@ const VideoList = ({ refreshTrigger = 0 }) => {
         return { ready, data: currentVideo };
       }, 2000, 10);
 
+
       if (updatedVideo) {
         setVideos((prevVideos) =>
           prevVideos.map((video) =>
@@ -128,21 +154,41 @@ const VideoList = ({ refreshTrigger = 0 }) => {
     setSelectedVideoName(video.originalName);
   };
 
-  if (loading) return <p>Loading videos...</p>;
+  const statusFilters = [
+    { id: 'all', label: 'All', active: statusFilter === 'all' },
+    { id: 'pending', label: 'Pending', active: statusFilter === 'pending' },
+    { id: 'processing', label: 'Processing', active: statusFilter === 'processing' },
+    { id: 'analyzed', label: 'Analyzed', active: statusFilter === 'analyzed' },
+    { id: 'failed', label: 'Failed', active: statusFilter === 'failed' },
+  ];
+
+  if (loading) return <LoadingSpinner message="Loading videos..." />;
 
   return (
     <div className="video-list">
       <h2>Uploaded Videos</h2>
       {statusMessage && <Toast type="info" message={statusMessage} onClose={() => setStatusMessage(null)} />}
       {error && <Toast type="error" message={error} onClose={() => setError(null)} />}
+      
+      <SearchFilter
+        placeholder="Search videos by name..."
+        value={searchQuery}
+        onChange={setSearchQuery}
+        filters={statusFilters}
+        onFilterChange={(filterId) => setStatusFilter(filterId)}
+      />
+
       {selectedVideoUrl && (
         <div className="video-preview-panel">
           <h3>Preview: {selectedVideoName}</h3>
           <video controls width="100%" src={selectedVideoUrl} />
         </div>
       )}
-      {videos.length === 0 ? (
-        <p>No videos uploaded yet</p>
+      
+      {filteredVideos.length === 0 ? (
+        <p className="no-videos">
+          {videos.length === 0 ? 'No videos uploaded yet' : 'No videos match your search'}
+        </p>
       ) : (
         <table>
           <thead>
@@ -155,11 +201,11 @@ const VideoList = ({ refreshTrigger = 0 }) => {
             </tr>
           </thead>
           <tbody>
-            {videos.map((video) => (
+            {filteredVideos.map((video) => (
               <tr key={video._id}>
                 <td>{video.originalName}</td>
                 <td>{(video.fileSize / 1024 / 1024).toFixed(2)} MB</td>
-                <td>{video.status}</td>
+                <td><span className={`status-badge status-${video.status}`}>{video.status}</span></td>
                 <td>{new Date(video.createdAt).toLocaleDateString()}</td>
                 <td>
                   <button
