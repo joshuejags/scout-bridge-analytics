@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const Video = require('../models/Video');
 const Analysis = require('../models/Analysis');
 const Player = require('../models/Player');
+const { emitEvent } = require('../utils/socket');
 
 // Project root is one level up from server/ (this file lives in
 // server/controllers/) when running from a full repo checkout — true for
@@ -40,7 +41,7 @@ if (!fs.existsSync(TMP_DIR)) {
  * representative crop per player track, for the manual review UI) are
  * written directly to thumbnailDir by the analyzer.
  */
-function runAnalyzer(videoPath, maxFrames = null, thumbnailDir = null) {
+function runAnalyzer(videoPath, maxFrames = null, thumbnailDir = null, onProgress = null, sport = null) {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(ANALYZER_SCRIPT)) {
       return reject(new Error(`Analyzer script not found at ${ANALYZER_SCRIPT}`));
@@ -50,6 +51,7 @@ function runAnalyzer(videoPath, maxFrames = null, thumbnailDir = null) {
     const args = [ANALYZER_SCRIPT, videoPath, '--output', outFile];
     if (maxFrames) args.push('--max-frames', String(maxFrames));
     if (thumbnailDir) args.push('--thumbnail-dir', thumbnailDir);
+    if (sport) args.push('--sport', sport);
 
     const child = spawn(PYTHON_BIN, args, {
       cwd: CV_DIR,
@@ -59,11 +61,32 @@ function runAnalyzer(videoPath, maxFrames = null, thumbnailDir = null) {
 
     let stderr = '';
     let stdout = '';
+    // video_analyzer.py logs "Processed frame X/Y" to stderr (Python's
+    // default logging stream) every 30 frames. Scraping that instead of
+    // adding a second output channel keeps the analyzer's CLI contract
+    // (stdout/--output = final JSON only) unchanged.
+    const PROGRESS_RE = /Processed frame (\d+)\/(\d+)/;
+    let stderrTail = '';
     child.stdout.on('data', (b) => {
       stdout += b.toString();
     });
     child.stderr.on('data', (b) => {
-      stderr += b.toString();
+      const str = b.toString();
+      stderr += str;
+      if (!onProgress) return;
+      // A log line can be split across chunk boundaries; buffer the tail
+      // of the previous chunk and only parse complete lines.
+      stderrTail += str;
+      const lines = stderrTail.split('\n');
+      stderrTail = lines.pop();
+      for (const line of lines) {
+        const m = line.match(PROGRESS_RE);
+        if (m) {
+          const frame = Number(m[1]);
+          const total = Number(m[2]);
+          onProgress({ frame, total, progress: total > 0 ? Math.min(99, Math.round((frame / total) * 100)) : null });
+        }
+      }
     });
 
     child.on('error', (err) => {
@@ -213,13 +236,31 @@ exports.processAnalysis = async (req, res) => {
     status: 'processing',
   });
 
+  const videoIdStr = String(video._id);
+  emitEvent('analysis:started', { videoId: videoIdStr });
+
+  // Progress updates are pushed live via socket on every throttled log line,
+  // but only persisted to Mongo every 10% — full per-frame DB writes would
+  // add write load with no real benefit, since the socket push is what
+  // drives the live UI and the DB copy only needs to be fresh enough to
+  // survive a page reload mid-analysis.
+  let lastPersistedProgress = 0;
+  const onProgress = ({ frame, total, progress }) => {
+    emitEvent('analysis:progress', { videoId: videoIdStr, frame, total, progress });
+    if (progress != null && progress - lastPersistedProgress >= 10) {
+      lastPersistedProgress = progress;
+      Video.updateOne({ _id: video._id }, { progress }).catch(() => {});
+    }
+  };
+
   // Run analyzer in the background.
-  runAnalyzer(videoPath, maxFrames, thumbnailDir)
+  runAnalyzer(videoPath, maxFrames, thumbnailDir, onProgress, video.sport)
     .then(async (result) => {
-      await persistAnalysis(video, result);
+      const analysis = await persistAnalysis(video, result);
       console.log(
         `Analysis complete for video ${video._id} (${result._runtimeSeconds ?? '?'}s)`
       );
+      emitEvent('analysis:complete', { videoId: videoIdStr, analysisId: String(analysis._id) });
     })
     .catch(async (err) => {
       console.error(`Analysis failed for video ${video._id}: ${err.message}`);
@@ -232,6 +273,7 @@ exports.processAnalysis = async (req, res) => {
       } catch (saveErr) {
         console.error(`Failed to mark video ${video._id} as failed: ${saveErr.message}`);
       }
+      emitEvent('analysis:failed', { videoId: videoIdStr, error: err.message });
     });
 };
 

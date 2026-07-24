@@ -1,0 +1,3 @@
+{
+  "ignore": ["tmp_analysis/*", "uploads/*"]
+}

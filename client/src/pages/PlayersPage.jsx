@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import Toast from '../components/Toast';
+import PlayerComparison from '../components/PlayerComparison';
 import './PlayersPage.css';
 
 const PlayersPage = () => {
@@ -13,6 +14,8 @@ const PlayersPage = () => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [selectedForCompare, setSelectedForCompare] = useState([]);
+  const [comparing, setComparing] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,10 +64,17 @@ const PlayersPage = () => {
     try {
       await axios.delete(`${process.env.REACT_APP_API_URL}/players/${playerId}`);
       setPlayers((prev) => prev.filter((player) => player._id !== playerId));
+      setSelectedForCompare((prev) => prev.filter((id) => id !== playerId));
       setMessage('Player deleted successfully.');
     } catch (err) {
       setError(err.response?.data?.error || 'Unable to delete player.');
     }
+  };
+
+  const toggleCompareSelection = (playerId) => {
+    setSelectedForCompare((prev) =>
+      prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId]
+    );
   };
 
   if (loading) {
@@ -122,6 +132,24 @@ const PlayersPage = () => {
         <button type="submit">Create Player</button>
       </form>
 
+      {selectedForCompare.length > 0 && (
+        <div className="compare-bar">
+          <span>{selectedForCompare.length} player{selectedForCompare.length === 1 ? '' : 's'} selected</span>
+          <div className="compare-bar-actions">
+            <button
+              className="compare-btn"
+              disabled={selectedForCompare.length < 2}
+              onClick={() => setComparing(true)}
+            >
+              Compare
+            </button>
+            <button className="compare-clear-btn" onClick={() => setSelectedForCompare([])}>
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="player-list">
         {players.length === 0 ? (
           <p>No players yet.</p>
@@ -129,6 +157,14 @@ const PlayersPage = () => {
           <ul>
             {players.map((player) => (
               <li key={player._id} className="player-card">
+                <label className="player-compare-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={selectedForCompare.includes(player._id)}
+                    onChange={() => toggleCompareSelection(player._id)}
+                    aria-label={`Select ${player.name} for comparison`}
+                  />
+                </label>
                 <div>
                   <strong>{player.name}</strong>
                   <p>{player.team?.name || 'No team assigned'}</p>
@@ -140,6 +176,10 @@ const PlayersPage = () => {
           </ul>
         )}
       </div>
+
+      {comparing && (
+        <PlayerComparison playerIds={selectedForCompare} onClose={() => setComparing(false)} />
+      )}
     </div>
   );
 };

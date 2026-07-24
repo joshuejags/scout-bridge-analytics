@@ -19,9 +19,12 @@ before statistics are computed. Tracks with no legible number remain
 distinct "unidentified" entities rather than being merged speculatively.
 
 Ball tracking produces a per-frame position series. Possession is
-approximated by nearest-player within a radius. Actions are inferred from
-velocity spikes near the ball. A grid heatmap aggregates all player
-positions.
+approximated by nearest-player within a radius. "Shot" actions are inferred
+from velocity spikes near the ball; "pass"/"tackle"/"interception" are
+inferred from possession transferring between players, classified by
+whether the two players share a shirt color (pass) and, if not, whether
+they were physically close together at the moment of transfer (tackle) or
+not (interception). A grid heatmap aggregates all player positions.
 """
 
 import argparse
@@ -45,9 +48,44 @@ logging.basicConfig(
 )
 logger = logging.getLogger("video_analyzer")
 
-# Pixels-per-meter assumption (a sports pitch is ~105m x 68m; for a 1280-wide
-# frame that is ~12 px/m). Used to convert pixel deltas into physical units.
-PX_PER_METER = 12.0
+# Per-sport calibration: real-world playing-surface length (the dimension a
+# broadcast-style side-on camera typically shows across the frame's full
+# width) and the ball's HSV color range for ball_tracker's color-based
+# detection. Pixels-per-meter is derived at runtime as
+# frame_width_px / field_length_m rather than a flat constant, so it's
+# correct for whatever the actual video's resolution is, not just a
+# 1280-wide assumption.
+#
+# "soccer" is the original, tested default (105m pitch length; the ball
+# color range is whatever this project's own broadcast-footage tuning
+# arrived at — it is deliberately left unchanged from before per-sport
+# support existed). The other presets are reasonable starting points, not
+# footage-verified the way soccer's is: a real deployment for a new sport
+# should confirm the ball color range against its own footage.
+SPORT_PRESETS = {
+    "soccer": {
+        "field_length_m": 105.0,
+        "ball_color_lower": (35, 100, 100),
+        "ball_color_upper": (85, 255, 255),
+    },
+    "basketball": {
+        "field_length_m": 28.0,
+        "ball_color_lower": (5, 150, 100),
+        "ball_color_upper": (20, 255, 255),
+    },
+    "hockey": {
+        "field_length_m": 91.4,
+        "ball_color_lower": (0, 0, 180),
+        "ball_color_upper": (179, 60, 255),
+    },
+    "rugby": {
+        "field_length_m": 100.0,
+        "ball_color_lower": (0, 0, 180),
+        "ball_color_upper": (179, 60, 255),
+    },
+}
+DEFAULT_SPORT = "soccer"
+
 # Player speed above this many m/s is counted as a sprint.
 SPRINT_SPEED_MS = 7.0
 # Minimum speed (m/s) for a player to be considered to "have" the ball.
@@ -61,6 +99,11 @@ SPEED_WINDOW = 5
 MIN_SPRINT_RUN = 5
 # Minimum frame gap between two "shot" events for the same track.
 SHOT_COOLDOWN_FRAMES = 30
+# When ball possession transfers between two players on different teams
+# (by shirt color), the transfer is a "tackle" if the two were within this
+# many pixels of each other (a physical challenge) or an "interception"
+# otherwise (the new owner read and cut out a pass from a distance).
+TACKLE_PROXIMITY_PX = 50
 
 # --- Jersey OCR / track-merging tuning ---
 # Only attempt OCR when the detected person is at least this tall in pixels;
@@ -153,7 +196,7 @@ def _dominant_shirt_color(crop):
     return "unknown"
 
 
-def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=None):
+def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=None, sport=DEFAULT_SPORT):
     """Run full analysis and return a dict matching the Analysis schema.
 
     Args:
@@ -162,6 +205,8 @@ def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=N
             human-review UI (jersey OCR only identifies a small fraction of
             tracks on typical broadcast-angle footage, so a person needs to
             be able to look at each track and label/merge it manually).
+        sport: key into SPORT_PRESETS, controlling real-world field-size
+            calibration (distance/speed accuracy) and ball color detection.
     """
     if not os.path.isfile(video_path):
         raise FileNotFoundError(f"Video not found: {video_path}")
@@ -169,8 +214,10 @@ def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=N
     if thumbnail_dir:
         os.makedirs(thumbnail_dir, exist_ok=True)
 
+    preset = SPORT_PRESETS.get(sport, SPORT_PRESETS[DEFAULT_SPORT])
+
     detector = PlayerDetector()
-    tracker = BallTracker()
+    tracker = BallTracker(preset["ball_color_lower"], preset["ball_color_upper"])
 
     jersey_reader = None
     if enable_jersey_ocr:
@@ -191,6 +238,10 @@ def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=N
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    # Derived from the actual frame width rather than a flat constant, so
+    # it's correct for whatever resolution this particular video is, not
+    # just whatever resolution the original flat constant assumed.
+    px_per_meter = width / preset["field_length_m"] if width > 0 else 12.0
 
     # Tracks: track_id -> {positions: [...], frames: [...], speeds: [...]}
     tracks = {}
@@ -304,8 +355,8 @@ def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=N
                 p_curr = positions[n - 1]
                 frame_gap = frames[n - 1] - frames[n - 1 - lookback]
                 dt = frame_gap / fps if frame_gap > 0 else 1.0 / fps
-                dx = (p_curr["x"] - p_prev["x"]) / PX_PER_METER
-                dy = (p_curr["y"] - p_prev["y"]) / PX_PER_METER
+                dx = (p_curr["x"] - p_prev["x"]) / px_per_meter
+                dy = (p_curr["y"] - p_prev["y"]) / px_per_meter
                 speed = math.hypot(dx, dy) / dt if dt > 0 else 0.0
             else:
                 speed = 0.0
@@ -356,6 +407,42 @@ def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=N
                                     "endFrame": frame_idx,
                                 }
                             )
+                        # 5b. Classify the transfer itself as a pass (same
+                        # team), tackle (opposing team, players close
+                        # together — a physical challenge), or interception
+                        # (opposing team, at a distance — a misplaced pass
+                        # read and cut out). Shirt color, voted every
+                        # matched frame for the track-merge step above, is
+                        # the only team signal available without a jersey
+                        # number on both sides, so this only classifies
+                        # transfers where both tracks have a color already.
+                        prev_color = tracks[last_ball_owner].get("shirt_color")
+                        new_color = tracks[nearest_tid].get("shirt_color")
+                        if prev_color and new_color:
+                            if prev_color == new_color:
+                                actions.append(
+                                    {
+                                        "type": "pass",
+                                        "playerId": str(last_ball_owner),
+                                        "frameNumber": frame_idx,
+                                        "confidence": 0.5,
+                                    }
+                                )
+                            else:
+                                ptx, pty = tracks[last_ball_owner]["_last_xy"]
+                                ntx, nty = tracks[nearest_tid]["_last_xy"]
+                                proximity = math.hypot(ntx - ptx, nty - pty)
+                                action_type = (
+                                    "tackle" if proximity < TACKLE_PROXIMITY_PX else "interception"
+                                )
+                                actions.append(
+                                    {
+                                        "type": action_type,
+                                        "playerId": str(nearest_tid),
+                                        "frameNumber": frame_idx,
+                                        "confidence": 0.5,
+                                    }
+                                )
                     last_ball_owner = nearest_tid
                     last_owner_since = frame_idx
         # else: ball not detected this frame; ownership unchanged
@@ -493,8 +580,8 @@ def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=N
                     p_curr = positions[n]
                     frame_gap = frames[n] - frames[n - lookback]
                     dt = frame_gap / fps if frame_gap > 0 else 1.0 / fps
-                    dx = (p_curr["x"] - p_prev["x"]) / PX_PER_METER
-                    dy = (p_curr["y"] - p_prev["y"]) / PX_PER_METER
+                    dx = (p_curr["x"] - p_prev["x"]) / px_per_meter
+                    dy = (p_curr["y"] - p_prev["y"]) / px_per_meter
                     speed = math.hypot(dx, dy) / dt if dt > 0 else 0.0
                 else:
                     speed = 0.0
@@ -523,13 +610,13 @@ def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=N
         positions = track["positions"]
         if len(positions) < MIN_TRACK_FRAMES:
             continue
-        # Distance: sum of pixel deltas / PX_PER_METER
+        # Distance: sum of pixel deltas / px_per_meter
         dist_px = 0.0
         for i in range(1, len(positions)):
             dx = positions[i]["x"] - positions[i - 1]["x"]
             dy = positions[i]["y"] - positions[i - 1]["y"]
             dist_px += math.hypot(dx, dy)
-        distance_covered = dist_px / PX_PER_METER
+        distance_covered = dist_px / px_per_meter
         avg_speed = float(np.mean(speeds)) if speeds else 0.0
         sprint_count = int(track.get("sprint_count", 0))
 
@@ -673,6 +760,12 @@ def main():
         "--thumbnail-dir",
         help="Directory to write one representative crop per player track (for manual review UI)",
     )
+    parser.add_argument(
+        "--sport",
+        choices=list(SPORT_PRESETS.keys()),
+        default=DEFAULT_SPORT,
+        help="Sport preset controlling field-size calibration and ball color detection (default: soccer)",
+    )
     args = parser.parse_args()
 
     started = time.time()
@@ -682,6 +775,7 @@ def main():
             max_frames=args.max_frames,
             enable_jersey_ocr=not args.no_jersey_ocr,
             thumbnail_dir=args.thumbnail_dir,
+            sport=args.sport,
         )
     except Exception as e:
         logger.exception("Analysis failed")

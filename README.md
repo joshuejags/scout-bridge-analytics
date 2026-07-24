@@ -5,14 +5,17 @@ A comprehensive sports analytics platform built with MERN stack and Computer Vis
 ## Features
 
 - 📹 **Video Upload**: Upload match highlights in multiple formats (MP4, AVI, MOV, MKV, FLV)
+- 🏅 **Multi-Sport**: Soccer, basketball, hockey, and rugby presets calibrate distance/speed accuracy and ball detection to each sport's real-world field size and ball color
 - 👥 **Player Tracking**: Player detection and multi-object tracking using YOLOv8 + TrackTrack
 - ⚽ **Ball Detection**: Color-based ball tracking and possession analysis
 - 🔢 **Jersey OCR**: Automatic jersey-number reading and shirt-color classification, with a manual verification UI to fill the gaps OCR can't reach
 - 🏷️ **Teams & Players**: Manage team rosters, player profiles, positions, and jersey numbers
 - 🔐 **Accounts**: JWT auth with role-based access (admin/scout), email verification, and password reset
 - 📊 **Performance Analytics**: Player statistics including distance covered, speed, sprint counts
+- ⚖️ **Player Comparison**: Side-by-side cross-match stat comparison for two or more players
 - 🔥 **Heatmaps**: Visualize player movement patterns and activity areas
-- 🎯 **Action Detection**: Currently detects "shot" events from sprint-near-ball heuristics; passes/tackles/interceptions are defined but not yet populated
+- 🎯 **Action Detection**: Shots, passes, tackles, and interceptions, inferred from ball-possession transfers and sprint-near-ball heuristics
+- ⚡ **Live Progress**: Analysis progress streams over WebSocket instead of waiting on polling
 
 ## Tech Stack
 
@@ -20,6 +23,7 @@ A comprehensive sports analytics platform built with MERN stack and Computer Vis
 - **Framework**: Express.js (Node.js)
 - **Database**: MongoDB
 - **File Upload**: Multer
+- **Real-time**: Socket.IO (JWT-authenticated, broadcasts analysis progress/completion)
 - **Computer Vision bridge**: Node spawns the Python CV pipeline as a background child process per analysis request
 
 ### Frontend
@@ -134,12 +138,12 @@ All routes below except `/api/auth/register`, `/api/auth/login`, `/api/auth/forg
 ### Videos
 - `GET /api/videos` - Get all videos
 - `GET /api/videos/:id` - Get specific video
-- `POST /api/videos/upload` - Upload video file
+- `POST /api/videos/upload` - Upload video file. Accepts `sport` (`soccer` | `basketball` | `hockey` | `rugby`, default `soccer`), which calibrates the analyzer's distance/speed accuracy and ball detection (see Computer Vision Components below)
 - `DELETE /api/videos/:id` **(admin)** - Delete video
 
 ### Analysis
 - `GET /api/analysis/:videoId` - Get video analysis
-- `POST /api/analysis/:videoId/process` - Start video analysis (returns `202` immediately; runs YOLO/tracking in the background, poll `GET /api/videos/:id` for `status`)
+- `POST /api/analysis/:videoId/process` - Start video analysis (returns `202` immediately; runs YOLO/tracking in the background). Progress streams over Socket.IO (`analysis:started`/`analysis:progress`/`analysis:complete`/`analysis:failed`, broadcast to all authenticated sockets); polling `GET /api/videos/:id` for `status` still works as a fallback.
 - `PATCH /api/analysis/:analysisId/tracks/:trackId` - Manually set a track's jersey number / linked roster player / team color (marks it `verified: true`)
 - `POST /api/analysis/:analysisId/tracks/merge` - Merge two player tracks that are the same real person into one
 
@@ -152,6 +156,7 @@ All routes below except `/api/auth/register`, `/api/auth/login`, `/api/auth/forg
 
 ### Players
 - `GET /api/players` - Get all players
+- `GET /api/players/compare?ids=id1,id2,...` - Cross-match stat comparison for 2+ players (distance, speed, sprints, action counts by type)
 - `POST /api/players` - Create a new player
 - `GET /api/players/:id` - Get a player
 - `PUT /api/players/:id` - Update a player
@@ -216,15 +221,20 @@ Analysis is triggered by `POST /api/analysis/:videoId/process`, which spawns `se
 - The Analysis report page has a "Verify Players" panel: a thumbnail grid where a human can set a track's jersey number, link it to a roster `Player`, or merge two tracks that are the same real person — closing the gap OCR and tracking alone can't close on real-world footage
 
 ### Ball Tracking
-- Color-based (HSV) ball detection
+- Color-based (HSV) ball detection; the color range is chosen per sport (see Multi-Sport below)
 - Possession approximated by nearest tracked player within a pixel radius
 - Per-frame trajectory recorded
 
 ### Performance Metrics
-- Distance covered (converted from pixel movement via an assumed pixels-per-meter constant — not camera-calibrated, so treat as directionally correct rather than precise)
+- Distance covered (converted from pixel movement via a per-sport pixels-per-meter figure — derived from the video's actual frame width and the sport's real-world field length, not camera-calibrated, so treat as directionally correct rather than precise)
 - Average speed and sprint-event counts (smoothed over a multi-frame window to filter detection jitter)
 - Heatmap grid of player positions
-- Action detection (currently: "shot" events, heuristically inferred from a sprint near the ball with a cooldown to avoid duplicate-frame spam)
+- Action detection: "shot" (sprint near the ball, with a cooldown to avoid duplicate-frame spam), plus "pass"/"tackle"/"interception" inferred from ball-possession transferring between players — same shirt color is a pass, different shirt color close together is a tackle, different shirt color at a distance is an interception
+
+### Multi-Sport
+- `SPORT_PRESETS` in `video_analyzer.py` covers `soccer` (default), `basketball`, `hockey`, and `rugby`, each with a real-world field length (drives distance/speed accuracy) and a ball HSV color range
+- Soccer's values are the original, footage-tuned defaults; the other presets are reasonable starting points that haven't been verified against real footage for that sport — confirm the ball color range against your own footage before relying on it
+- Set via `sport` on `POST /api/videos/upload` (or the Sport dropdown in the upload form); passed to the analyzer as `--sport`
 
 ## Development Guidelines
 
@@ -249,10 +259,12 @@ Analysis is triggered by `POST /api/analysis/:videoId/process`, which spawns `se
 ## Testing
 
 ```bash
-# Backend tests (Jest + Supertest, 31 tests: auth, teams, players, rate limiting)
+# Backend tests (Jest + Supertest, 52 tests: auth, password reset, teams, players + comparison,
+# videos/sport, rate limiting)
 npm test --prefix server
 
-# Frontend tests (React Testing Library, 15 tests: AuthContext, Login/Register pages, ProtectedRoute)
+# Frontend tests (React Testing Library, 52 tests: AuthContext, Login/Register/reset pages,
+# ProtectedRoute, LandingPage, VideoList/Upload, PlayerComparison, AnalysisPage)
 npm test --prefix client -- --watchAll=false
 ```
 
@@ -351,15 +363,15 @@ For issues and questions:
 - [x] Password reset / email verification — `POST /api/auth/forgot-password` (always 200, no account-existence leak, rate-limited to 5/15min per IP+email), `POST /api/auth/reset-password`, `POST /api/auth/verify-email`, `POST /api/auth/resend-verification`. Tokens are single-use, expire (1h reset / 24h verify), and only their SHA-256 hash is ever persisted — the raw token exists only in the URL sent to the user, mirroring how the password itself is never stored in plaintext. `server/utils/email.js` sends via any SMTP provider if `SMTP_HOST`/`SMTP_USER`/`SMTP_PASS` are set; with no SMTP configured (the state of this environment — no provider credentials exist here), it logs the email to the server console instead of pretending to send it, so the whole flow is still testable end-to-end locally. Frontend: `ForgotPasswordPage`, `ResetPasswordPage`, `VerifyEmailPage`, and an `EmailVerificationBanner` shown app-wide for unverified accounts. 12 backend tests + 4 new frontend test files, all verified against the live server with real tokens end-to-end (not just the test suite).
 - [x] `multer` upgraded 1.4.5→2.2.0 — 1.x has four real DoS/crash CVEs (unhandled stream errors, malformed multipart requests, empty field names, unhandled busboy errors) all fixed by 2.x; verified via the public API diff between the two versions that no application code needed to change, then confirmed with a real multipart upload against the live server (201, correct file size) plus the `fileFilter` rejection path.
 - [x] Public landing page + redesigned authenticated home — `/` used to be behind the login wall entirely (`ProtectedRoute` around `Home`). It's now a `RootRoute` that renders `LandingPage` (hero, clickable feature tabs, an expandable "how it works" accordion, and a sample report table explicitly labeled "sample data") for signed-out visitors, or the redesigned `Home` (time-of-day greeting, live stat cards linking to Dashboard/Teams/Players, collapsible upload panel, recent-activity feed) for signed-in users — so a visitor can explore what the product does before creating an account. 5 new tests exercise the actual tab-switching and accordion interactions, not just that the page renders.
+- [x] Real-time WebSocket streaming — analysis progress is now pushed via Socket.IO (`server/utils/socket.js`) instead of purely polled. The socket handshake requires the same JWT as the REST API (mirrors `requireAuth`); since every video is already visible to every authenticated user via `GET /api/videos`, events broadcast to all connected sockets rather than per-video rooms, matching that existing visibility model instead of inventing a stricter one. `analysisController.js` scrapes the analyzer's existing `"Processed frame X/Y"` stderr log lines to emit `analysis:started`/`analysis:progress`/`analysis:complete`/`analysis:failed`, and throttle-persists progress to `Video.progress` every 10% so it survives a page reload mid-analysis. `VideoList` shows a live `processing (NN%)` badge and only falls back to the old poll loop if the socket is disconnected (the poll interval was also bumped from a 20s timeout — far too short for a real analysis run — to 5 minutes, now that it's a true fallback rather than the primary mechanism). Verified against the live server: unauthenticated sockets are rejected, a real upload→process→complete round trip streamed real progress ticks, and 4 new frontend tests drive the socket events directly. Along the way, found and fixed a real bug: nodemon's default `.json` watch picked up the analyzer's own temp output files in `server/tmp_analysis/`, restarting the server mid-analysis and losing the result — fixed via `server/nodemon.json` ignoring `tmp_analysis/` and `uploads/`.
+- [x] Player comparison tools — `GET /api/players/compare?ids=id1,id2,...` aggregates cross-match stats per player (matches played, total/average distance, average speed, sprints, action counts by type, verified-track count) by walking every `Analysis` document that references each player and mapping each track's `trackId` to that analysis's `actions` (actions are keyed by trackId, not the real Player id, so this can't be a single cross-collection query). `PlayersPage` gets a checkbox-based selection UI and a `PlayerComparison` modal with a side-by-side stats table that highlights the best value per row. 5 backend tests (including a real multi-analysis aggregation case) + 7 frontend tests.
+- [x] Advanced action recognition — `video_analyzer.py` now populates `pass`/`tackle`/`interception`, not just `shot`. When ball possession transfers between two tracked players, it's classified as a **pass** if both share a shirt color (same team), otherwise a **tackle** if the two were within a close pixel radius at the moment of transfer (a physical challenge) or an **interception** if not (a misplaced pass read from a distance) — reusing the shirt-color voting already computed for track merging rather than adding a separate classifier. `AnalysisPage` shows a per-type count breakdown. Verified with two real end-to-end analysis runs against live footage (not just code review): one produced 11 shots/2 passes/3 interceptions, another 17 shots/3 passes/5 interceptions.
+- [x] Multi-sport support — `SPORT_PRESETS` in `video_analyzer.py` defines a real-world field length and ball HSV color range per sport (soccer/basketball/hockey/rugby); soccer's values are the original, footage-tuned defaults, left unchanged. Pixels-per-meter is now derived at runtime as `frame_width / field_length_m` instead of a flat constant that assumed a 1280px-wide frame, so distance/speed accuracy no longer silently degrades on other resolutions either. `Video.sport` (enum, default `soccer`) is set at upload time via a new selector in `VideoUpload`, validated on the upload route, and threaded through to the analyzer via a new `--sport` CLI flag. Verified two ways: running the same footage through both `soccer` and `basketball` presets produced distance values in an exact 3.75x ratio, matching the two presets' field-length ratio (105m/28m) precisely; and a real upload→process run through the live API with `sport: basketball` produced correctly-scaled distances end-to-end. 4 new backend tests cover the validation/default behavior.
 
 **Known gaps (no work started):**
 - [ ] Nothing security-related from the original gap list remains untouched — see Larger feature gaps below for what's left, which is product functionality rather than hardening.
 
 **Larger feature gaps:**
-- [ ] Real-time WebSocket streaming (analysis is currently poll-based, not pushed)
-- [ ] Advanced action recognition beyond the current sprint-near-ball "shot" heuristic (passes, tackles, interceptions are defined in the schema but never populated)
-- [ ] Multi-sport support (pitch/heatmap assumptions are football-specific)
-- [ ] Player comparison tools (cross-match stats aggregation)
 - [ ] Cloud storage integration (uploads are local-disk only via Multer)
 - [ ] Mobile app
 - [ ] Advanced ML models (pose estimation, tactical/formation analysis) — `OPENPOSE_MODEL_PATH` is in `.env` but OpenPose was never integrated

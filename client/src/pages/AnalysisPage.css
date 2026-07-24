@@ -12,6 +12,11 @@
   margin-bottom: 8px;
 }
 
+.analysis-sport-tag {
+  text-transform: capitalize;
+  color: #555;
+}
+
 .pv-toggle-btn {
   margin-top: 8px;
   padding: 8px 16px;
@@ -77,4 +82,41 @@
 .error {
   color: #dc3545;
   font-size: 16px;
+}
+
+.action-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.action-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+  background: #e9ecef;
+  color: #333;
+}
+
+.action-badge-shot {
+  background: #ffe3e3;
+  color: #c0392b;
+}
+
+.action-badge-pass {
+  background: #e3f2ff;
+  color: #1565c0;
+}
+
+.action-badge-tackle {
+  background: #fff3cd;
+  color: #8a6500;
+}
+
+.action-badge-interception {
+  background: #e6f7ec;
+  color: #1a7f37;
 }

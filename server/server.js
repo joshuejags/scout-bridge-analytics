@@ -1,6 +1,7 @@
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const path = require('path');
+const http = require('http');
 
 // The server process always runs with cwd=server/, but the documented
 // .env lives at the project root (see README setup steps), so it was
@@ -8,6 +9,7 @@ const path = require('path');
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 const app = require('./app');
+const { initSocket } = require('./utils/socket');
 
 const connectDB = async () => {
   try {
@@ -24,7 +26,12 @@ const connectDB = async () => {
 
 connectDB();
 
+// socket.io needs the raw HTTP server (not just the Express app) so it can
+// upgrade connections to WebSocket alongside the existing HTTP routes.
+const server = http.createServer(app);
+initSocket(server);
+
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

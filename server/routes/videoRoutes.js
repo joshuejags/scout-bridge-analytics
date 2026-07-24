@@ -52,6 +52,10 @@ router.post(
       .optional({ values: 'falsy' })
       .isMongoId()
       .withMessage('Invalid opponent team id'),
+    body('sport')
+      .optional({ values: 'falsy' })
+      .isIn(['soccer', 'basketball', 'hockey', 'rugby'])
+      .withMessage('Invalid sport'),
   ],
   validate,
   videoController.uploadVideo

@@ -25,6 +25,7 @@ exports.uploadVideo = async (req, res) => {
       team: req.body.team || null,
       opponentTeam: req.body.opponentTeam || null,
       players,
+      sport: req.body.sport || 'soccer',
     });
 
     await video.save();

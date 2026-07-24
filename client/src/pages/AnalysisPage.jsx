@@ -39,6 +39,7 @@ const AnalysisPage = () => {
       <div className="analysis-header">
         <h2>Analysis Report</h2>
         <p>Video: {analysis.video?.originalName || 'Unknown video'}</p>
+        <p className="analysis-sport-tag">Sport: {analysis.video?.sport || 'soccer'}</p>
         <button
           className="pv-toggle-btn"
           onClick={() => setShowVerification((prev) => !prev)}
@@ -60,6 +61,21 @@ const AnalysisPage = () => {
         <p>Total Players: {analysis.summary.totalPlayers}</p>
         <p>Match Duration: {analysis.summary.matchDuration} seconds</p>
         <p>Actions detected: {analysis.actions.length}</p>
+        {analysis.actions.length > 0 && (
+          <div className="action-breakdown">
+            {Object.entries(
+              analysis.actions.reduce((counts, action) => {
+                counts[action.type] = (counts[action.type] || 0) + 1;
+                return counts;
+              }, {})
+            ).map(([type, count]) => (
+              <span key={type} className={`action-badge action-badge-${type}`}>
+                {count} {type}
+                {count === 1 ? '' : 's'}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="analysis-grid">

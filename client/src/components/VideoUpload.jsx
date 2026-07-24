@@ -3,6 +3,13 @@ import axios from 'axios';
 import Toast from './Toast';
 import './VideoUpload.css';
 
+const SPORTS = [
+  { value: 'soccer', label: 'Soccer' },
+  { value: 'basketball', label: 'Basketball' },
+  { value: 'hockey', label: 'Hockey' },
+  { value: 'rugby', label: 'Rugby' },
+];
+
 const VideoUpload = ({ onUploadSuccess }) => {
   const [file, setFile] = useState(null);
   const [teams, setTeams] = useState([]);
@@ -10,6 +17,7 @@ const VideoUpload = ({ onUploadSuccess }) => {
   const [selectedTeam, setSelectedTeam] = useState('');
   const [selectedOpponent, setSelectedOpponent] = useState('');
   const [selectedPlayers, setSelectedPlayers] = useState([]);
+  const [sport, setSport] = useState('soccer');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState(null);
@@ -53,6 +61,7 @@ const VideoUpload = ({ onUploadSuccess }) => {
     const formData = new FormData();
     formData.append('video', file);
     formData.append('uploadedBy', 'user@example.com');
+    formData.append('sport', sport);
     if (selectedTeam) formData.append('team', selectedTeam);
     if (selectedOpponent) formData.append('opponentTeam', selectedOpponent);
     selectedPlayers.forEach((playerId) => formData.append('players', playerId));
@@ -72,6 +81,7 @@ const VideoUpload = ({ onUploadSuccess }) => {
       setSelectedTeam('');
       setSelectedOpponent('');
       setSelectedPlayers([]);
+      setSport('soccer');
       setProgress(0);
       setMessage('Upload succeeded!');
       if (onUploadSuccess) onUploadSuccess(response.data);
@@ -86,6 +96,22 @@ const VideoUpload = ({ onUploadSuccess }) => {
     <div className="video-upload">
       <h2>Upload Match Highlight</h2>
       <form onSubmit={handleUpload}>
+        <div className="form-row">
+          <label htmlFor="sport">Sport</label>
+          <select
+            id="sport"
+            value={sport}
+            onChange={(e) => setSport(e.target.value)}
+            disabled={uploading}
+          >
+            {SPORTS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="form-row">
           <label htmlFor="team">Team</label>
           <select

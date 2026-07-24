@@ -13,6 +13,15 @@ const videoSchema = new mongoose.Schema(
       enum: ['uploaded', 'processing', 'analyzed', 'failed'],
       default: 'uploaded',
     },
+    // Controls the analyzer's field-size calibration (distance/speed
+    // accuracy) and ball-color detection — see SPORT_PRESETS in
+    // server/cv/video_analyzer.py. Fixed at upload time since it can't be
+    // inferred from the footage itself.
+    sport: {
+      type: String,
+      enum: ['soccer', 'basketball', 'hockey', 'rugby'],
+      default: 'soccer',
+    },
     team: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
     opponentTeam: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
     players: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Player' }],

@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { poll } from '../utils/polling';
 import { useAuthedMedia } from '../utils/useAuthedMedia';
+import { useAuth } from '../context/AuthContext';
 import Toast from './Toast';
 import SearchFilter from './SearchFilter';
 import LoadingSpinner from './LoadingSpinner';
 import './VideoList.css';
 
 const VideoList = ({ refreshTrigger = 0 }) => {
+  const { socket } = useAuth();
   const [videos, setVideos] = useState([]);
   const [filteredVideos, setFilteredVideos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,10 +21,59 @@ const VideoList = ({ refreshTrigger = 0 }) => {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [liveProgress, setLiveProgress] = useState({});
 
   useEffect(() => {
     fetchVideos();
   }, [refreshTrigger]);
+
+  // Analysis is pushed live over the socket set up in AuthContext (progress
+  // percentage as the Python analyzer works through frames, then a
+  // complete/failed event) rather than waiting for the poll loop below,
+  // which stays in place as a fallback for a dropped/reconnecting socket.
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleProgress = ({ videoId, progress }) => {
+      if (progress == null) return;
+      setLiveProgress((prev) => ({ ...prev, [videoId]: progress }));
+    };
+    const clearLiveProgress = (videoId) => {
+      setLiveProgress((prev) => {
+        if (!(videoId in prev)) return prev;
+        const next = { ...prev };
+        delete next[videoId];
+        return next;
+      });
+    };
+    const handleComplete = async ({ videoId }) => {
+      clearLiveProgress(videoId);
+      const data = await refreshVideos();
+      const updated = data.find((v) => v._id === videoId);
+      setStatusMessage(
+        updated ? 'Video analysis complete. You can view the report.' : null
+      );
+      setProcessingId((current) => (current === videoId ? null : current));
+    };
+    const handleFailed = ({ videoId, error: analysisError }) => {
+      clearLiveProgress(videoId);
+      setVideos((prev) =>
+        prev.map((v) => (v._id === videoId ? { ...v, status: 'failed' } : v))
+      );
+      setError(analysisError || 'Video processing failed.');
+      setProcessingId((current) => (current === videoId ? null : current));
+    };
+
+    socket.on('analysis:progress', handleProgress);
+    socket.on('analysis:complete', handleComplete);
+    socket.on('analysis:failed', handleFailed);
+    return () => {
+      socket.off('analysis:progress', handleProgress);
+      socket.off('analysis:complete', handleComplete);
+      socket.off('analysis:failed', handleFailed);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket]);
 
   useEffect(() => {
     filterVideos();
@@ -132,13 +183,23 @@ const VideoList = ({ refreshTrigger = 0 }) => {
       return;
     }
 
+    // 202 Accepted: analysis is running in the background. With a live
+    // socket connected, the analysis:progress/complete/failed handlers
+    // above resolve processingId and status in real time — no need to
+    // poll (and polling on a short fixed timeout was actively wrong here,
+    // since real analysis routinely takes longer than the old 20s window).
+    // Polling stays only as a fallback for a dropped/unavailable socket.
+    if (socket && socket.connected) {
+      return;
+    }
+
     try {
       const updatedVideo = await poll(async () => {
         const data = await refreshVideos();
         const currentVideo = data.find((video) => video._id === videoId);
         const ready = currentVideo && currentVideo.status !== 'processing';
         return { ready, data: currentVideo };
-      }, 2000, 10);
+      }, 5000, 60);
 
 
       if (updatedVideo) {
@@ -219,6 +280,7 @@ const VideoList = ({ refreshTrigger = 0 }) => {
           <thead>
             <tr>
               <th>Name</th>
+              <th>Sport</th>
               <th>Size</th>
               <th>Status</th>
               <th>Uploaded</th>
@@ -229,8 +291,15 @@ const VideoList = ({ refreshTrigger = 0 }) => {
             {filteredVideos.map((video) => (
               <tr key={video._id}>
                 <td>{video.originalName}</td>
+                <td className="video-sport-cell">{video.sport || 'soccer'}</td>
                 <td>{(video.fileSize / 1024 / 1024).toFixed(2)} MB</td>
-                <td><span className={`status-badge status-${video.status}`}>{video.status}</span></td>
+                <td>
+                  <span className={`status-badge status-${video.status}`}>
+                    {video.status === 'processing' && liveProgress[video._id] != null
+                      ? `processing (${liveProgress[video._id]}%)`
+                      : video.status}
+                  </span>
+                </td>
                 <td>{new Date(video.createdAt).toLocaleDateString()}</td>
                 <td>
                   <button
