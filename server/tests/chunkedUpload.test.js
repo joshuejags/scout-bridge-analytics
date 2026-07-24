@@ -172,4 +172,37 @@ describe('Chunked video upload', () => {
         .set('Authorization', `Bearer ${token}`);
       expect(statusRes.status).toBe(404);
     }));
+
+  it("404s a different user trying to append a chunk to someone else's upload session", async () =>
+    withUploadCleanup(async () => {
+      const owner = await registerUser('cu10-owner@example.com');
+      const other = await registerUser('cu10-other@example.com');
+      const { body } = await initUpload(owner.token);
+
+      const res = await sendChunk(other.token, body.uploadId, fileBytes.subarray(0, 1024));
+      expect(res.status).toBe(404);
+    }));
+
+  it("404s a different user checking status or completing someone else's upload session", async () =>
+    withUploadCleanup(async () => {
+      const owner = await registerUser('cu11-owner@example.com');
+      const other = await registerUser('cu11-other@example.com');
+      const { body } = await initUpload(owner.token);
+
+      const statusRes = await request(app)
+        .get(`/api/videos/upload/${body.uploadId}/status`)
+        .set('Authorization', `Bearer ${other.token}`);
+      expect(statusRes.status).toBe(404);
+
+      const completeRes = await request(app)
+        .post(`/api/videos/upload/${body.uploadId}/complete`)
+        .set('Authorization', `Bearer ${other.token}`);
+      expect(completeRes.status).toBe(404);
+
+      // The owner's session is untouched by the other user's failed attempts.
+      const ownerStatusRes = await request(app)
+        .get(`/api/videos/upload/${body.uploadId}/status`)
+        .set('Authorization', `Bearer ${owner.token}`);
+      expect(ownerStatusRes.status).toBe(200);
+    }));
 });

@@ -6,7 +6,15 @@ const videoSchema = new mongoose.Schema(
     originalName: { type: String, required: true },
     fileSize: { type: Number, required: true },
     duration: Number,
+    // Display-only string (the uploader's email at upload time); the real
+    // access-control check is against `user` below, not this field.
     uploadedBy: { type: String },
+    // The account that owns this video. Every video a non-admin user lists
+    // or fetches is scoped to this field (see videoController.js) — not
+    // required, since videos created before this field existed have no
+    // owner on record and are intentionally admin-only until manually
+    // assigned one.
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     filePath: { type: String, required: true },
     status: {
       type: String,

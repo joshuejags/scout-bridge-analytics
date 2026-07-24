@@ -1,0 +1,1225 @@
+{
+  "generatedAt": "2026-07-24T21:18:23.314Z",
+  "source": "https://github.com/metrica-sports/sample-data (Sample_Game_1, real anonymized match tracking)",
+  "video": {
+    "originalName": "Sample Match (Metrica Sports open tracking data)",
+    "sport": "soccer",
+    "metadata": {
+      "width": 1280,
+      "height": 829,
+      "fps": 25,
+      "frameCount": 10000
+    }
+  },
+  "summary": {
+    "totalPlayers": 22,
+    "matchDuration": 400,
+    "highlightedMoments": [
+      {
+        "frameNumber": 1,
+        "type": "pass",
+        "description": "Pass at frame 1"
+      },
+      {
+        "frameNumber": 3,
+        "type": "pass",
+        "description": "Pass at frame 3"
+      },
+      {
+        "frameNumber": 45,
+        "type": "pass",
+        "description": "Pass at frame 45"
+      },
+      {
+        "frameNumber": 77,
+        "type": "pass",
+        "description": "Pass at frame 77"
+      },
+      {
+        "frameNumber": 191,
+        "type": "pass",
+        "description": "Pass at frame 191"
+      },
+      {
+        "frameNumber": 279,
+        "type": "pass",
+        "description": "Pass at frame 279"
+      },
+      {
+        "frameNumber": 378,
+        "type": "interception",
+        "description": "Interception at frame 378"
+      },
+      {
+        "frameNumber": 453,
+        "type": "interception",
+        "description": "Interception at frame 453"
+      },
+      {
+        "frameNumber": 498,
+        "type": "tackle",
+        "description": "Tackle at frame 498"
+      },
+      {
+        "frameNumber": 498,
+        "type": "interception",
+        "description": "Interception at frame 498"
+      }
+    ]
+  },
+  "heatmapData": {
+    "grid": [
+      [
+        43,
+        59,
+        83,
+        168,
+        153,
+        236,
+        83,
+        181,
+        49,
+        83,
+        68,
+        64,
+        55,
+        191,
+        95,
+        129,
+        21,
+        0,
+        25,
+        29,
+        0,
+        0,
+        14,
+        21,
+        302
+      ],
+      [
+        75,
+        1,
+        46,
+        97,
+        233,
+        271,
+        104,
+        228,
+        69,
+        83,
+        164,
+        22,
+        110,
+        318,
+        339,
+        103,
+        30,
+        81,
+        130,
+        25,
+        50,
+        136,
+        71,
+        54,
+        82
+      ],
+      [
+        43,
+        41,
+        98,
+        170,
+        227,
+        215,
+        255,
+        248,
+        245,
+        119,
+        360,
+        352,
+        860,
+        407,
+        299,
+        540,
+        493,
+        154,
+        144,
+        199,
+        93,
+        172,
+        165,
+        459,
+        350
+      ],
+      [
+        13,
+        39,
+        35,
+        126,
+        475,
+        291,
+        375,
+        580,
+        731,
+        546,
+        444,
+        548,
+        1117,
+        559,
+        252,
+        604,
+        469,
+        560,
+        194,
+        276,
+        295,
+        198,
+        325,
+        121,
+        348
+      ],
+      [
+        15,
+        78,
+        4,
+        196,
+        357,
+        462,
+        371,
+        363,
+        917,
+        946,
+        657,
+        1206,
+        1012,
+        1045,
+        728,
+        943,
+        548,
+        393,
+        393,
+        606,
+        296,
+        447,
+        378,
+        316,
+        2227
+      ],
+      [
+        4,
+        91,
+        109,
+        283,
+        374,
+        463,
+        300,
+        231,
+        443,
+        547,
+        771,
+        1327,
+        850,
+        773,
+        820,
+        1086,
+        898,
+        931,
+        922,
+        815,
+        749,
+        1230,
+        707,
+        631,
+        605
+      ],
+      [
+        289,
+        210,
+        158,
+        523,
+        645,
+        963,
+        625,
+        476,
+        1077,
+        699,
+        868,
+        1777,
+        1245,
+        1152,
+        1324,
+        997,
+        643,
+        462,
+        350,
+        761,
+        731,
+        570,
+        670,
+        394,
+        1131
+      ],
+      [
+        1127,
+        366,
+        455,
+        1223,
+        922,
+        569,
+        549,
+        791,
+        1100,
+        1278,
+        1470,
+        1572,
+        1879,
+        1410,
+        1391,
+        1237,
+        1002,
+        1121,
+        396,
+        911,
+        1005,
+        742,
+        1517,
+        1681,
+        3214
+      ],
+      [
+        1443,
+        1140,
+        1174,
+        1474,
+        1120,
+        788,
+        1179,
+        411,
+        709,
+        1244,
+        957,
+        1730,
+        1810,
+        1207,
+        1560,
+        942,
+        1353,
+        1269,
+        1531,
+        1710,
+        1346,
+        1257,
+        2225,
+        2956,
+        1580
+      ],
+      [
+        64,
+        191,
+        279,
+        866,
+        530,
+        603,
+        470,
+        354,
+        761,
+        1423,
+        1150,
+        1159,
+        1204,
+        887,
+        922,
+        664,
+        889,
+        1026,
+        842,
+        971,
+        1215,
+        1614,
+        2179,
+        1531,
+        1515
+      ],
+      [
+        0,
+        0,
+        22,
+        274,
+        259,
+        646,
+        456,
+        606,
+        885,
+        942,
+        1345,
+        1723,
+        1350,
+        731,
+        926,
+        955,
+        561,
+        836,
+        571,
+        336,
+        473,
+        417,
+        340,
+        28,
+        197
+      ],
+      [
+        0,
+        0,
+        22,
+        90,
+        112,
+        424,
+        693,
+        901,
+        1310,
+        1221,
+        936,
+        1151,
+        1107,
+        1232,
+        1209,
+        566,
+        492,
+        868,
+        242,
+        182,
+        34,
+        69,
+        0,
+        0,
+        162
+      ],
+      [
+        0,
+        0,
+        0,
+        51,
+        111,
+        180,
+        326,
+        530,
+        821,
+        752,
+        752,
+        756,
+        416,
+        708,
+        1675,
+        724,
+        780,
+        279,
+        186,
+        28,
+        83,
+        89,
+        62,
+        62,
+        1
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        351,
+        437,
+        345,
+        250,
+        685,
+        923,
+        800,
+        1038,
+        834,
+        695,
+        871,
+        1122,
+        612,
+        218,
+        83,
+        60,
+        44,
+        84,
+        24,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        38,
+        73,
+        174,
+        222,
+        677,
+        746,
+        308,
+        575,
+        1229,
+        795,
+        872,
+        896,
+        715,
+        233,
+        91,
+        42,
+        0,
+        16,
+        114,
+        69,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        235,
+        342,
+        702,
+        599,
+        746,
+        494,
+        1096,
+        1063,
+        760,
+        509,
+        325,
+        141,
+        107,
+        64,
+        60,
+        0,
+        138,
+        0,
+        0
+      ]
+    ],
+    "cellSize": 50
+  },
+  "actions": [
+    {
+      "type": "pass",
+      "playerId": "19",
+      "frameNumber": 1,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "21",
+      "frameNumber": 3,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "15",
+      "frameNumber": 45,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "19",
+      "frameNumber": 77,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "21",
+      "frameNumber": 191,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "22",
+      "frameNumber": 279,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "2",
+      "frameNumber": 378,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "16",
+      "frameNumber": 453,
+      "confidence": 0.95
+    },
+    {
+      "type": "tackle",
+      "playerId": "2",
+      "frameNumber": 498,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "2",
+      "frameNumber": 498,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "2",
+      "frameNumber": 498,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "9",
+      "frameNumber": 536,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "16",
+      "frameNumber": 618,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "16",
+      "frameNumber": 763,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "19",
+      "frameNumber": 784,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "20",
+      "frameNumber": 834,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "22",
+      "frameNumber": 976,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "5",
+      "frameNumber": 1134,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "5",
+      "frameNumber": 1134,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "6",
+      "frameNumber": 1154,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "10",
+      "frameNumber": 1226,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "15",
+      "frameNumber": 1374,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "6",
+      "frameNumber": 2143,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "10",
+      "frameNumber": 2263,
+      "confidence": 0.95
+    },
+    {
+      "type": "shot",
+      "playerId": "9",
+      "frameNumber": 2289,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "19",
+      "frameNumber": 3675,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "21",
+      "frameNumber": 3780,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "20",
+      "frameNumber": 3829,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "22",
+      "frameNumber": 3882,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "17",
+      "frameNumber": 3930,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "1",
+      "frameNumber": 4386,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "1",
+      "frameNumber": 4516,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "17",
+      "frameNumber": 4679,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "7",
+      "frameNumber": 4751,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "22",
+      "frameNumber": 5057,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "2",
+      "frameNumber": 5149,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "2",
+      "frameNumber": 5149,
+      "confidence": 0.95
+    },
+    {
+      "type": "tackle",
+      "playerId": "19",
+      "frameNumber": 5228,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "19",
+      "frameNumber": 5228,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "1",
+      "frameNumber": 5263,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "17",
+      "frameNumber": 5385,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "17",
+      "frameNumber": 5385,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "20",
+      "frameNumber": 5431,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "18",
+      "frameNumber": 5549,
+      "confidence": 0.95
+    },
+    {
+      "type": "tackle",
+      "playerId": "1",
+      "frameNumber": 5627,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "1",
+      "frameNumber": 5627,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "2",
+      "frameNumber": 5663,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "8",
+      "frameNumber": 5761,
+      "confidence": 0.95
+    },
+    {
+      "type": "shot",
+      "playerId": "10",
+      "frameNumber": 5923,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "25",
+      "frameNumber": 6685,
+      "confidence": 0.95
+    },
+    {
+      "type": "tackle",
+      "playerId": "21",
+      "frameNumber": 6863,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "21",
+      "frameNumber": 6863,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "21",
+      "frameNumber": 6863,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "20",
+      "frameNumber": 6905,
+      "confidence": 0.95
+    },
+    {
+      "type": "tackle",
+      "playerId": "3",
+      "frameNumber": 7041,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "3",
+      "frameNumber": 7041,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "3",
+      "frameNumber": 7041,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "18",
+      "frameNumber": 7203,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "21",
+      "frameNumber": 7266,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "18",
+      "frameNumber": 7334,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "15",
+      "frameNumber": 7404,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "19",
+      "frameNumber": 7519,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "18",
+      "frameNumber": 7603,
+      "confidence": 0.95
+    },
+    {
+      "type": "shot",
+      "playerId": "21",
+      "frameNumber": 7753,
+      "confidence": 0.95
+    },
+    {
+      "type": "tackle",
+      "playerId": "15",
+      "frameNumber": 8576,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "15",
+      "frameNumber": 8576,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "15",
+      "frameNumber": 8650,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "18",
+      "frameNumber": 8868,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "3",
+      "frameNumber": 9069,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "23",
+      "frameNumber": 9215,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "18",
+      "frameNumber": 9306,
+      "confidence": 0.95
+    },
+    {
+      "type": "interception",
+      "playerId": "6",
+      "frameNumber": 9354,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "6",
+      "frameNumber": 9390,
+      "confidence": 0.95
+    },
+    {
+      "type": "pass",
+      "playerId": "10",
+      "frameNumber": 9599,
+      "confidence": 0.95
+    },
+    {
+      "type": "shot",
+      "playerId": "8",
+      "frameNumber": 9628,
+      "confidence": 0.95
+    }
+  ],
+  "playerData": [
+    {
+      "trackId": "11",
+      "jerseyNumber": 11,
+      "teamColor": "blue",
+      "statistics": {
+        "distanceCovered": 277.49,
+        "averageSpeed": 0.69,
+        "sprintCount": 0,
+        "activationArea": "Midfield-Left"
+      },
+      "playerName": "Player #11"
+    },
+    {
+      "trackId": "1",
+      "jerseyNumber": 1,
+      "teamColor": "blue",
+      "statistics": {
+        "distanceCovered": 814.45,
+        "averageSpeed": 2.03,
+        "sprintCount": 0,
+        "activationArea": "Bottom-Center"
+      },
+      "playerName": "Player #1"
+    },
+    {
+      "trackId": "2",
+      "jerseyNumber": 2,
+      "teamColor": "blue",
+      "statistics": {
+        "distanceCovered": 752.77,
+        "averageSpeed": 1.88,
+        "sprintCount": 1,
+        "activationArea": "Midfield-Center"
+      },
+      "playerName": "Player #2"
+    },
+    {
+      "trackId": "3",
+      "jerseyNumber": 3,
+      "teamColor": "blue",
+      "statistics": {
+        "distanceCovered": 806.46,
+        "averageSpeed": 2.01,
+        "sprintCount": 3,
+        "activationArea": "Midfield-Center"
+      },
+      "playerName": "Player #3"
+    },
+    {
+      "trackId": "4",
+      "jerseyNumber": 4,
+      "teamColor": "blue",
+      "statistics": {
+        "distanceCovered": 844.02,
+        "averageSpeed": 2.11,
+        "sprintCount": 2,
+        "activationArea": "Top-Center"
+      },
+      "playerName": "Player #4"
+    },
+    {
+      "trackId": "5",
+      "jerseyNumber": 5,
+      "teamColor": "blue",
+      "statistics": {
+        "distanceCovered": 933.6,
+        "averageSpeed": 2.33,
+        "sprintCount": 4,
+        "activationArea": "Bottom-Center"
+      },
+      "playerName": "Player #5"
+    },
+    {
+      "trackId": "6",
+      "jerseyNumber": 6,
+      "teamColor": "blue",
+      "statistics": {
+        "distanceCovered": 838.77,
+        "averageSpeed": 2.09,
+        "sprintCount": 0,
+        "activationArea": "Midfield-Center"
+      },
+      "playerName": "Player #6"
+    },
+    {
+      "trackId": "7",
+      "jerseyNumber": 7,
+      "teamColor": "blue",
+      "statistics": {
+        "distanceCovered": 949.4,
+        "averageSpeed": 2.37,
+        "sprintCount": 1,
+        "activationArea": "Midfield-Center"
+      },
+      "playerName": "Player #7"
+    },
+    {
+      "trackId": "8",
+      "jerseyNumber": 8,
+      "teamColor": "blue",
+      "statistics": {
+        "distanceCovered": 936.06,
+        "averageSpeed": 2.33,
+        "sprintCount": 7,
+        "activationArea": "Top-Center"
+      },
+      "playerName": "Player #8"
+    },
+    {
+      "trackId": "9",
+      "jerseyNumber": 9,
+      "teamColor": "blue",
+      "statistics": {
+        "distanceCovered": 857.73,
+        "averageSpeed": 2.13,
+        "sprintCount": 5,
+        "activationArea": "Midfield-Center"
+      },
+      "playerName": "Player #9"
+    },
+    {
+      "trackId": "10",
+      "jerseyNumber": 10,
+      "teamColor": "blue",
+      "statistics": {
+        "distanceCovered": 825.64,
+        "averageSpeed": 2.06,
+        "sprintCount": 5,
+        "activationArea": "Midfield-Center"
+      },
+      "playerName": "Player #10"
+    },
+    {
+      "trackId": "25",
+      "jerseyNumber": 25,
+      "teamColor": "red",
+      "statistics": {
+        "distanceCovered": 410.05,
+        "averageSpeed": 1.02,
+        "sprintCount": 0,
+        "activationArea": "Midfield-Right"
+      },
+      "playerName": "Player #25"
+    },
+    {
+      "trackId": "15",
+      "jerseyNumber": 15,
+      "teamColor": "red",
+      "statistics": {
+        "distanceCovered": 777.69,
+        "averageSpeed": 1.94,
+        "sprintCount": 2,
+        "activationArea": "Midfield-Right"
+      },
+      "playerName": "Player #15"
+    },
+    {
+      "trackId": "16",
+      "jerseyNumber": 16,
+      "teamColor": "red",
+      "statistics": {
+        "distanceCovered": 744.98,
+        "averageSpeed": 1.86,
+        "sprintCount": 1,
+        "activationArea": "Midfield-Right"
+      },
+      "playerName": "Player #16"
+    },
+    {
+      "trackId": "17",
+      "jerseyNumber": 17,
+      "teamColor": "red",
+      "statistics": {
+        "distanceCovered": 796.21,
+        "averageSpeed": 1.98,
+        "sprintCount": 2,
+        "activationArea": "Bottom-Right"
+      },
+      "playerName": "Player #17"
+    },
+    {
+      "trackId": "18",
+      "jerseyNumber": 18,
+      "teamColor": "red",
+      "statistics": {
+        "distanceCovered": 859.16,
+        "averageSpeed": 2.14,
+        "sprintCount": 2,
+        "activationArea": "Top-Center"
+      },
+      "playerName": "Player #18"
+    },
+    {
+      "trackId": "19",
+      "jerseyNumber": 19,
+      "teamColor": "red",
+      "statistics": {
+        "distanceCovered": 887.09,
+        "averageSpeed": 2.21,
+        "sprintCount": 0,
+        "activationArea": "Midfield-Center"
+      },
+      "playerName": "Player #19"
+    },
+    {
+      "trackId": "20",
+      "jerseyNumber": 20,
+      "teamColor": "red",
+      "statistics": {
+        "distanceCovered": 843.81,
+        "averageSpeed": 2.11,
+        "sprintCount": 3,
+        "activationArea": "Midfield-Center"
+      },
+      "playerName": "Player #20"
+    },
+    {
+      "trackId": "21",
+      "jerseyNumber": 21,
+      "teamColor": "red",
+      "statistics": {
+        "distanceCovered": 872.57,
+        "averageSpeed": 2.18,
+        "sprintCount": 2,
+        "activationArea": "Midfield-Center"
+      },
+      "playerName": "Player #21"
+    },
+    {
+      "trackId": "22",
+      "jerseyNumber": 22,
+      "teamColor": "red",
+      "statistics": {
+        "distanceCovered": 853.76,
+        "averageSpeed": 2.13,
+        "sprintCount": 2,
+        "activationArea": "Bottom-Center"
+      },
+      "playerName": "Player #22"
+    },
+    {
+      "trackId": "23",
+      "jerseyNumber": 23,
+      "teamColor": "red",
+      "statistics": {
+        "distanceCovered": 824.17,
+        "averageSpeed": 2.06,
+        "sprintCount": 3,
+        "activationArea": "Midfield-Center"
+      },
+      "playerName": "Player #23"
+    },
+    {
+      "trackId": "24",
+      "jerseyNumber": 24,
+      "teamColor": "red",
+      "statistics": {
+        "distanceCovered": 812.8,
+        "averageSpeed": 2.03,
+        "sprintCount": 2,
+        "activationArea": "Midfield-Center"
+      },
+      "playerName": "Player #24"
+    }
+  ]
+}

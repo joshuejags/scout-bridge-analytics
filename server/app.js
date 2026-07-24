@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { requireAuth } = require('./middleware/auth');
+const authorizeUploadAccess = require('./middleware/uploadAccess');
 
 const app = express();
 
@@ -12,9 +13,9 @@ app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || 'uploads');
 // Video files and player-verification thumbnails are private scouting
-// data; require the same Bearer auth as the API rather than relying on
-// unguessable ObjectId-based paths.
-app.use('/uploads', requireAuth, express.static(uploadDir));
+// data, scoped per-owner (see authorizeUploadAccess) — requireAuth alone
+// only proves a valid session, not that it owns this particular file.
+app.use('/uploads', requireAuth, authorizeUploadAccess, express.static(uploadDir));
 
 // Routes
 app.get('/api/health', (req, res) => {

@@ -62,4 +62,20 @@ describe('LandingPage', () => {
     expect(ctas.length).toBeGreaterThanOrEqual(2);
     ctas.forEach((cta) => expect(cta).toHaveAttribute('href', '/register'));
   });
+
+  it('renders the sample report from real seeded data, not hand-typed placeholders', () => {
+    renderPage();
+    // Real numbers computed by server/scripts/seedDemoData.js from actual
+    // match-tracking data, not fixed strings baked into the component.
+    expect(screen.getByText(/players tracked/i)).toBeInTheDocument();
+    expect(screen.getByText(/actions detected/i)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /player position density heatmap/i })).toBeInTheDocument();
+    expect(screen.getByRole('table')).toBeInTheDocument();
+  });
+
+  it('credits the real dataset source', () => {
+    renderPage();
+    const link = screen.getByRole('link', { name: /metrica sports/i });
+    expect(link).toHaveAttribute('href', 'https://github.com/metrica-sports/sample-data');
+  });
 });

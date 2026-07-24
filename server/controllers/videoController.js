@@ -6,6 +6,18 @@ const chunkedUploads = require('../utils/chunkedUploads');
 const ALLOWED_SPORTS = ['soccer', 'basketball', 'hockey', 'rugby'];
 const ALLOWED_EXTENSIONS = ['.mp4', '.avi', '.mov', '.mkv', '.flv'];
 
+// Every video a non-admin user lists or fetches is scoped to their own
+// uploads — admins see everything (needed to manage the app, and the only
+// way to reach videos uploaded before the `user` field existed, which have
+// no owner on record at all). Centralized here so getVideos/getVideoById
+// (and analysisController's video-derived checks) can't drift apart.
+const ownershipFilter = (req) => (req.user.role === 'admin' ? {} : { user: req.user._id });
+const isOwnerOrAdmin = (video, user) =>
+  user.role === 'admin' || (video.user && String(video.user) === String(user._id));
+// Reused by analysisController (analysis data is exactly as private as the
+// video it belongs to) and the /uploads static-file access check in app.js.
+exports.isOwnerOrAdmin = isOwnerOrAdmin;
+
 // Upload video file
 exports.uploadVideo = async (req, res) => {
   try {
@@ -24,7 +36,11 @@ exports.uploadVideo = async (req, res) => {
       originalName: req.file.originalname,
       fileSize: req.file.size,
       filePath: req.file.path,
-      uploadedBy: req.body.uploadedBy || 'anonymous',
+      // The server is the source of truth for who uploaded this, not
+      // whatever the client claims — uploadedBy is display-only, `user` is
+      // what access control actually checks.
+      uploadedBy: req.user.email,
+      user: req.user._id,
       status: 'uploaded',
       team: req.body.team || null,
       opponentTeam: req.body.opponentTeam || null,
@@ -74,7 +90,8 @@ exports.initChunkedUpload = async (req, res) => {
         opponentTeam: req.body.opponentTeam || null,
         sport: ALLOWED_SPORTS.includes(sport) ? sport : 'soccer',
         players,
-        uploadedBy: req.body.uploadedBy || 'anonymous',
+        uploadedBy: req.user.email,
+        userId: req.user._id,
       },
     });
 
@@ -91,7 +108,9 @@ exports.uploadChunk = (req, res) => {
   try {
     const { uploadId } = req.params;
     const session = chunkedUploads.getSession(uploadId);
-    if (!session) {
+    if (!session || String(session.meta.userId) !== String(req.user._id)) {
+      // Same response either way — a real session belonging to someone
+      // else shouldn't be distinguishable from a made-up uploadId.
       return res.status(404).json({ error: 'Unknown or expired upload session' });
     }
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
@@ -116,7 +135,7 @@ exports.uploadChunk = (req, res) => {
 // re-sending the whole file from the start.
 exports.getChunkedUploadStatus = (req, res) => {
   const session = chunkedUploads.getSession(req.params.uploadId);
-  if (!session) {
+  if (!session || String(session.meta.userId) !== String(req.user._id)) {
     return res.status(404).json({ error: 'Unknown or expired upload session' });
   }
   res.json({ bytesReceived: session.bytesReceived, expectedSize: session.expectedSize });
@@ -130,7 +149,7 @@ exports.completeChunkedUpload = async (req, res) => {
   try {
     const { uploadId } = req.params;
     const session = chunkedUploads.getSession(uploadId);
-    if (!session) {
+    if (!session || String(session.meta.userId) !== String(req.user._id)) {
       return res.status(404).json({ error: 'Unknown or expired upload session' });
     }
 
@@ -148,6 +167,7 @@ exports.completeChunkedUpload = async (req, res) => {
       fileSize: session.expectedSize,
       filePath: finalPath,
       uploadedBy: session.meta.uploadedBy,
+      user: session.meta.userId,
       status: 'uploaded',
       team: session.meta.team,
       opponentTeam: session.meta.opponentTeam,
@@ -161,11 +181,11 @@ exports.completeChunkedUpload = async (req, res) => {
   }
 };
 
-// Get all videos
+// Get all videos — scoped to the requesting user (admins see everything).
 exports.getVideos = async (req, res) => {
   try {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const videos = await Video.find()
+    const videos = await Video.find(ownershipFilter(req))
       .populate('analysis')
       .populate('team')
       .populate('opponentTeam')
@@ -180,7 +200,9 @@ exports.getVideos = async (req, res) => {
   }
 };
 
-// Get video by ID
+// Get video by ID — 404 (not 403) for a video that exists but isn't
+// owned by the requester, so its existence isn't distinguishable from it
+// simply not being there.
 exports.getVideoById = async (req, res) => {
   try {
     const video = await Video.findById(req.params.id)
@@ -188,7 +210,7 @@ exports.getVideoById = async (req, res) => {
       .populate('team')
       .populate('opponentTeam')
       .populate('players');
-    if (!video) {
+    if (!video || !isOwnerOrAdmin(video, req.user)) {
       return res.status(404).json({ error: 'Video not found' });
     }
     res.json(video);

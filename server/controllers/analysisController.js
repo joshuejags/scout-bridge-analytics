@@ -5,6 +5,7 @@ const Analysis = require('../models/Analysis');
 const Player = require('../models/Player');
 const { emitEvent } = require('../utils/socket');
 const workerPool = require('../utils/analysisWorkerPool');
+const { isOwnerOrAdmin } = require('./videoController');
 
 // Project root is one level up from server/ (this file lives in
 // server/controllers/) when running from a full repo checkout — true for
@@ -92,7 +93,7 @@ exports.processAnalysis = async (req, res) => {
   const { videoId } = req.params;
   const video = await Video.findById(videoId);
 
-  if (!video) {
+  if (!video || !isOwnerOrAdmin(video, req.user)) {
     return res.status(404).json({ error: 'Video not found' });
   }
 
@@ -198,7 +199,8 @@ exports.getAnalysisByVideo = async (req, res) => {
       .populate('playerData.playerId')
       .populate('actions.playerId');
 
-    if (!analysis) {
+    // Analysis data is exactly as private as the video it belongs to.
+    if (!analysis || !analysis.video || !isOwnerOrAdmin(analysis.video, req.user)) {
       return res.status(404).json({ error: 'Analysis not found' });
     }
 
@@ -223,6 +225,10 @@ exports.updatePlayerTrack = async (req, res) => {
 
     const analysis = await Analysis.findById(analysisId);
     if (!analysis) {
+      return res.status(404).json({ error: 'Analysis not found' });
+    }
+    const video = await Video.findById(analysis.video);
+    if (!video || !isOwnerOrAdmin(video, req.user)) {
       return res.status(404).json({ error: 'Analysis not found' });
     }
 
@@ -280,6 +286,10 @@ exports.mergePlayerTracks = async (req, res) => {
 
     const analysis = await Analysis.findById(analysisId);
     if (!analysis) {
+      return res.status(404).json({ error: 'Analysis not found' });
+    }
+    const video = await Video.findById(analysis.video);
+    if (!video || !isOwnerOrAdmin(video, req.user)) {
       return res.status(404).json({ error: 'Analysis not found' });
     }
 

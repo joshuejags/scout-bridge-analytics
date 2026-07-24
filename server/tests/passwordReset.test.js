@@ -97,6 +97,49 @@ describe('Email verification', () => {
   });
 });
 
+describe('Email delivery resilience', () => {
+  // sendMail() itself never throws (see utils/email.js) — these confirm
+  // the callers actually handle a real ({ delivered: false, reason:
+  // 'send-error' }) failure result correctly, not just the happy path.
+  const sendFailure = { delivered: false, reason: 'send-error', error: 'Connection refused' };
+
+  it('register still creates the account and returns 201 even if the verification email fails to send', async () => {
+    sendMail.mockResolvedValueOnce(sendFailure);
+    const res = await registerUser('emailfail@example.com');
+
+    expect(res.status).toBe(201);
+    expect(res.body.emailDelivered).toBe(false);
+    const stored = await User.findOne({ email: 'emailfail@example.com' });
+    expect(stored).not.toBeNull();
+  });
+
+  it('resend-verification reports the failure (502) instead of falsely claiming success', async () => {
+    const reg = await registerUser();
+    sendMail.mockResolvedValueOnce(sendFailure);
+
+    const res = await request(app)
+      .post('/api/auth/resend-verification')
+      .set('Authorization', `Bearer ${reg.body.token}`);
+    expect(res.status).toBe(502);
+  });
+
+  it('forgot-password still returns the same 200 for a real account even if the email fails to send — no enumeration leak via status code', async () => {
+    await registerUser('forgotfail@example.com');
+    sendMail.mockResolvedValueOnce(sendFailure);
+
+    const resReal = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'forgotfail@example.com' });
+    const resFake = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'no-such-account@example.com' });
+
+    expect(resReal.status).toBe(200);
+    expect(resFake.status).toBe(200);
+    expect(resReal.body).toEqual(resFake.body);
+  });
+});
+
 describe('Password reset', () => {
   it('forgot-password sends a reset email for an existing account', async () => {
     await registerUser();

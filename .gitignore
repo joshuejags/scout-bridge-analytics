@@ -20,3 +20,4 @@ cv/models/
 tmp_analysis/
 .pytest_cache/
 coverage/
+server/scripts/.cache/

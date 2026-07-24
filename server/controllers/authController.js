@@ -39,14 +39,28 @@ exports.register = async (req, res) => {
     await user.save();
 
     const verifyUrl = `${CLIENT_URL}/verify-email?token=${verifyToken}`;
-    await sendMail({
+    // Best-effort: the account is already created and usable regardless of
+    // whether this email actually goes out (see utils/email.js — sendMail
+    // never throws). Failing registration outright over an SMTP hiccup
+    // would be worse than a user needing to hit "resend verification".
+    const emailResult = await sendMail({
       to: user.email,
       subject: 'Verify your Scout Bridge Analytics account',
       text: `Welcome to Scout Bridge Analytics, ${user.name}.\n\nVerify your email address:\n${verifyUrl}\n\nThis link expires in 24 hours.`,
     });
+    if (!emailResult.delivered && emailResult.reason === 'send-error') {
+      console.error(`Verification email failed to send for new account ${user.email}: ${emailResult.error}`);
+    }
 
     const token = signToken(user);
-    res.status(201).json({ token, user: toPublicUser(user) });
+    res.status(201).json({
+      token,
+      user: toPublicUser(user),
+      // Lets the frontend tell a real send failure ("we'll retry, or use
+      // Resend Verification") apart from the no-SMTP-configured dev/test
+      // state, without exposing SMTP internals.
+      emailDelivered: emailResult.delivered,
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -137,13 +151,17 @@ exports.resendVerification = async (req, res) => {
     await user.save();
 
     const verifyUrl = `${CLIENT_URL}/verify-email?token=${verifyToken}`;
-    await sendMail({
+    const emailResult = await sendMail({
       to: user.email,
       subject: 'Verify your Scout Bridge Analytics account',
       text: `Verify your email address:\n${verifyUrl}\n\nThis link expires in 24 hours.`,
     });
+    if (!emailResult.delivered && emailResult.reason === 'send-error') {
+      console.error(`Resend-verification email failed for ${user.email}: ${emailResult.error}`);
+      return res.status(502).json({ error: 'Could not send the verification email right now. Please try again shortly.' });
+    }
 
-    res.json({ message: 'Verification email sent' });
+    res.json({ message: 'Verification email sent', emailDelivered: emailResult.delivered });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -163,11 +181,19 @@ exports.forgotPassword = async (req, res) => {
       await user.save();
 
       const resetUrl = `${CLIENT_URL}/reset-password?token=${resetToken}`;
-      await sendMail({
+      // Deliberately not branching on the result: this response must stay
+      // 200/identical whether or not the send actually succeeds, or the
+      // response itself would leak account existence (a real account
+      // whose email happens to fail vs. a fake one that was never
+      // attempted would otherwise be distinguishable).
+      const emailResult = await sendMail({
         to: user.email,
         subject: 'Reset your Scout Bridge Analytics password',
         text: `A password reset was requested for this account.\n\nReset your password:\n${resetUrl}\n\nThis link expires in 1 hour. If you didn't request this, you can ignore this email.`,
       });
+      if (!emailResult.delivered && emailResult.reason === 'send-error') {
+        console.error(`Password reset email failed to send for ${user.email}: ${emailResult.error}`);
+      }
     }
 
     res.json({ message: 'If an account with that email exists, a reset link has been sent.' });

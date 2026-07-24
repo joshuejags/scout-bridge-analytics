@@ -11,7 +11,8 @@ const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024; // 5MB, overridden by the server's c
  * longer a concern once no single request runs longer than one chunk's
  * transfer time.
  *
- * meta: { team, opponentTeam, sport, players, uploadedBy }
+ * meta: { team, opponentTeam, sport, players } — the owning user is
+ * derived server-side from the auth token, not sent by the client.
  * onProgress(percent): called after each chunk finishes uploading
  */
 export const uploadFileInChunks = async (file, meta = {}, { onProgress } = {}) => {

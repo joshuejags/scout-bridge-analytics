@@ -11,6 +11,7 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 const app = require('./app');
 const { initSocket } = require('./utils/socket');
 const analysisWorkerPool = require('./utils/analysisWorkerPool');
+const { verifySmtpConnection } = require('./utils/email');
 
 const connectDB = async () => {
   try {
@@ -26,6 +27,20 @@ const connectDB = async () => {
 };
 
 connectDB();
+
+// Surfaces SMTP misconfiguration at startup instead of only when a real
+// user's registration/reset email silently fails later. Purely
+// informational — never blocks startup, since console-fallback mode
+// (no SMTP configured) is a valid, deliberate state for local dev.
+verifySmtpConnection().then((result) => {
+  if (result === null) {
+    console.log('[email] No SMTP configured — emails will be logged to this console instead of sent.');
+  } else if (result.ok) {
+    console.log(`[email] SMTP connection verified (${process.env.SMTP_HOST}).`);
+  } else {
+    console.error(`[email] SMTP is configured but connection/auth failed: ${result.error}`);
+  }
+});
 
 // socket.io needs the raw HTTP server (not just the Express app) so it can
 // upgrade connections to WebSocket alongside the existing HTTP routes.

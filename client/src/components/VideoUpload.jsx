@@ -70,7 +70,6 @@ const VideoUpload = ({ onUploadSuccess }) => {
       const video = await uploadFileInChunks(
         file,
         {
-          uploadedBy: 'user@example.com',
           sport,
           team: selectedTeam || undefined,
           opponentTeam: selectedOpponent || undefined,
