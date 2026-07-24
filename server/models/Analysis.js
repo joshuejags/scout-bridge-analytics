@@ -13,6 +13,14 @@ const TrackingDataSchema = new mongoose.Schema(
 const PlayerDataSchema = new mongoose.Schema(
   {
     playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
+    trackId: String,
+    jerseyNumber: Number,
+    jerseyConfidence: Number,
+    teamColor: String,
+    thumbnail: String,
+    // True once a human has confirmed or corrected this track's identity
+    // via the manual review UI, as opposed to an OCR-only guess.
+    verified: { type: Boolean, default: false },
     trackingData: { type: [TrackingDataSchema], default: [] },
     statistics: {
       distanceCovered: Number,

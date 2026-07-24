@@ -1,0 +1,11 @@
+node_modules
+uploads
+tmp_analysis
+.git
+.env
+*.log
+coverage
+venv
+__pycache__
+*.pyc
+cv/*.pt

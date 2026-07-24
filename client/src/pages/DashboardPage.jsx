@@ -25,7 +25,7 @@ const DashboardPage = () => {
         ]);
 
         const videos = videosRes.data;
-        const analyzed = videos.filter((v) => v.status === 'completed').length;
+        const analyzed = videos.filter((v) => v.status === 'analyzed').length;
 
         setStats({
           totalVideos: videos.length,

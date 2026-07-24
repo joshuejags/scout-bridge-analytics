@@ -1,19 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import PlayerVerification from '../components/PlayerVerification';
 import './AnalysisPage.css';
 
 const AnalysisPage = () => {
   const { videoId } = useParams();
   const [analysis, setAnalysis] = useState(null);
+  const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showVerification, setShowVerification] = useState(false);
 
   useEffect(() => {
     const fetchAnalysis = async () => {
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/analysis/${videoId}`);
-        setAnalysis(response.data);
+        const [analysisRes, playersRes] = await Promise.all([
+          axios.get(`${process.env.REACT_APP_API_URL}/analysis/${videoId}`),
+          axios.get(`${process.env.REACT_APP_API_URL}/players`),
+        ]);
+        setAnalysis(analysisRes.data);
+        setPlayers(playersRes.data);
       } catch (err) {
         setError(err.response?.data?.error || 'Failed to load analysis');
       } finally {
@@ -32,7 +39,21 @@ const AnalysisPage = () => {
       <div className="analysis-header">
         <h2>Analysis Report</h2>
         <p>Video: {analysis.video?.originalName || 'Unknown video'}</p>
+        <button
+          className="pv-toggle-btn"
+          onClick={() => setShowVerification((prev) => !prev)}
+        >
+          {showVerification ? 'Hide player verification' : 'Verify Players'}
+        </button>
       </div>
+
+      {showVerification && (
+        <PlayerVerification
+          analysis={analysis}
+          players={players}
+          onAnalysisUpdate={setAnalysis}
+        />
+      )}
 
       <div className="analysis-summary-card">
         <h3>Summary</h3>
@@ -55,15 +76,27 @@ const AnalysisPage = () => {
 
         <div className="analysis-panel">
           <h3>Player stats</h3>
-          {analysis.playerData.map((player) => (
-            <div key={player.playerId} className="player-card">
-              <h4>{player.playerId}</h4>
-              <p>Distance covered: {player.statistics.distanceCovered} m</p>
-              <p>Average speed: {player.statistics.averageSpeed} m/s</p>
-              <p>Sprints: {player.statistics.sprintCount}</p>
-              <p>Activation area: {player.statistics.activationArea}</p>
-            </div>
-          ))}
+          {analysis.playerData.map((player, index) => {
+            const label = player.playerId?.name
+              ? player.playerId.name
+              : player.jerseyNumber != null
+              ? `#${player.jerseyNumber}`
+              : `Unidentified (track ${index + 1})`;
+            return (
+              <div key={player.playerId?._id || player.trackId || index} className="player-card">
+                <h4>
+                  {label}
+                  {player.teamColor && (
+                    <span className="jersey-color-tag"> · {player.teamColor} kit</span>
+                  )}
+                </h4>
+                <p>Distance covered: {player.statistics.distanceCovered} m</p>
+                <p>Average speed: {player.statistics.averageSpeed} m/s</p>
+                <p>Sprints: {player.statistics.sprintCount}</p>
+                <p>Activation area: {player.statistics.activationArea}</p>
+              </div>
+            );
+          })}
         </div>
       </div>
 

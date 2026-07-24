@@ -1,0 +1,16 @@
+# easyocr is installed separately from requirements.txt, with --no-deps
+# (see server/Dockerfile). Its own dependency list pulls in
+# opencv-python-headless, which installs into the same cv2 import
+# namespace as opencv-python (already in requirements.txt) and corrupts
+# it. Confirmed two ways: on Windows both land on disk and
+# opencv-python-headless silently wins, so cv2.VideoCapture loses its
+# FFMPEG backend and every video fails to open; on Linux (this project's
+# Docker image) pip installs them in the same batch since they share
+# files under cv2/, and uninstalling either afterward deletes files the
+# other still needs, breaking the cv2 import entirely.
+#
+# --no-deps skips resolving opencv-python-headless (and every other
+# easyocr dependency) at all; requirements.txt already covers everything
+# easyocr actually needs at runtime (torch, numpy, opencv-python, Pillow,
+# scipy, scikit-image, python-bidi, PyYAML, Shapely, pyclipper, ninja).
+easyocr>=1.7.0

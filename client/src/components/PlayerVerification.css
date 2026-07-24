@@ -1,0 +1,265 @@
+.player-verification {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  margin-bottom: 20px;
+}
+
+.pv-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.pv-subtitle {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-bottom: 0;
+}
+
+.pv-filters {
+  display: flex;
+  gap: 8px;
+}
+
+.pv-filter-btn {
+  padding: 6px 14px;
+  border: 2px solid var(--border-color);
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-color);
+  transition: var(--transition);
+}
+
+.pv-filter-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.pv-filter-btn.active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+.pv-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.pv-merge-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff8e1;
+  border: 1px solid var(--warning-color);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.pv-merge-confirm {
+  background: var(--success-color);
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.pv-merge-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pv-merge-cancel {
+  background: none;
+  border: 1px solid var(--border-color);
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.pv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.pv-card {
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: var(--transition);
+  background: white;
+}
+
+.pv-card-selected {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.15);
+}
+
+.pv-card-verified {
+  border-color: var(--success-color);
+}
+
+.pv-thumb-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background: var(--light-bg);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.pv-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pv-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.pv-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.pv-card-body {
+  padding: 10px;
+}
+
+.pv-card-label {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.pv-card-color {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  text-transform: capitalize;
+}
+
+.pv-verified-tag {
+  display: inline-block;
+  background: var(--success-color);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+
+.pv-edit-btn {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--light-bg);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-color);
+}
+
+.pv-edit-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.pv-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pv-edit-form label {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  color: var(--text-muted);
+  gap: 3px;
+}
+
+.pv-edit-form input,
+.pv-edit-form select {
+  padding: 5px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  font-size: 13px;
+}
+
+.pv-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pv-save-btn {
+  flex: 1;
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.pv-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pv-cancel-btn {
+  flex: 1;
+  background: none;
+  border: 1px solid var(--border-color);
+  padding: 6px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.pv-empty {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 20px;
+}
+
+@media (max-width: 768px) {
+  .pv-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+  }
+}

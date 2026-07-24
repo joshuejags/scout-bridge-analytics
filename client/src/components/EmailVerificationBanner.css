@@ -1,0 +1,32 @@
+.email-verification-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #fff8e1;
+  border-bottom: 1px solid var(--warning-color);
+  padding: 10px 20px;
+  font-size: 14px;
+}
+
+.evb-error {
+  color: var(--danger-color);
+}
+
+.email-verification-banner button {
+  background: var(--warning-color);
+  color: #333;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.email-verification-banner button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

@@ -1,7 +1,10 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const { body, param } = require('express-validator');
 const videoController = require('../controllers/videoController');
+const validate = require('../middleware/validate');
+const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -35,10 +38,26 @@ const upload = multer({
   },
 });
 
-// Routes
-router.post('/upload', upload.single('video'), videoController.uploadVideo);
+const idParam = param('id').isMongoId().withMessage('Invalid video id');
+
+// Routes. Body validation for the upload route runs after multer has
+// parsed the multipart form, since express-validator can't read
+// multipart fields before that.
+router.post(
+  '/upload',
+  upload.single('video'),
+  [
+    body('team').optional({ values: 'falsy' }).isMongoId().withMessage('Invalid team id'),
+    body('opponentTeam')
+      .optional({ values: 'falsy' })
+      .isMongoId()
+      .withMessage('Invalid opponent team id'),
+  ],
+  validate,
+  videoController.uploadVideo
+);
 router.get('/', videoController.getVideos);
-router.get('/:id', videoController.getVideoById);
-router.delete('/:id', videoController.deleteVideo);
+router.get('/:id', [idParam], validate, videoController.getVideoById);
+router.delete('/:id', requireRole('admin'), [idParam], validate, videoController.deleteVideo);
 
 module.exports = router;

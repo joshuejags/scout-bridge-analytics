@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -20,7 +21,7 @@ class PlayerDetector:
 
     def detect_players(self, frame):
         """
-        Detect players in a frame.
+        Detect players in a frame (no cross-frame identity tracking).
 
         Args:
             frame: Input video frame (numpy array)
@@ -29,7 +30,7 @@ class PlayerDetector:
             List of detections with bounding boxes and confidence scores
         """
         try:
-            results = self.model(frame)
+            results = self.model(frame, verbose=False)
             detections = []
 
             for result in results:
@@ -52,6 +53,69 @@ class PlayerDetector:
             return detections
         except Exception as e:
             logger.error(f"Error detecting players: {e}")
+            return []
+
+    def track_players(self, frame, tracker_config=None):
+        """
+        Detect and track players across frames using Ultralytics' built-in
+        tracker. Must be called on consecutive frames of the same video for
+        track IDs to be meaningful; use a fresh PlayerDetector instance
+        between videos so the tracker's internal state doesn't bleed
+        across clips.
+
+        Args:
+            frame: Input video frame (numpy array)
+            tracker_config: path to a tracker YAML config. Defaults to the
+                bundled tracktrack_reid.yaml (TrackTrack, a 2025 multi-cue
+                tracker, with appearance ReID enabled). Measured on this
+                project's football footage: 48 surviving tracks over a full
+                46s clip vs 68 for plain ByteTrack and 68 for stock
+                TrackTrack without ReID — a ~29% reduction in fragmented
+                player identities, at no meaningful runtime cost since ReID
+                reuses YOLO's own features rather than a separate model.
+                Plain BoT-SORT+ReID was also tried and showed no
+                improvement over ByteTrack (41 vs 42 tracks/300 frames).
+
+        Returns:
+            List of detections with bounding boxes, confidence scores, and
+            a persistent "track_id" (int, or None if the tracker has not
+            yet assigned one for this detection).
+        """
+        if tracker_config is None:
+            tracker_config = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "tracktrack_reid.yaml"
+            )
+        try:
+            results = self.model.track(
+                frame,
+                persist=True,
+                classes=[0],
+                verbose=False,
+                tracker=tracker_config,
+            )
+            detections = []
+
+            for result in results:
+                boxes = result.boxes
+                if boxes is None:
+                    continue
+                ids = boxes.id
+                for i, box in enumerate(boxes):
+                    x1, y1, x2, y2 = box.xyxy[0]
+                    conf = box.conf[0]
+                    track_id = int(ids[i]) if ids is not None else None
+                    detections.append(
+                        {
+                            "bbox": [float(x1), float(y1), float(x2), float(y2)],
+                            "confidence": float(conf),
+                            "class": 0,
+                            "track_id": track_id,
+                        }
+                    )
+
+            return detections
+        except Exception as e:
+            logger.error(f"Error tracking players: {e}")
             return []
 
     def draw_detections(self, frame, detections):

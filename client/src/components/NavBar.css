@@ -16,6 +16,8 @@
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.5px;
+  color: white;
+  text-decoration: none;
 }
 
 .nav-links {
@@ -52,6 +54,27 @@
 
 .nav-links a:hover::after {
   width: 100%;
+}
+
+.nav-user {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+.nav-logout-btn {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 7px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: var(--transition);
+}
+
+.nav-logout-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 /* Mobile Responsive */

@@ -5,13 +5,14 @@ A comprehensive sports analytics platform built with MERN stack and Computer Vis
 ## Features
 
 - 📹 **Video Upload**: Upload match highlights in multiple formats (MP4, AVI, MOV, MKV, FLV)
-- 👥 **Player Tracking**: Real-time player detection and tracking using YOLO
-- ⚽ **Ball Detection**: Automatic ball tracking and possession analysis
-- � **Teams & Players**: Manage team rosters, player profiles, positions, and jersey numbers
-- �📊 **Performance Analytics**: Player statistics including distance covered, speed, movements
+- 👥 **Player Tracking**: Player detection and multi-object tracking using YOLOv8 + TrackTrack
+- ⚽ **Ball Detection**: Color-based ball tracking and possession analysis
+- 🔢 **Jersey OCR**: Automatic jersey-number reading and shirt-color classification, with a manual verification UI to fill the gaps OCR can't reach
+- 🏷️ **Teams & Players**: Manage team rosters, player profiles, positions, and jersey numbers
+- 🔐 **Accounts**: JWT auth with role-based access (admin/scout), email verification, and password reset
+- 📊 **Performance Analytics**: Player statistics including distance covered, speed, sprint counts
 - 🔥 **Heatmaps**: Visualize player movement patterns and activity areas
-- 🎯 **Action Detection**: Identify passes, shots, tackles, and other game actions
-- 📈 **Real-time Streaming**: Stream analysis results for live events
+- 🎯 **Action Detection**: Currently detects "shot" events from sprint-near-ball heuristics; passes/tackles/interceptions are defined but not yet populated
 
 ## Tech Stack
 
@@ -19,8 +20,7 @@ A comprehensive sports analytics platform built with MERN stack and Computer Vis
 - **Framework**: Express.js (Node.js)
 - **Database**: MongoDB
 - **File Upload**: Multer
-- **Video Processing**: FFmpeg integration ready
-- **Computer Vision**: YOLO (YOLOv8), OpenPose
+- **Computer Vision bridge**: Node spawns the Python CV pipeline as a background child process per analysis request
 
 ### Frontend
 - **Framework**: React 18
@@ -30,9 +30,9 @@ A comprehensive sports analytics platform built with MERN stack and Computer Vis
 - **Styling**: CSS3
 
 ### Machine Learning
-- **Object Detection**: YOLOv8 (Ultralytics)
-- **Pose Estimation**: OpenPose
-- **Python**: 3.8+
+- **Object Detection & Tracking**: YOLOv8n (Ultralytics), TrackTrack tracker with appearance ReID
+- **Jersey OCR**: EasyOCR
+- **Python**: 3.13 (developed/tested on; 3.8+ should work but is untested)
 
 ## Project Structure
 
@@ -118,25 +118,47 @@ npm run build
 
 ## API Endpoints
 
+All routes below except `/api/auth/register`, `/api/auth/login`, `/api/auth/forgot-password`, `/api/auth/reset-password`, `/api/auth/verify-email`, and `/api/health` require `Authorization: Bearer <token>`. Routes marked **(admin)** additionally require the authenticated user's `role` to be `admin`.
+
+### Auth
+- `POST /api/auth/register` - Create an account `{ name, email, password }` (password ≥ 8 chars) → `{ token, user }`. Sends a verification email (or logs it to the console — see Email below). The first account ever created becomes `admin`; every account after that defaults to `scout`.
+- `POST /api/auth/login` - `{ email, password }` → `{ token, user }`
+- `GET /api/auth/me` - Current authenticated user
+- `GET /api/auth/users` **(admin)** - List all accounts
+- `PATCH /api/auth/users/:id/role` **(admin)** - `{ role: 'admin' | 'scout' }` - Change another user's role
+- `POST /api/auth/verify-email` - `{ token }` (from the verification email link) → marks the account verified. Single-use, expires after 24h.
+- `POST /api/auth/resend-verification` - Requires auth. Issues a new verification email for the logged-in account; 400 if already verified.
+- `POST /api/auth/forgot-password` - `{ email }` → always `200`, regardless of whether the email is registered (prevents account enumeration). Rate-limited to 5 requests / 15 min per IP+email.
+- `POST /api/auth/reset-password` - `{ token, password }` (token from the reset email link) → resets the password. Single-use, expires after 1h.
+
 ### Videos
 - `GET /api/videos` - Get all videos
 - `GET /api/videos/:id` - Get specific video
 - `POST /api/videos/upload` - Upload video file
-- `DELETE /api/videos/:id` - Delete video
+- `DELETE /api/videos/:id` **(admin)** - Delete video
 
 ### Analysis
 - `GET /api/analysis/:videoId` - Get video analysis
-- `POST /api/analysis/:videoId/process` - Start video analysis
+- `POST /api/analysis/:videoId/process` - Start video analysis (returns `202` immediately; runs YOLO/tracking in the background, poll `GET /api/videos/:id` for `status`)
+- `PATCH /api/analysis/:analysisId/tracks/:trackId` - Manually set a track's jersey number / linked roster player / team color (marks it `verified: true`)
+- `POST /api/analysis/:analysisId/tracks/merge` - Merge two player tracks that are the same real person into one
 
 ### Teams
 - `GET /api/teams` - Get all teams
 - `POST /api/teams` - Create a new team
-- `DELETE /api/teams/:id` - Delete a team
+- `GET /api/teams/:id` - Get a team
+- `PUT /api/teams/:id` - Update a team
+- `DELETE /api/teams/:id` **(admin)** - Delete a team
 
 ### Players
 - `GET /api/players` - Get all players
 - `POST /api/players` - Create a new player
-- `DELETE /api/players/:id` - Delete a player
+- `GET /api/players/:id` - Get a player
+- `PUT /api/players/:id` - Update a player
+- `DELETE /api/players/:id` **(admin)** - Delete a player
+
+### Media
+- `GET /uploads/*` - Serves uploaded video files and player-verification thumbnails; requires the same Bearer token as the API (not a public static folder)
 
 ## Environment Variables
 
@@ -162,25 +184,47 @@ OPENPOSE_MODEL_PATH=./models/openpose
 
 # Frontend
 REACT_APP_API_URL=http://localhost:5000/api
+CLIENT_URL=http://localhost:3000  # used to build password-reset/verify-email links
+
+# Email (password reset + verification) — see "Email" section below
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=Scout Bridge Analytics <no-reply@yourdomain.com>
 ```
+
+## Email
+
+Password reset and email verification send mail through `server/utils/email.js`. If `SMTP_HOST`/`SMTP_USER`/`SMTP_PASS` are all set, it sends via that SMTP server — any provider works (SES, SendGrid, Postmark, a self-hosted relay) since they all speak SMTP. **This repo ships with no SMTP credentials configured anywhere** — with them unset, the email is logged to the server console instead of sent, so the reset/verify link is still visible and the whole flow is testable without real email infrastructure. This is deliberate, not a stub: a fallback that silently pretended to send would be worse than one that's loud about what it's actually doing. Configure real `SMTP_*` values before relying on this for real users.
 
 ## Computer Vision Components
 
-### Player Detection (YOLO)
-- Detects players in video frames
-- Provides bounding boxes and confidence scores
-- Real-time processing capability
+Analysis is triggered by `POST /api/analysis/:videoId/process`, which spawns `server/cv/video_analyzer.py` as a background child process. The video's status moves `uploaded → processing → analyzed` (or `failed`); poll `GET /api/videos/:id` to watch it.
+
+### Player Detection & Tracking (YOLOv8 + TrackTrack)
+- YOLOv8n detects people per frame; Ultralytics' TrackTrack tracker (with appearance ReID) links detections into per-player tracks across frames
+- On typical single-camera match footage a full 22-player match still fragments into 40-70+ raw tracks, since a player who is occluded or leaves frame gets a new ID — this is a real limitation of motion-only tracking, not a bug (see "Manual Player Verification" below)
+
+### Jersey Number OCR + Team Color
+- EasyOCR reads 1-2 digit jersey numbers from torso crops when a player's back faces the camera (numbers are not legible from front/side angles — this caps automatic identification to a small fraction of tracks on wide-angle footage)
+- Each track is also classified into a coarse shirt-color bucket (HSV-based) every frame
+- Tracks that agree on both a trusted jersey number and shirt color are automatically merged into one player
+
+### Manual Player Verification
+- Each surviving track gets a saved thumbnail crop (`server/uploads/thumbnails/<videoId>/<trackId>.jpg`)
+- The Analysis report page has a "Verify Players" panel: a thumbnail grid where a human can set a track's jersey number, link it to a roster `Player`, or merge two tracks that are the same real person — closing the gap OCR and tracking alone can't close on real-world footage
 
 ### Ball Tracking
-- Color-based ball detection
-- Possession analysis
-- Movement trajectory tracking
+- Color-based (HSV) ball detection
+- Possession approximated by nearest tracked player within a pixel radius
+- Per-frame trajectory recorded
 
 ### Performance Metrics
-- Distance covered calculation
-- Speed and acceleration
-- Movement patterns and heatmaps
-- Action classification
+- Distance covered (converted from pixel movement via an assumed pixels-per-meter constant — not camera-calibrated, so treat as directionally correct rather than precise)
+- Average speed and sprint-event counts (smoothed over a multi-frame window to filter detection jitter)
+- Heatmap grid of player positions
+- Action detection (currently: "shot" events, heuristically inferred from a sprint near the ball with a cooldown to avoid duplicate-frame spam)
 
 ## Development Guidelines
 
@@ -205,19 +249,25 @@ REACT_APP_API_URL=http://localhost:5000/api
 ## Testing
 
 ```bash
-# Backend tests
+# Backend tests (Jest + Supertest, 31 tests: auth, teams, players, rate limiting)
 npm test --prefix server
 
-# Frontend tests
-npm test --prefix client
+# Frontend tests (React Testing Library, 15 tests: AuthContext, Login/Register pages, ProtectedRoute)
+npm test --prefix client -- --watchAll=false
 ```
+
+Backend tests run against a disposable `scout-bridge-analytics-test` database (same `MONGODB_URI` host, different db name — set in `server/tests/setup.js`) so they never read or modify real data, and the database is dropped after each run. They talk to the Express app directly via `server/app.js` (no live server needs to be running separately — a local `mongod` reachable at `MONGODB_URI` is the only requirement).
+
+Frontend tests mock `axios` and `useAuth` rather than hitting a real server, so they run standalone. CI runs both suites plus a production client build and a Python CV byte-compile check on every push/PR — see `.github/workflows/ci.yml`.
 
 ## Deployment
 
-### Docker Support (Coming Soon)
+### Docker
 ```bash
-docker-compose up
+docker compose up --build
 ```
+
+Brings up MongoDB, the Express server, and the CRA dev server. The server image includes the full Python CV stack (ultralytics/torch/opencv/easyocr) alongside Node, since the analysis pipeline is core functionality, not optional — expect a large first build (torch alone is 500+ MB) and a multi-minute build time, longer on a slow connection since pip has no build-cache equivalent for the download itself. If you don't need GPU inference (this project runs CPU-only in practice — no CUDA device is assumed anywhere in the CV code), pointing pip at the CPU-only PyTorch wheel index cuts that download substantially; see https://pytorch.org/get-started/locally/ for the current index URL. Set a real `JWT_SECRET` via a `.env` file in the project root before running in anything other than throwaway local testing; `docker-compose.yml` falls back to a placeholder so `up` doesn't hard-crash with no config, but that placeholder must not be used for real data.
 
 ### Cloud Deployment
 - AWS: EC2 + RDS + S3
@@ -249,6 +299,13 @@ mongod --version
 python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
 ```
 
+### `npm ci` fails in the Docker image with "Missing: X from lock file"
+If your local npm major version differs from the one in `node:20-bookworm-slim` (npm 10 as of writing), `npm install` run locally can produce a `package-lock.json` that your local npm accepts but the container's older npm rejects as incomplete — even though nothing is actually wrong with your dependencies. Check with `npm --version` locally vs. `docker run --rm node:20-bookworm-slim npm --version`. If they differ, regenerate the lockfile using the same npm version the image uses:
+```bash
+docker run --rm -v "$(pwd)/client:/app" -w /app node:20-bookworm-slim npm install
+```
+(swap `client` for `server` as needed), then use `npm ci` (not `npm install`) for any further local installs against that lockfile, since `npm install` will silently rewrite it back to your local npm's format.
+
 ### Port Already in Use
 ```bash
 # Change ports in .env
@@ -277,19 +334,38 @@ For issues and questions:
 
 ## Roadmap
 
-- [ ] Real-time WebSocket streaming
-- [ ] Advanced action recognition
-- [ ] Multi-sport support
-- [ ] Team analytics dashboard
-- [ ] Player comparison tools
-- [ ] Cloud storage integration
+**Shipped:**
+- [x] Real YOLO player detection + tracking (TrackTrack w/ ReID), replacing the earlier hardcoded mock analysis
+- [x] Jersey number OCR + shirt-color classification, with automatic track merging where confident
+- [x] Manual player verification UI (thumbnail review, jersey/roster editing, track merging) for the majority of tracks OCR can't identify on its own
+- [x] Async analysis pipeline (`202` + background processing + status polling) instead of blocking the request
+- [x] Teams & players management dashboard (basic — see gaps below)
+- [x] JWT authentication — register/login, bcrypt-hashed passwords, all `/api/videos`, `/api/analysis`, `/api/teams`, `/api/players`, and `/uploads` (video files + thumbnails) routes require a valid Bearer token. Frontend has Login/Register pages, a `ProtectedRoute` wrapper, and an axios interceptor that attaches the token and force-logs-out on 401; native `<video>`/`<img>` tags can't send auth headers, so media is fetched as an authenticated blob via `useAuthedMedia` and handed to the element as an object URL. `/api/health` and `/api/auth/{register,login}` remain open.
+- [x] Role-based restrictions — `role: 'admin' | 'scout'` on `User`; the first account ever registered on a fresh install is auto-promoted to admin (there'd otherwise be no way to ever satisfy a role check), every account after that defaults to `scout`. Admins can list users and change roles via `GET/PATCH /api/auth/users`. Deleting a team, player, or video is admin-only (cascades into other data); create/update/read stay open to any authenticated user.
+- [x] Input validation — every mutating route (`POST`/`PUT`/`PATCH`) validates its body/params with `express-validator` (email format, password length, Mongo ObjectId shape, jersey-number range, etc.) via a shared `middleware/validate.js`, returning `400` with the specific field error instead of hitting Mongoose and leaking a raw driver error.
+- [x] Backend automated tests — `server/tests/` (Jest + Supertest), 31 tests covering registration/login/role-bootstrap, validation rejection, role-gated deletes, and the rate-limit mechanism itself, run against a disposable `scout-bridge-analytics-test` database so they never touch real data. Split `server.js` into `app.js` (the Express app, importable by tests) + a thin `server.js` entrypoint to make this possible.
+- [x] Frontend automated tests — React Testing Library, 15 tests covering `AuthContext` (login/register/logout/session-restore/stale-token-logout), `LoginPage`, `RegisterPage`, and `ProtectedRoute`. Mocks `axios`/`useAuth` rather than needing a live server.
+- [x] Rate limiting — `/api/auth/login` capped at 10 attempts / 15 min, keyed by IP + submitted email (so one attacker can't lock out a real user's email from a different IP, but a single IP+email pair is capped) via `express-rate-limit`; `/api/auth/register` capped at 20/hour per IP to slow mass fake-account creation. Disabled under `NODE_ENV=test` since the mechanism itself has its own dedicated tests (`server/tests/rateLimit.test.js`) against a throwaway low-limit app rather than fighting the real 15-minute window.
+- [x] CI/CD — `.github/workflows/ci.yml` runs on every push/PR: backend test suite (with a real `mongo:6.0` service container), frontend test suite, a production client build, and a Python CV module byte-compile check.
+- [x] Docker — `server/Dockerfile` (Node 20 + the full Python CV stack — ultralytics/torch/opencv/easyocr — in a venv, since the analysis pipeline is core functionality) and `client/Dockerfile` (Node 20, runs the CRA dev server, matching `docker-compose.yml`'s bind-mount dev workflow). **Fully verified**: both images build successfully and `docker compose up` was run for real — all three containers (mongo, server, client) started, the server connected to Mongo, and a real register→login round trip succeeded through the published ports, with the reset/verify console-fallback email log visible in `docker logs`. Along the way, found and fixed six real bugs by actually building and running it (not by inspection): (1) missing `.dockerignore` files meant `node_modules` was being uploaded as build context (338MB, 4 min, for nothing); (2) `analysisController.js`'s Python/CV/upload paths were hardcoded relative to a full repo checkout (`__dirname/../..`), which silently breaks in the container (only `server/` is copied in) — now overridable via `PYTHON_BIN`/`CV_DIR`/`TMP_ANALYSIS_DIR`/`UPLOAD_DIR` env vars set in the Dockerfile, local dev's `__dirname` defaults unchanged; (3) `docker-compose.yml` was missing `JWT_SECRET` (and `CLIENT_URL`/`SMTP_*`) entirely — every login/register would have thrown; (4) local npm 11 and the image's npm 10 disagreed about `client/package-lock.json` completeness (npm 10 correctly flagged a real missing `yaml` transitive dependency) — regenerated the lockfile via the same npm version the image uses, documented in Troubleshooting below; (5) `easyocr` transitively depends on `opencv-python-headless`, which shares files with `opencv-python` on Linux — installing both in one pass and then uninstalling one afterward corrupted the surviving `cv2` install entirely (`import cv2` failed), caught by a build-time assertion rather than shipped broken; fixed properly by installing `easyocr` with `pip install --no-deps` (its other real dependencies are listed explicitly in `requirements.txt`) so `opencv-python-headless` is never resolved at all; (6) pip's default resolver picked torch's CUDA build (multi-GB, including a full cuDNN/cuBLAS/cuFFT toolkit) despite nothing in this codebase requesting a CUDA device — fixed by installing the CPU-only build from PyTorch's own wheel index before the main `requirements.txt` install; confirmed in the build log (`torch 2.5.1+cpu - CUDA build: False`).
+- [x] Password reset / email verification — `POST /api/auth/forgot-password` (always 200, no account-existence leak, rate-limited to 5/15min per IP+email), `POST /api/auth/reset-password`, `POST /api/auth/verify-email`, `POST /api/auth/resend-verification`. Tokens are single-use, expire (1h reset / 24h verify), and only their SHA-256 hash is ever persisted — the raw token exists only in the URL sent to the user, mirroring how the password itself is never stored in plaintext. `server/utils/email.js` sends via any SMTP provider if `SMTP_HOST`/`SMTP_USER`/`SMTP_PASS` are set; with no SMTP configured (the state of this environment — no provider credentials exist here), it logs the email to the server console instead of pretending to send it, so the whole flow is still testable end-to-end locally. Frontend: `ForgotPasswordPage`, `ResetPasswordPage`, `VerifyEmailPage`, and an `EmailVerificationBanner` shown app-wide for unverified accounts. 12 backend tests + 4 new frontend test files, all verified against the live server with real tokens end-to-end (not just the test suite).
+- [x] `multer` upgraded 1.4.5→2.2.0 — 1.x has four real DoS/crash CVEs (unhandled stream errors, malformed multipart requests, empty field names, unhandled busboy errors) all fixed by 2.x; verified via the public API diff between the two versions that no application code needed to change, then confirmed with a real multipart upload against the live server (201, correct file size) plus the `fileFilter` rejection path.
+- [x] Public landing page + redesigned authenticated home — `/` used to be behind the login wall entirely (`ProtectedRoute` around `Home`). It's now a `RootRoute` that renders `LandingPage` (hero, clickable feature tabs, an expandable "how it works" accordion, and a sample report table explicitly labeled "sample data") for signed-out visitors, or the redesigned `Home` (time-of-day greeting, live stat cards linking to Dashboard/Teams/Players, collapsible upload panel, recent-activity feed) for signed-in users — so a visitor can explore what the product does before creating an account. 5 new tests exercise the actual tab-switching and accordion interactions, not just that the page renders.
+
+**Known gaps (no work started):**
+- [ ] Nothing security-related from the original gap list remains untouched — see Larger feature gaps below for what's left, which is product functionality rather than hardening.
+
+**Larger feature gaps:**
+- [ ] Real-time WebSocket streaming (analysis is currently poll-based, not pushed)
+- [ ] Advanced action recognition beyond the current sprint-near-ball "shot" heuristic (passes, tackles, interceptions are defined in the schema but never populated)
+- [ ] Multi-sport support (pitch/heatmap assumptions are football-specific)
+- [ ] Player comparison tools (cross-match stats aggregation)
+- [ ] Cloud storage integration (uploads are local-disk only via Multer)
 - [ ] Mobile app
-- [ ] Docker containerization
-- [ ] CI/CD pipeline
-- [ ] Advanced ML models (3D pose, tactical analysis)
+- [ ] Advanced ML models (pose estimation, tactical/formation analysis) — `OPENPOSE_MODEL_PATH` is in `.env` but OpenPose was never integrated
 
 ## Acknowledgments
 
-- YOLO by Ultralytics
-- OpenPose community
+- YOLO & TrackTrack by Ultralytics
+- EasyOCR by JaidedAI
 - MERN Stack resources

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { poll } from '../utils/polling';
+import { useAuthedMedia } from '../utils/useAuthedMedia';
 import Toast from './Toast';
 import SearchFilter from './SearchFilter';
 import LoadingSpinner from './LoadingSpinner';
@@ -83,6 +84,16 @@ const VideoList = ({ refreshTrigger = 0 }) => {
     }
   };
 
+  const revertOptimistic = (videoId) => {
+    setVideos((prevVideos) =>
+      prevVideos.map((video) =>
+        video._id === videoId && video.status === 'processing'
+          ? { ...video, status: 'uploaded' }
+          : video
+      )
+    );
+  };
+
   const handleProcess = async (videoId) => {
     setProcessingId(videoId);
     setError(null);
@@ -96,23 +107,28 @@ const VideoList = ({ refreshTrigger = 0 }) => {
     try {
       const response = await axios.post(`${process.env.REACT_APP_API_URL}/analysis/${videoId}/process`);
       if (response.status === 201 || response.status === 200) {
-        setVideos((prevVideos) =>
-          prevVideos.map((video) =>
-            video._id === videoId
-              ? { ...video, status: 'analyzed', analysis: response.data }
-              : video
-          )
-        );
-        setStatusMessage('Video analysis complete. You can view the report.');
-        setError(null);
-        setProcessingId(null);
-        return;
+        const analysis = response.data?.video ? response.data : null;
+        const alreadyDone = analysis && analysis.video;
+        if (alreadyDone || response.status === 201) {
+          setVideos((prevVideos) =>
+            prevVideos.map((video) =>
+              video._id === videoId
+                ? { ...video, status: 'analyzed', analysis: response.data }
+                : video
+            )
+          );
+          setStatusMessage('Video analysis complete. You can view the report.');
+          setError(null);
+          setProcessingId(null);
+          return;
+        }
       }
     } catch (error) {
       const errorMessage = error.response?.data?.error || 'Video processing failed.';
       setError(errorMessage);
       setStatusMessage(null);
       setProcessingId(null);
+      revertOptimistic(videoId);
       return;
     }
 
@@ -139,11 +155,14 @@ const VideoList = ({ refreshTrigger = 0 }) => {
             : `Video status: ${updatedVideo.status}`
         );
         setError(null);
+      } else {
+        revertOptimistic(videoId);
       }
     } catch (pollError) {
       console.error('Polling error:', pollError);
       setError('Processing timed out. Refresh the page or retry.');
       setStatusMessage(null);
+      revertOptimistic(videoId);
     } finally {
       setProcessingId(null);
     }
@@ -153,6 +172,8 @@ const VideoList = ({ refreshTrigger = 0 }) => {
     setSelectedVideoUrl(video.url);
     setSelectedVideoName(video.originalName);
   };
+
+  const { blobUrl: previewBlobUrl } = useAuthedMedia(selectedVideoUrl);
 
   const statusFilters = [
     { id: 'all', label: 'All', active: statusFilter === 'all' },
@@ -181,7 +202,11 @@ const VideoList = ({ refreshTrigger = 0 }) => {
       {selectedVideoUrl && (
         <div className="video-preview-panel">
           <h3>Preview: {selectedVideoName}</h3>
-          <video controls width="100%" src={selectedVideoUrl} />
+          {previewBlobUrl ? (
+            <video controls width="100%" src={previewBlobUrl} />
+          ) : (
+            <p>Loading preview...</p>
+          )}
         </div>
       )}
       
