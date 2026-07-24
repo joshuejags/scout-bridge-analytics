@@ -34,6 +34,16 @@ const VideoList = ({ refreshTrigger = 0 }) => {
   useEffect(() => {
     if (!socket) return;
 
+    const handleQueued = ({ videoId }) => {
+      setVideos((prev) =>
+        prev.map((v) => (v._id === videoId ? { ...v, status: 'queued' } : v))
+      );
+    };
+    const handleStarted = ({ videoId }) => {
+      setVideos((prev) =>
+        prev.map((v) => (v._id === videoId ? { ...v, status: 'processing' } : v))
+      );
+    };
     const handleProgress = ({ videoId, progress }) => {
       if (progress == null) return;
       setLiveProgress((prev) => ({ ...prev, [videoId]: progress }));
@@ -64,10 +74,14 @@ const VideoList = ({ refreshTrigger = 0 }) => {
       setProcessingId((current) => (current === videoId ? null : current));
     };
 
+    socket.on('analysis:queued', handleQueued);
+    socket.on('analysis:started', handleStarted);
     socket.on('analysis:progress', handleProgress);
     socket.on('analysis:complete', handleComplete);
     socket.on('analysis:failed', handleFailed);
     return () => {
+      socket.off('analysis:queued', handleQueued);
+      socket.off('analysis:started', handleStarted);
       socket.off('analysis:progress', handleProgress);
       socket.off('analysis:complete', handleComplete);
       socket.off('analysis:failed', handleFailed);
@@ -138,7 +152,7 @@ const VideoList = ({ refreshTrigger = 0 }) => {
   const revertOptimistic = (videoId) => {
     setVideos((prevVideos) =>
       prevVideos.map((video) =>
-        video._id === videoId && video.status === 'processing'
+        video._id === videoId && (video.status === 'processing' || video.status === 'queued')
           ? { ...video, status: 'uploaded' }
           : video
       )
@@ -149,9 +163,12 @@ const VideoList = ({ refreshTrigger = 0 }) => {
     setProcessingId(videoId);
     setError(null);
     setStatusMessage('Processing video...');
+    // The server queues the job and only flips it to 'processing' once an
+    // analysis worker actually picks it up (analysis:started); 'queued' is
+    // the accurate optimistic state in the meantime.
     setVideos((prevVideos) =>
       prevVideos.map((video) =>
-        video._id === videoId ? { ...video, status: 'processing' } : video
+        video._id === videoId ? { ...video, status: 'queued' } : video
       )
     );
 
@@ -197,7 +214,8 @@ const VideoList = ({ refreshTrigger = 0 }) => {
       const updatedVideo = await poll(async () => {
         const data = await refreshVideos();
         const currentVideo = data.find((video) => video._id === videoId);
-        const ready = currentVideo && currentVideo.status !== 'processing';
+        const ready =
+          currentVideo && currentVideo.status !== 'processing' && currentVideo.status !== 'queued';
         return { ready, data: currentVideo };
       }, 5000, 60);
 
@@ -239,6 +257,7 @@ const VideoList = ({ refreshTrigger = 0 }) => {
   const statusFilters = [
     { id: 'all', label: 'All', active: statusFilter === 'all' },
     { id: 'pending', label: 'Pending', active: statusFilter === 'pending' },
+    { id: 'queued', label: 'Queued', active: statusFilter === 'queued' },
     { id: 'processing', label: 'Processing', active: statusFilter === 'processing' },
     { id: 'analyzed', label: 'Analyzed', active: statusFilter === 'analyzed' },
     { id: 'failed', label: 'Failed', active: statusFilter === 'failed' },
@@ -320,9 +339,15 @@ const VideoList = ({ refreshTrigger = 0 }) => {
                     <button
                       onClick={() => handleProcess(video._id)}
                       className="process-btn"
-                      disabled={processingId === video._id || video.status === 'processing'}
+                      disabled={
+                        processingId === video._id ||
+                        video.status === 'processing' ||
+                        video.status === 'queued'
+                      }
                     >
-                      {processingId === video._id || video.status === 'processing'
+                      {video.status === 'queued'
+                        ? 'Queued...'
+                        : processingId === video._id || video.status === 'processing'
                         ? 'Processing...'
                         : video.status === 'failed'
                         ? 'Retry'

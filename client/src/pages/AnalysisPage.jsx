@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import PlayerVerification from '../components/PlayerVerification';
+import Heatmap from '../components/Heatmap';
 import './AnalysisPage.css';
 
 const AnalysisPage = () => {
@@ -78,61 +79,63 @@ const AnalysisPage = () => {
         )}
       </div>
 
-      <div className="analysis-grid">
-        <div className="analysis-panel">
-          <h3>Key moments</h3>
-          <ul>
-            {analysis.summary.highlightedMoments.map((moment, index) => (
-              <li key={index}>
-                <strong>{moment.type}</strong> at frame {moment.frameNumber}: {moment.description}
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div className="analysis-panel">
+        <h3>Key moments</h3>
+        <ul>
+          {analysis.summary.highlightedMoments.map((moment, index) => (
+            <li key={index}>
+              <strong>{moment.type}</strong> at frame {moment.frameNumber}: {moment.description}
+            </li>
+          ))}
+        </ul>
+      </div>
 
-        <div className="analysis-panel">
-          <h3>Player stats</h3>
-          {analysis.playerData.map((player, index) => {
-            const label = player.playerId?.name
-              ? player.playerId.name
-              : player.jerseyNumber != null
-              ? `#${player.jerseyNumber}`
-              : `Unidentified (track ${index + 1})`;
-            return (
-              <div key={player.playerId?._id || player.trackId || index} className="player-card">
-                <h4>
-                  {label}
-                  {player.teamColor && (
-                    <span className="jersey-color-tag"> · {player.teamColor} kit</span>
-                  )}
-                </h4>
-                <p>Distance covered: {player.statistics.distanceCovered} m</p>
-                <p>Average speed: {player.statistics.averageSpeed} m/s</p>
-                <p>Sprints: {player.statistics.sprintCount}</p>
-                <p>Activation area: {player.statistics.activationArea}</p>
-              </div>
-            );
-          })}
-        </div>
+      <div className="analysis-panel">
+        <h3>Player stats</h3>
+        {analysis.playerData.length === 0 ? (
+          <p>No player data in this analysis.</p>
+        ) : (
+          <div className="player-stats-table-wrap">
+            <table className="player-stats-table">
+              <thead>
+                <tr>
+                  <th>Player</th>
+                  <th>Kit color</th>
+                  <th>Distance (m)</th>
+                  <th>Avg speed (m/s)</th>
+                  <th>Sprints</th>
+                  <th>Activation area</th>
+                  <th>Verified</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analysis.playerData.map((player, index) => {
+                  const label = player.playerId?.name
+                    ? player.playerId.name
+                    : player.jerseyNumber != null
+                    ? `#${player.jerseyNumber}`
+                    : `Unidentified (track ${index + 1})`;
+                  return (
+                    <tr key={player.playerId?._id || player.trackId || index}>
+                      <td>{label}</td>
+                      <td>{player.teamColor || '—'}</td>
+                      <td>{player.statistics.distanceCovered}</td>
+                      <td>{player.statistics.averageSpeed}</td>
+                      <td>{player.statistics.sprintCount}</td>
+                      <td>{player.statistics.activationArea}</td>
+                      <td>{player.verified ? 'Yes' : 'No'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="heatmap-card">
         <h3>Heatmap</h3>
-        <div className="heatmap-grid">
-          {analysis.heatmapData.grid.map((row, rowIndex) => (
-            <div key={rowIndex} className="heatmap-row">
-              {row.map((value, colIndex) => (
-                <div
-                  key={colIndex}
-                  className="heatmap-cell"
-                  style={{ opacity: Math.min(1, value / 5) }}
-                >
-                  {value}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+        <Heatmap grid={analysis.heatmapData.grid} sport={analysis.video?.sport} />
       </div>
     </div>
   );

@@ -10,7 +10,11 @@ const videoSchema = new mongoose.Schema(
     filePath: { type: String, required: true },
     status: {
       type: String,
-      enum: ['uploaded', 'processing', 'analyzed', 'failed'],
+      // 'queued' means a job has been submitted but every analysis worker
+      // is currently busy with another video; it transitions to
+      // 'processing' once a worker actually picks it up (see
+      // analysisController.processAnalysis / utils/analysisWorkerPool.js).
+      enum: ['uploaded', 'queued', 'processing', 'analyzed', 'failed'],
       default: 'uploaded',
     },
     // Controls the analyzer's field-size calibration (distance/speed

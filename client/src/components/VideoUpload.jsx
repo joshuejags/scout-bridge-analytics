@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import Toast from './Toast';
+import { uploadFileInChunks } from '../utils/chunkedUpload';
 import './VideoUpload.css';
 
 const SPORTS = [
@@ -58,24 +59,25 @@ const VideoUpload = ({ onUploadSuccess }) => {
       return;
     }
 
-    const formData = new FormData();
-    formData.append('video', file);
-    formData.append('uploadedBy', 'user@example.com');
-    formData.append('sport', sport);
-    if (selectedTeam) formData.append('team', selectedTeam);
-    if (selectedOpponent) formData.append('opponentTeam', selectedOpponent);
-    selectedPlayers.forEach((playerId) => formData.append('players', playerId));
-
     setUploading(true);
+    setProgress(0);
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/videos/upload`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        onUploadProgress: (progressEvent) => {
-          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setProgress(percent);
+      // Uploaded as a sequence of chunks rather than one long-lived
+      // multipart POST — see utils/chunkedUpload.js for why (resilience
+      // against a dropped connection, and reverse-proxy/load-balancer
+      // idle-timeout limits on very large single requests).
+      const video = await uploadFileInChunks(
+        file,
+        {
+          uploadedBy: 'user@example.com',
+          sport,
+          team: selectedTeam || undefined,
+          opponentTeam: selectedOpponent || undefined,
+          players: selectedPlayers,
         },
-      });
+        { onProgress: setProgress }
+      );
 
       setFile(null);
       setSelectedTeam('');
@@ -84,7 +86,7 @@ const VideoUpload = ({ onUploadSuccess }) => {
       setSport('soccer');
       setProgress(0);
       setMessage('Upload succeeded!');
-      if (onUploadSuccess) onUploadSuccess(response.data);
+      if (onUploadSuccess) onUploadSuccess(video);
     } catch (err) {
       setError(err.response?.data?.error || 'Upload failed');
     } finally {

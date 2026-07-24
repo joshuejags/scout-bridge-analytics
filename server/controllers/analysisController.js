@@ -1,12 +1,10 @@
 const path = require('path');
-const { spawn } = require('child_process');
-const fs = require('fs');
-const mongoose = require('mongoose');
 
 const Video = require('../models/Video');
 const Analysis = require('../models/Analysis');
 const Player = require('../models/Player');
 const { emitEvent } = require('../utils/socket');
+const workerPool = require('../utils/analysisWorkerPool');
 
 // Project root is one level up from server/ (this file lives in
 // server/controllers/) when running from a full repo checkout — true for
@@ -16,113 +14,10 @@ const { emitEvent } = require('../utils/socket');
 // working unchanged.
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
-const PYTHON_BIN =
-  process.env.PYTHON_BIN ||
-  (process.platform === 'win32'
-    ? path.join(PROJECT_ROOT, 'venv', 'Scripts', 'python.exe')
-    : path.join(PROJECT_ROOT, 'venv', 'bin', 'python'));
-
-const CV_DIR = process.env.CV_DIR || path.join(PROJECT_ROOT, 'server', 'cv');
-const ANALYZER_SCRIPT = path.join(CV_DIR, 'video_analyzer.py');
-const TMP_DIR = process.env.TMP_ANALYSIS_DIR || path.join(PROJECT_ROOT, 'server', 'tmp_analysis');
 const UPLOAD_DIR = path.resolve(
   process.env.UPLOAD_DIR || path.join(PROJECT_ROOT, 'server', 'uploads')
 );
 const THUMBNAILS_ROOT = path.join(UPLOAD_DIR, 'thumbnails');
-
-if (!fs.existsSync(TMP_DIR)) {
-  fs.mkdirSync(TMP_DIR, { recursive: true });
-}
-
-/**
- * Run the Python analyzer as a child process, write its JSON to a temp file,
- * and return the parsed result. Resolves with the result dict, rejects with
- * an Error on spawn failure, non-zero exit, or invalid JSON. Thumbnails (one
- * representative crop per player track, for the manual review UI) are
- * written directly to thumbnailDir by the analyzer.
- */
-function runAnalyzer(videoPath, maxFrames = null, thumbnailDir = null, onProgress = null, sport = null) {
-  return new Promise((resolve, reject) => {
-    if (!fs.existsSync(ANALYZER_SCRIPT)) {
-      return reject(new Error(`Analyzer script not found at ${ANALYZER_SCRIPT}`));
-    }
-
-    const outFile = path.join(TMP_DIR, `analysis-${Date.now()}-${process.pid}.json`);
-    const args = [ANALYZER_SCRIPT, videoPath, '--output', outFile];
-    if (maxFrames) args.push('--max-frames', String(maxFrames));
-    if (thumbnailDir) args.push('--thumbnail-dir', thumbnailDir);
-    if (sport) args.push('--sport', sport);
-
-    const child = spawn(PYTHON_BIN, args, {
-      cwd: CV_DIR,
-      env: { ...process.env, PYTHONUNBUFFERED: '1' },
-      windowsHide: true,
-    });
-
-    let stderr = '';
-    let stdout = '';
-    // video_analyzer.py logs "Processed frame X/Y" to stderr (Python's
-    // default logging stream) every 30 frames. Scraping that instead of
-    // adding a second output channel keeps the analyzer's CLI contract
-    // (stdout/--output = final JSON only) unchanged.
-    const PROGRESS_RE = /Processed frame (\d+)\/(\d+)/;
-    let stderrTail = '';
-    child.stdout.on('data', (b) => {
-      stdout += b.toString();
-    });
-    child.stderr.on('data', (b) => {
-      const str = b.toString();
-      stderr += str;
-      if (!onProgress) return;
-      // A log line can be split across chunk boundaries; buffer the tail
-      // of the previous chunk and only parse complete lines.
-      stderrTail += str;
-      const lines = stderrTail.split('\n');
-      stderrTail = lines.pop();
-      for (const line of lines) {
-        const m = line.match(PROGRESS_RE);
-        if (m) {
-          const frame = Number(m[1]);
-          const total = Number(m[2]);
-          onProgress({ frame, total, progress: total > 0 ? Math.min(99, Math.round((frame / total) * 100)) : null });
-        }
-      }
-    });
-
-    child.on('error', (err) => {
-      reject(new Error(`Failed to spawn analyzer: ${err.message}`));
-    });
-
-    child.on('close', (code) => {
-      if (code !== 0) {
-        return reject(
-          new Error(
-            `Analyzer exited with code ${code}. stderr (tail): ${stderr.slice(-2000)}`
-          )
-        );
-      }
-      let raw;
-      try {
-        raw = fs.readFileSync(outFile, 'utf8');
-      } catch (e) {
-        return reject(new Error(`Analyzer produced no output file: ${e.message}`));
-      } finally {
-        // Best-effort cleanup of the temp file
-        fs.unlink(outFile, () => {});
-      }
-      let parsed;
-      try {
-        parsed = JSON.parse(raw);
-      } catch (e) {
-        return reject(new Error(`Analyzer output was not valid JSON: ${e.message}`));
-      }
-      if (parsed && parsed.error) {
-        return reject(new Error(`Analyzer reported error: ${parsed.error}`));
-      }
-      resolve(parsed);
-    });
-  });
-}
 
 /**
  * Persist the analyzer's JSON output as an Analysis document and update the
@@ -210,13 +105,16 @@ exports.processAnalysis = async (req, res) => {
     // status says analyzed but no analysis doc — fall through and reprocess
   }
 
-  // Stale processing state: allow retry by clearing the flag and continuing.
-  if (video.status === 'processing') {
-    console.warn(`Video ${videoId} was stuck in 'processing'; retrying.`);
+  // Stale processing/queued state: allow retry by clearing the flag and continuing.
+  if (video.status === 'processing' || video.status === 'queued') {
+    console.warn(`Video ${videoId} was stuck in '${video.status}'; retrying.`);
   }
 
-  // Mark as processing and respond 202 immediately so the client can poll.
-  video.status = 'processing';
+  // Mark as queued and respond 202 immediately; the queued->processing
+  // transition happens in onDispatch below, once a worker actually picks
+  // this job up (see utils/analysisWorkerPool.js) rather than assuming one
+  // is free right now.
+  video.status = 'queued';
   await video.save();
 
   // Resolve to an absolute file path. Multer's UPLOAD_DIR (./uploads) is
@@ -231,13 +129,12 @@ exports.processAnalysis = async (req, res) => {
   const thumbnailDir = path.join(THUMBNAILS_ROOT, String(video._id));
 
   res.status(202).json({
-    message: 'Analysis started',
+    message: 'Analysis queued',
     videoId: video._id,
-    status: 'processing',
+    status: 'queued',
   });
 
   const videoIdStr = String(video._id);
-  emitEvent('analysis:started', { videoId: videoIdStr });
 
   // Progress updates are pushed live via socket on every throttled log line,
   // but only persisted to Mongo every 10% — full per-frame DB writes would
@@ -252,9 +149,25 @@ exports.processAnalysis = async (req, res) => {
       Video.updateOne({ _id: video._id }, { progress }).catch(() => {});
     }
   };
+  const onQueued = () => {
+    emitEvent('analysis:queued', { videoId: videoIdStr });
+  };
+  const onDispatch = () => {
+    emitEvent('analysis:started', { videoId: videoIdStr });
+    Video.updateOne({ _id: video._id }, { status: 'processing' }).catch(() => {});
+  };
 
-  // Run analyzer in the background.
-  runAnalyzer(videoPath, maxFrames, thumbnailDir, onProgress, video.sport)
+  workerPool
+    .submitJob(
+      {
+        videoPath,
+        maxFrames,
+        thumbnailDir,
+        sport: video.sport,
+        enableJerseyOcr: true,
+      },
+      { onProgress, onQueued, onDispatch }
+    )
     .then(async (result) => {
       const analysis = await persistAnalysis(video, result);
       console.log(

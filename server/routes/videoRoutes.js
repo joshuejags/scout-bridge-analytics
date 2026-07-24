@@ -39,6 +39,17 @@ const upload = multer({
 });
 
 const idParam = param('id').isMongoId().withMessage('Invalid video id');
+const uploadMetaValidators = [
+  body('team').optional({ values: 'falsy' }).isMongoId().withMessage('Invalid team id'),
+  body('opponentTeam')
+    .optional({ values: 'falsy' })
+    .isMongoId()
+    .withMessage('Invalid opponent team id'),
+  body('sport')
+    .optional({ values: 'falsy' })
+    .isIn(['soccer', 'basketball', 'hockey', 'rugby'])
+    .withMessage('Invalid sport'),
+];
 
 // Routes. Body validation for the upload route runs after multer has
 // parsed the multipart form, since express-validator can't read
@@ -46,20 +57,31 @@ const idParam = param('id').isMongoId().withMessage('Invalid video id');
 router.post(
   '/upload',
   upload.single('video'),
-  [
-    body('team').optional({ values: 'falsy' }).isMongoId().withMessage('Invalid team id'),
-    body('opponentTeam')
-      .optional({ values: 'falsy' })
-      .isMongoId()
-      .withMessage('Invalid opponent team id'),
-    body('sport')
-      .optional({ values: 'falsy' })
-      .isIn(['soccer', 'basketball', 'hockey', 'rugby'])
-      .withMessage('Invalid sport'),
-  ],
+  uploadMetaValidators,
   validate,
   videoController.uploadVideo
 );
+
+// Chunked upload: for files large enough that one long-lived multipart
+// POST is a reliability risk (network drop = start over, and some
+// reverse proxies/load balancers time out long-idle requests outright).
+// init declares the file and its metadata up front; chunk is called
+// repeatedly with raw binary bodies; complete assembles the result once
+// every declared byte has arrived. See server/utils/chunkedUploads.js.
+router.post(
+  '/upload/init',
+  [body('originalName').trim().notEmpty().withMessage('originalName is required'), ...uploadMetaValidators],
+  validate,
+  videoController.initChunkedUpload
+);
+router.post(
+  '/upload/:uploadId/chunk',
+  express.raw({ type: '*/*', limit: '10mb' }),
+  videoController.uploadChunk
+);
+router.get('/upload/:uploadId/status', videoController.getChunkedUploadStatus);
+router.post('/upload/:uploadId/complete', videoController.completeChunkedUpload);
+
 router.get('/', videoController.getVideos);
 router.get('/:id', [idParam], validate, videoController.getVideoById);
 router.delete('/:id', requireRole('admin'), [idParam], validate, videoController.deleteVideo);

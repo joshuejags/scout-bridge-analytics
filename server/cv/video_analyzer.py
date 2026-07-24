@@ -196,7 +196,15 @@ def _dominant_shirt_color(crop):
     return "unknown"
 
 
-def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=None, sport=DEFAULT_SPORT):
+def analyze(
+    video_path,
+    max_frames=None,
+    enable_jersey_ocr=True,
+    thumbnail_dir=None,
+    sport=DEFAULT_SPORT,
+    jersey_reader=None,
+    progress_callback=None,
+):
     """Run full analysis and return a dict matching the Analysis schema.
 
     Args:
@@ -207,6 +215,19 @@ def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=N
             be able to look at each track and label/merge it manually).
         sport: key into SPORT_PRESETS, controlling real-world field-size
             calibration (distance/speed accuracy) and ball color detection.
+        jersey_reader: an already-constructed JerseyReader to reuse instead
+            of building a new one. EasyOCR's model init is the single most
+            expensive part of a cold start (~3s) and, unlike the YOLO
+            tracker, has no per-video state that needs to be reset between
+            videos (read_number() is a pure crop-in/text-out call) — so a
+            long-lived worker process (see worker.py) builds one reader
+            once and reuses it across every job it handles. Ignored (and a
+            fresh one built as before) when None, so direct CLI use is
+            unaffected.
+        progress_callback: optional callable(frame_idx, frame_count)
+            invoked alongside the existing periodic log line, for a
+            worker process to report progress structurally (as a message)
+            instead of a caller having to scrape log text.
     """
     if not os.path.isfile(video_path):
         raise FileNotFoundError(f"Video not found: {video_path}")
@@ -219,8 +240,11 @@ def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=N
     detector = PlayerDetector()
     tracker = BallTracker(preset["ball_color_lower"], preset["ball_color_upper"])
 
-    jersey_reader = None
-    if enable_jersey_ocr:
+    if not enable_jersey_ocr:
+        jersey_reader = None
+    elif jersey_reader is not None:
+        logger.info("Jersey OCR enabled (reusing preloaded reader)")
+    else:
         try:
             from jersey_reader import JerseyReader
 
@@ -482,6 +506,8 @@ def analyze(video_path, max_frames=None, enable_jersey_ocr=True, thumbnail_dir=N
         frame_idx += 1
         if frame_idx % 30 == 0:
             logger.info(f"Processed frame {frame_idx}/{frame_count}")
+            if progress_callback:
+                progress_callback(frame_idx, frame_count)
 
     cap.release()
 

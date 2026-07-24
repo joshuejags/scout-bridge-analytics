@@ -62,12 +62,16 @@ describe('VideoList real-time analysis updates', () => {
   });
 
   it('shows live progress percentage from analysis:progress events', async () => {
-    axios.post.mockResolvedValueOnce({ status: 202, data: { status: 'processing' } });
+    axios.post.mockResolvedValueOnce({ status: 202, data: { status: 'queued' } });
     renderList();
 
     await waitFor(() => expect(screen.getByText('match1.mp4')).toBeInTheDocument());
     await userEvent.click(screen.getByRole('button', { name: 'Process' }));
 
+    await waitFor(() => expect(screen.getByText('queued')).toBeInTheDocument());
+
+    // A worker actually picking the job up flips queued -> processing.
+    await fakeSocket.__trigger('analysis:started', { videoId: 'vid1' });
     await waitFor(() => expect(screen.getByText('processing')).toBeInTheDocument());
 
     await fakeSocket.__trigger('analysis:progress', { videoId: 'vid1', frame: 30, total: 100, progress: 30 });
@@ -76,11 +80,14 @@ describe('VideoList real-time analysis updates', () => {
   });
 
   it('refreshes and clears progress on analysis:complete', async () => {
-    axios.post.mockResolvedValueOnce({ status: 202, data: { status: 'processing' } });
+    axios.post.mockResolvedValueOnce({ status: 202, data: { status: 'queued' } });
     renderList();
 
     await waitFor(() => expect(screen.getByText('match1.mp4')).toBeInTheDocument());
     await userEvent.click(screen.getByRole('button', { name: 'Process' }));
+    await waitFor(() => expect(screen.getByText('queued')).toBeInTheDocument());
+
+    await fakeSocket.__trigger('analysis:started', { videoId: 'vid1' });
     await waitFor(() => expect(screen.getByText('processing')).toBeInTheDocument());
 
     await fakeSocket.__trigger('analysis:progress', { videoId: 'vid1', frame: 30, total: 100, progress: 30 });
@@ -94,12 +101,12 @@ describe('VideoList real-time analysis updates', () => {
   });
 
   it('marks the video failed and surfaces the error on analysis:failed', async () => {
-    axios.post.mockResolvedValueOnce({ status: 202, data: { status: 'processing' } });
+    axios.post.mockResolvedValueOnce({ status: 202, data: { status: 'queued' } });
     renderList();
 
     await waitFor(() => expect(screen.getByText('match1.mp4')).toBeInTheDocument());
     await userEvent.click(screen.getByRole('button', { name: 'Process' }));
-    await waitFor(() => expect(screen.getByText('processing')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('queued')).toBeInTheDocument());
 
     await fakeSocket.__trigger('analysis:failed', { videoId: 'vid1', error: 'Analyzer exited with code 1' });
 
@@ -108,16 +115,26 @@ describe('VideoList real-time analysis updates', () => {
   });
 
   it('does not poll while a live socket is connected', async () => {
-    axios.post.mockResolvedValueOnce({ status: 202, data: { status: 'processing' } });
+    axios.post.mockResolvedValueOnce({ status: 202, data: { status: 'queued' } });
     renderList();
 
     await waitFor(() => expect(screen.getByText('match1.mp4')).toBeInTheDocument());
     const getCallsBeforeProcess = axios.get.mock.calls.length;
     await userEvent.click(screen.getByRole('button', { name: 'Process' }));
-    await waitFor(() => expect(screen.getByText('processing')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('queued')).toBeInTheDocument());
 
     // Give any (incorrect) poll loop a chance to fire before asserting it didn't.
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(axios.get.mock.calls.length).toBe(getCallsBeforeProcess);
+  });
+
+  it('shows a queued badge for a video queued by another connected client', async () => {
+    axios.get.mockResolvedValue({ data: [baseVideo] });
+    renderList();
+
+    await waitFor(() => expect(screen.getByText('match1.mp4')).toBeInTheDocument());
+    await fakeSocket.__trigger('analysis:queued', { videoId: 'vid1' });
+
+    await waitFor(() => expect(screen.getByText('queued')).toBeInTheDocument());
   });
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import axios from 'axios';
 import AnalysisPage from '../AnalysisPage';
@@ -59,5 +59,86 @@ describe('AnalysisPage action breakdown', () => {
 
     await waitFor(() => expect(screen.getByText('Actions detected: 0')).toBeInTheDocument());
     expect(screen.queryByText(/shot/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('AnalysisPage player stats table', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const playerData = [
+    {
+      trackId: '1',
+      playerId: { _id: 'p1', name: 'Sam Striker' },
+      jerseyNumber: 9,
+      teamColor: 'red',
+      verified: true,
+      statistics: { distanceCovered: 1500, averageSpeed: 5.2, sprintCount: 4, activationArea: 'Center' },
+    },
+    {
+      trackId: '2',
+      playerId: null,
+      jerseyNumber: null,
+      teamColor: 'blue',
+      verified: false,
+      statistics: { distanceCovered: 900, averageSpeed: 3.8, sprintCount: 1, activationArea: 'Left' },
+    },
+  ];
+
+  it('renders player stats as a real table with a header row and one row per player', async () => {
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/analysis/')) return Promise.resolve({ data: { ...baseAnalysis, playerData } });
+      return Promise.resolve({ data: [] });
+    });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument());
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Player')).toBeInTheDocument();
+    expect(within(table).getByText('Distance (m)').tagName).toBe('TH');
+
+    expect(within(table).getByText('Sam Striker')).toBeInTheDocument();
+    expect(within(table).getByText('Unidentified (track 2)')).toBeInTheDocument();
+
+    // Every stat row renders inside an actual <tr>, not a stacked div list.
+    const rows = within(table).getAllByRole('row');
+    expect(rows).toHaveLength(1 + playerData.length); // header + 2 players
+  });
+
+  it('shows a fallback message instead of an empty table when there is no player data', async () => {
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/analysis/')) return Promise.resolve({ data: { ...baseAnalysis, playerData: [] } });
+      return Promise.resolve({ data: [] });
+    });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('No player data in this analysis.')).toBeInTheDocument());
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('wraps the table in a scrollable container so a long roster does not grow the page unbounded', async () => {
+    const manyPlayers = Array.from({ length: 30 }, (_, i) => ({
+      trackId: String(i),
+      playerId: null,
+      jerseyNumber: i,
+      teamColor: 'red',
+      verified: false,
+      statistics: { distanceCovered: 100 * i, averageSpeed: 4, sprintCount: i, activationArea: 'Center' },
+    }));
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/analysis/'))
+        return Promise.resolve({ data: { ...baseAnalysis, playerData: manyPlayers } });
+      return Promise.resolve({ data: [] });
+    });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByRole('table')).toBeInTheDocument());
+    const wrap = screen.getByRole('table').closest('.player-stats-table-wrap');
+    expect(wrap).not.toBeNull();
+    expect(within(wrap).getAllByRole('row')).toHaveLength(1 + manyPlayers.length);
   });
 });

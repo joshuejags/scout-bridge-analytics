@@ -138,12 +138,16 @@ All routes below except `/api/auth/register`, `/api/auth/login`, `/api/auth/forg
 ### Videos
 - `GET /api/videos` - Get all videos
 - `GET /api/videos/:id` - Get specific video
-- `POST /api/videos/upload` - Upload video file. Accepts `sport` (`soccer` | `basketball` | `hockey` | `rugby`, default `soccer`), which calibrates the analyzer's distance/speed accuracy and ball detection (see Computer Vision Components below)
+- `POST /api/videos/upload` - Upload video file in one request. Accepts `sport` (`soccer` | `basketball` | `hockey` | `rugby`, default `soccer`), which calibrates the analyzer's distance/speed accuracy and ball detection (see Computer Vision Components below)
+- `POST /api/videos/upload/init` - Start a chunked upload: `{ originalName, fileSize, sport?, team?, opponentTeam?, players? }` → `{ uploadId, chunkSizeHint }`. Preferred over the single-shot endpoint for large files — see Roadmap.
+- `POST /api/videos/upload/:uploadId/chunk` - Append one raw binary chunk (`Content-Type` can be anything; body is read as-is) → `{ bytesReceived, expectedSize }`
+- `GET /api/videos/upload/:uploadId/status` - Bytes received so far, for resuming after a reload/dropped connection
+- `POST /api/videos/upload/:uploadId/complete` - Assemble the uploaded chunks and create the Video document, once `bytesReceived === expectedSize`
 - `DELETE /api/videos/:id` **(admin)** - Delete video
 
 ### Analysis
 - `GET /api/analysis/:videoId` - Get video analysis
-- `POST /api/analysis/:videoId/process` - Start video analysis (returns `202` immediately; runs YOLO/tracking in the background). Progress streams over Socket.IO (`analysis:started`/`analysis:progress`/`analysis:complete`/`analysis:failed`, broadcast to all authenticated sockets); polling `GET /api/videos/:id` for `status` still works as a fallback.
+- `POST /api/analysis/:videoId/process` - Queue video analysis (returns `202` immediately with `status: 'queued'`; a persistent worker pool — see Roadmap — picks it up as soon as one is free). Progress streams over Socket.IO (`analysis:queued`/`analysis:started`/`analysis:progress`/`analysis:complete`/`analysis:failed`, broadcast to all authenticated sockets); polling `GET /api/videos/:id` for `status` (`queued` → `processing` → `analyzed`/`failed`) still works as a fallback.
 - `PATCH /api/analysis/:analysisId/tracks/:trackId` - Manually set a track's jersey number / linked roster player / team color (marks it `verified: true`)
 - `POST /api/analysis/:analysisId/tracks/merge` - Merge two player tracks that are the same real person into one
 
@@ -186,6 +190,8 @@ UPLOAD_DIR=./uploads
 PYTHON_ENV_PATH=./venv
 YOLO_MODEL=yolov8n.pt
 OPENPOSE_MODEL_PATH=./models/openpose
+ANALYSIS_WORKER_POOL_SIZE=2  # concurrent analysis workers (see server/utils/analysisWorkerPool.js)
+ANALYZER_MAX_FRAMES=  # optional: cap frames processed, useful for smoke tests
 
 # Frontend
 REACT_APP_API_URL=http://localhost:5000/api
@@ -259,12 +265,13 @@ Analysis is triggered by `POST /api/analysis/:videoId/process`, which spawns `se
 ## Testing
 
 ```bash
-# Backend tests (Jest + Supertest, 52 tests: auth, password reset, teams, players + comparison,
-# videos/sport, rate limiting)
+# Backend tests (Jest + Supertest, 67 tests: auth, password reset, teams, players + comparison,
+# videos/sport, chunked upload, analysis worker pool, rate limiting)
 npm test --prefix server
 
-# Frontend tests (React Testing Library, 52 tests: AuthContext, Login/Register/reset pages,
-# ProtectedRoute, LandingPage, VideoList/Upload, PlayerComparison, AnalysisPage)
+# Frontend tests (React Testing Library, 67 tests: AuthContext, Login/Register/reset pages,
+# ProtectedRoute, LandingPage, VideoList/Upload, chunked upload, PlayerComparison,
+# AnalysisPage/Heatmap/player stats table)
 npm test --prefix client -- --watchAll=false
 ```
 
@@ -350,7 +357,7 @@ For issues and questions:
 - [x] Real YOLO player detection + tracking (TrackTrack w/ ReID), replacing the earlier hardcoded mock analysis
 - [x] Jersey number OCR + shirt-color classification, with automatic track merging where confident
 - [x] Manual player verification UI (thumbnail review, jersey/roster editing, track merging) for the majority of tracks OCR can't identify on its own
-- [x] Async analysis pipeline (`202` + background processing + status polling) instead of blocking the request
+- [x] Async analysis pipeline (`202` + background processing) instead of blocking the request, backed by a persistent worker pool — see below
 - [x] Teams & players management dashboard (basic — see gaps below)
 - [x] JWT authentication — register/login, bcrypt-hashed passwords, all `/api/videos`, `/api/analysis`, `/api/teams`, `/api/players`, and `/uploads` (video files + thumbnails) routes require a valid Bearer token. Frontend has Login/Register pages, a `ProtectedRoute` wrapper, and an axios interceptor that attaches the token and force-logs-out on 401; native `<video>`/`<img>` tags can't send auth headers, so media is fetched as an authenticated blob via `useAuthedMedia` and handed to the element as an object URL. `/api/health` and `/api/auth/{register,login}` remain open.
 - [x] Role-based restrictions — `role: 'admin' | 'scout'` on `User`; the first account ever registered on a fresh install is auto-promoted to admin (there'd otherwise be no way to ever satisfy a role check), every account after that defaults to `scout`. Admins can list users and change roles via `GET/PATCH /api/auth/users`. Deleting a team, player, or video is admin-only (cascades into other data); create/update/read stay open to any authenticated user.
@@ -367,6 +374,10 @@ For issues and questions:
 - [x] Player comparison tools — `GET /api/players/compare?ids=id1,id2,...` aggregates cross-match stats per player (matches played, total/average distance, average speed, sprints, action counts by type, verified-track count) by walking every `Analysis` document that references each player and mapping each track's `trackId` to that analysis's `actions` (actions are keyed by trackId, not the real Player id, so this can't be a single cross-collection query). `PlayersPage` gets a checkbox-based selection UI and a `PlayerComparison` modal with a side-by-side stats table that highlights the best value per row. 5 backend tests (including a real multi-analysis aggregation case) + 7 frontend tests.
 - [x] Advanced action recognition — `video_analyzer.py` now populates `pass`/`tackle`/`interception`, not just `shot`. When ball possession transfers between two tracked players, it's classified as a **pass** if both share a shirt color (same team), otherwise a **tackle** if the two were within a close pixel radius at the moment of transfer (a physical challenge) or an **interception** if not (a misplaced pass read from a distance) — reusing the shirt-color voting already computed for track merging rather than adding a separate classifier. `AnalysisPage` shows a per-type count breakdown. Verified with two real end-to-end analysis runs against live footage (not just code review): one produced 11 shots/2 passes/3 interceptions, another 17 shots/3 passes/5 interceptions.
 - [x] Multi-sport support — `SPORT_PRESETS` in `video_analyzer.py` defines a real-world field length and ball HSV color range per sport (soccer/basketball/hockey/rugby); soccer's values are the original, footage-tuned defaults, left unchanged. Pixels-per-meter is now derived at runtime as `frame_width / field_length_m` instead of a flat constant that assumed a 1280px-wide frame, so distance/speed accuracy no longer silently degrades on other resolutions either. `Video.sport` (enum, default `soccer`) is set at upload time via a new selector in `VideoUpload`, validated on the upload route, and threaded through to the analyzer via a new `--sport` CLI flag. Verified two ways: running the same footage through both `soccer` and `basketball` presets produced distance values in an exact 3.75x ratio, matching the two presets' field-length ratio (105m/28m) precisely; and a real upload→process run through the live API with `sport: basketball` produced correctly-scaled distances end-to-end. 4 new backend tests cover the validation/default behavior.
+- [x] Analysis worker pool (root-cause fix for slow processing) — profiling found that a fresh `python video_analyzer.py` spawn per request paid a real, measured cold-start tax (torch/ultralytics/opencv/easyocr imports + EasyOCR's model init) *every single time*, dominating wall-clock time for short clips: a live-server test on a 3.3s/100-frame clip took ~16s total, ~8s of which was pure cold start before a single frame was processed. `server/cv/worker.py` is a long-lived process that pays that cost once at startup and reuses its EasyOCR reader across every job (safe — OCR reads have no cross-video state, unlike YOLO's tracker); `server/utils/analysisWorkerPool.js` runs a small pool of these (`ANALYSIS_WORKER_POOL_SIZE`, default 2), pre-warmed at server startup, with jobs beyond pool capacity queued (`Video.status: 'queued'` → `'processing'`, with matching `analysis:queued`/`analysis:started` socket events) instead of spawned unbounded. Verified against the live server: dispatch to an already-warm worker took 8ms and total time for the same clip dropped to ~10.8s; 3 concurrent submissions against a pool of 2 correctly ran 2 immediately and queued the 3rd until a worker freed up. Found and fixed a second real bug along the way: nodemon's default `.json` watch was also triggered by the *new* worker protocol's stdin/stdout — unrelated to the earlier `tmp_analysis` fix, this pool never touches that directory at all (results come back over stdout, not a temp file).
+- [x] Chunked upload — `multer`'s existing `/api/videos/upload` already streamed straight to disk rather than buffering whole files in memory (confirmed, not just assumed), so that risk was already handled; what was missing was resilience for large files: one very long-lived HTTP request is what drops entirely on a flaky connection and what reverse proxies/load balancers commonly time out on their own. `POST /api/videos/upload/init` → repeated `POST .../upload/:uploadId/chunk` (raw binary body) → `POST .../upload/:uploadId/complete` lets a client upload a file as many smaller sequential requests instead, with `GET .../upload/:uploadId/status` letting it resume after a reload instead of restarting. The original single-shot `/upload` endpoint is unchanged and still used for small files elsewhere. Verified end-to-end through the live server with a real multi-chunk upload, confirming the assembled file is byte-identical to the source; 10 backend tests cover init validation, chunk sequencing, byte-correctness, and error paths (unknown session, incomplete upload, oversized chunk).
+- [x] Heatmap visualization fix — the report page's heatmap was rendering as a scrambled, meaningless grid of numbered boxes rather than an actual density visualization. Root cause: `AnalysisPage.css`'s `.heatmap-row` hardcoded `grid-template-columns: repeat(3, ...)` regardless of the real grid width, which for a typical 1280px-wide video (25 columns at the analyzer's 50px cell size — confirmed against real analysis output) meant each logical row's 25 cells wrapped across ~9 visual lines, destroying the 2D spatial layout entirely. Replaced with a new `Heatmap` component that renders an actual canvas-based density map: a sport-tinted playing-surface background, each cell shaded on a blue→red gradient normalized against that grid's own busiest cell (not a fixed arbitrary scale), with a legend and explicit empty-state messaging. 6 new tests.
+- [x] Player stats table fix — the report page listed players as a stack of `<div>` "cards", not a table, with no bound on height; a real match with 25+ tracked players (confirmed via live usage during this session) made the panel enormous and lopsided against the two-column layout it sat in. Replaced with a real `<table>` (Player/Kit color/Distance/Avg speed/Sprints/Activation area/Verified columns, sticky header) inside a `max-height` + `overflow: auto` wrapper that scrolls both directions instead of growing the page, and moved out of the two-column grid to use full width. 5 new tests, including one with 30 players confirming the row count and scroll container.
 
 **Known gaps (no work started):**
 - [ ] Nothing security-related from the original gap list remains untouched — see Larger feature gaps below for what's left, which is product functionality rather than hardening.
