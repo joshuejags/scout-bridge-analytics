@@ -28,6 +28,7 @@ not (interception). A grid heatmap aggregates all player positions.
 """
 
 import argparse
+import bisect
 import json
 import logging
 import math
@@ -128,6 +129,35 @@ MIN_VOTES_TO_TRUST = 2
 # Minimum EasyOCR confidence to count a reading as a vote at all.
 MIN_OCR_CONFIDENCE = 0.35
 
+# --- Pose estimation tuning ---
+# Pose estimation is a second whole-frame model pass (unlike jersey OCR,
+# which only crops boxes step 1 already detected), so it's throttled
+# globally rather than per-track to bound the added inference cost.
+POSE_SAMPLE_INTERVAL_FRAMES = 5
+# Minimum IoU between a pose detection's bbox and a track's bbox in the
+# same frame for that pose to be attributed to that track.
+POSE_MATCH_MIN_IOU = 0.3
+# A pose sample farther than this from a tracking_data point's frame is
+# considered too stale to attach — better to leave pose empty than show a
+# keypoint skeleton that's drifted from the player's actual position.
+MAX_POSE_SAMPLE_GAP_FRAMES = POSE_SAMPLE_INTERVAL_FRAMES * 3
+
+# --- Tactical/formation analysis tuning ---
+# A shirt-color group needs at least this many surviving tracks to be
+# treated as a "team" for shape/formation purposes — smaller groups are
+# more likely a referee, a goalkeeper alone, or OCR/color noise than an
+# actual side.
+MIN_TEAM_SIZE_FOR_TACTICAL = 4
+# A frame only contributes to a team's shape average if at least this many
+# of the team's players were visible in it (2-3 visible players isn't
+# enough to call it the team's "shape" that frame).
+MIN_PLAYERS_FOR_SHAPE = 3
+# Gap-based line banding: sort a team's players by average depth (y) and
+# start a new "line" whenever the gap to the next player exceeds this many
+# meters. This is a coarse heuristic (no attack-direction detection, no
+# positional roles), not a true formation classifier.
+FORMATION_LINE_GAP_METERS = 4.0
+
 
 def _grid_cell(x, y, frame_w, frame_h, cell_size=50):
     """Map a (x, y) pixel to a heatmap grid cell."""
@@ -196,6 +226,134 @@ def _dominant_shirt_color(crop):
     return "unknown"
 
 
+def _bbox_iou(a, b):
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+    iw, ih = max(0.0, ix2 - ix1), max(0.0, iy2 - iy1)
+    inter = iw * ih
+    if inter <= 0:
+        return 0.0
+    area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
+    area_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
+    union = area_a + area_b - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _match_pose_to_track(pose_detections, track_bboxes, min_iou=POSE_MATCH_MIN_IOU):
+    """Match each pose detection to the track whose same-frame bbox (from
+    step 1's tracker) it overlaps most, so pose data rides along on
+    identities the tracker already established instead of creating a
+    second, parallel one. Greedy highest-IoU-first so two overlapping
+    people can't both claim the same track. Returns {track_id: keypoints}.
+    """
+    candidates = []
+    for det in pose_detections:
+        for tid, bbox in track_bboxes.items():
+            iou = _bbox_iou(det["bbox"], bbox)
+            if iou >= min_iou:
+                candidates.append((iou, tid, det))
+    candidates.sort(key=lambda c: c[0], reverse=True)
+
+    matches = {}
+    used_tids = set()
+    used_dets = set()
+    for iou, tid, det in candidates:
+        if tid in used_tids or id(det) in used_dets:
+            continue
+        matches[tid] = det["keypoints"]
+        used_tids.add(tid)
+        used_dets.add(id(det))
+    return matches
+
+
+def _pose_for_frame(pose_samples, frame_number, max_gap=MAX_POSE_SAMPLE_GAP_FRAMES):
+    """Nearest-frame lookup: pose is only sampled every
+    POSE_SAMPLE_INTERVAL_FRAMES frames, so a tracking_data point's exact
+    frame usually has no direct sample. pose_samples is a list of
+    (frame_number, keypoints) tuples in increasing frame order.
+    """
+    if not pose_samples:
+        return {}
+    frames = [s[0] for s in pose_samples]
+    idx = bisect.bisect_left(frames, frame_number)
+    best_idx, best_gap = None, None
+    for i in (idx - 1, idx):
+        if 0 <= i < len(frames):
+            gap = abs(frames[i] - frame_number)
+            if best_gap is None or gap < best_gap:
+                best_gap, best_idx = gap, i
+    if best_idx is None or best_gap > max_gap:
+        return {}
+    return pose_samples[best_idx][1]
+
+
+def _team_shape(tracks, track_ids, px_per_meter):
+    """Per-frame team shape (width/depth/compactness in meters), averaged
+    across every frame at least MIN_PLAYERS_FOR_SHAPE of this team's
+    players were visible in. Uses each track's full-resolution
+    frames/positions (not the subsampled trackingData built later) since
+    those are already in memory and more accurate. Returns None if no
+    frame ever had enough of the team visible at once.
+    """
+    frame_positions = defaultdict(list)
+    for tid in track_ids:
+        track = tracks[tid]
+        for f, pos in zip(track["frames"], track["positions"]):
+            frame_positions[f].append((pos["x"], pos["y"]))
+
+    widths, depths, compactness = [], [], []
+    for positions in frame_positions.values():
+        if len(positions) < MIN_PLAYERS_FOR_SHAPE:
+            continue
+        xs = [p[0] for p in positions]
+        ys = [p[1] for p in positions]
+        widths.append(max(xs) - min(xs))
+        depths.append(max(ys) - min(ys))
+        cx, cy = sum(xs) / len(xs), sum(ys) / len(ys)
+        compactness.append(sum(math.hypot(x - cx, y - cy) for x, y in positions) / len(positions))
+
+    if not widths:
+        return None
+
+    return {
+        "width": round(float(np.mean(widths)) / px_per_meter, 2),
+        "depth": round(float(np.mean(depths)) / px_per_meter, 2),
+        "compactness": round(float(np.mean(compactness)) / px_per_meter, 2),
+        "sampledFrames": len(widths),
+    }
+
+
+def _formation_lines(tracks, track_ids, px_per_meter):
+    """Gap-based banding heuristic: sort a team's players by average depth
+    (y), then start a new line whenever the gap to the next player exceeds
+    FORMATION_LINE_GAP_METERS. Lines are ordered by increasing y (top of
+    frame to bottom), not defense-to-attack — which end is defense isn't
+    knowable without a possession-direction signal this pipeline doesn't
+    have. Returns None if the team has no positional data at all.
+    """
+    avg_y = []
+    for tid in track_ids:
+        positions = tracks[tid]["positions"]
+        if not positions:
+            continue
+        avg_y.append(float(np.mean([p["y"] for p in positions])))
+    avg_y.sort()
+
+    if not avg_y:
+        return None
+
+    gap_threshold_px = FORMATION_LINE_GAP_METERS * px_per_meter
+    lines = [1]
+    for i in range(1, len(avg_y)):
+        if avg_y[i] - avg_y[i - 1] > gap_threshold_px:
+            lines.append(0)
+        lines[-1] += 1
+
+    return {"lineCount": len(lines), "lineup": lines}
+
+
 def analyze(
     video_path,
     max_frames=None,
@@ -203,6 +361,8 @@ def analyze(
     thumbnail_dir=None,
     sport=DEFAULT_SPORT,
     jersey_reader=None,
+    enable_pose_estimation=True,
+    pose_estimator=None,
     progress_callback=None,
 ):
     """Run full analysis and return a dict matching the Analysis schema.
@@ -224,6 +384,10 @@ def analyze(
             once and reuses it across every job it handles. Ignored (and a
             fresh one built as before) when None, so direct CLI use is
             unaffected.
+        pose_estimator: same reuse pattern as jersey_reader, for the same
+            reason (a worker process builds one PoseEstimator once and
+            reuses it across jobs instead of reloading yolov8n-pose.pt
+            per job).
         progress_callback: optional callable(frame_idx, frame_count)
             invoked alongside the existing periodic log line, for a
             worker process to report progress structurally (as a message)
@@ -253,6 +417,20 @@ def analyze(
         except Exception as e:
             logger.warning(f"Jersey OCR unavailable, continuing without it: {e}")
             jersey_reader = None
+
+    if not enable_pose_estimation:
+        pose_estimator = None
+    elif pose_estimator is not None:
+        logger.info("Pose estimation enabled (reusing preloaded estimator)")
+    else:
+        try:
+            from pose_estimator import PoseEstimator
+
+            pose_estimator = PoseEstimator()
+            logger.info("Pose estimation enabled")
+        except Exception as e:
+            logger.warning(f"Pose estimation unavailable, continuing without it: {e}")
+            pose_estimator = None
 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -290,6 +468,7 @@ def analyze(
         # far more robustly than nearest-centroid matching.
         detections = detector.track_players(frame)
         matched_tids = set()
+        frame_bboxes = {}
         for d in detections:
             tid = d.get("track_id")
             if tid is None:
@@ -298,12 +477,13 @@ def analyze(
                 continue
             cx = (d["bbox"][0] + d["bbox"][2]) / 2
             cy = (d["bbox"][1] + d["bbox"][3]) / 2
+            frame_bboxes[tid] = d["bbox"]
             if tid not in tracks:
                 tracks[tid] = {
                     "positions": [],
                     "frames": [],
                     "confidences": [],
-                    "poses": [],
+                    "pose_samples": [],
                     "speeds": [],
                     "sprint_run": 0,
                     "sprint_count": 0,
@@ -318,7 +498,6 @@ def analyze(
             track["positions"].append({"x": cx, "y": cy})
             track["frames"].append(frame_idx)
             track["confidences"].append(d["confidence"])
-            track["poses"].append({})
             track["_last_xy"] = (cx, cy)
             matched_tids.add(tid)
 
@@ -364,6 +543,17 @@ def analyze(
                         and top_votes >= MIN_VOTES_TO_TRUST
                     ):
                         track["jersey_number"] = top_number
+
+        # 2. Pose estimation: throttled to every POSE_SAMPLE_INTERVAL_FRAMES
+        # frames (a second whole-frame model pass is too expensive to run
+        # every frame) and matched back to this frame's tracker bboxes by
+        # IoU, so it rides on step 1's identities instead of creating its
+        # own.
+        if pose_estimator is not None and frame_idx % POSE_SAMPLE_INTERVAL_FRAMES == 0:
+            pose_detections = pose_estimator.estimate(frame)
+            matched_poses = _match_pose_to_track(pose_detections, frame_bboxes)
+            for tid, keypoints in matched_poses.items():
+                tracks[tid]["pose_samples"].append((frame_idx, keypoints))
 
         # 3. Compute smoothed speed (m/s) per matched track using real elapsed
         # frames (not assumed 1/fps), averaged over a short window to filter
@@ -560,15 +750,21 @@ def analyze(
             # Interleave by frame number so distance/speed calculations
             # (which assume chronological order) stay valid after merge.
             combined = list(
-                zip(base["frames"], base["positions"], base["confidences"], base["poses"])
+                zip(base["frames"], base["positions"], base["confidences"])
             ) + list(
-                zip(other["frames"], other["positions"], other["confidences"], other["poses"])
+                zip(other["frames"], other["positions"], other["confidences"])
             )
             combined.sort(key=lambda x: x[0])
             base["frames"] = [c[0] for c in combined]
             base["positions"] = [c[1] for c in combined]
             base["confidences"] = [c[2] for c in combined]
-            base["poses"] = [c[3] for c in combined]
+            # pose_samples are looked up by nearest-frame at output time
+            # (see _pose_for_frame), not indexed positionally like the
+            # lists above, so merging them is just a sorted concat.
+            base["pose_samples"] = sorted(
+                base.get("pose_samples", []) + other.get("pose_samples", []),
+                key=lambda s: s[0],
+            )
             base["sprint_count"] = base.get("sprint_count", 0) + other.get("sprint_count", 0)
             if other.get("best_crop_score", 0) > base.get("best_crop_score", 0):
                 base["best_crop_score"] = other["best_crop_score"]
@@ -666,6 +862,7 @@ def analyze(
         # Tracking data: subsample to <= 50 points to keep Mongo doc small
         track_points = track["frames"]
         step = max(1, len(track_points) // 50)
+        pose_samples = track.get("pose_samples", [])
         tracking_data = []
         for i in range(0, len(track_points), step):
             tracking_data.append(
@@ -676,7 +873,7 @@ def analyze(
                         "y": float(track["positions"][i]["y"]),
                     },
                     "confidence": float(track["confidences"][i]),
-                    "pose": track["poses"][i],
+                    "pose": _pose_for_frame(pose_samples, track["frames"][i]),
                 }
             )
 
@@ -711,6 +908,37 @@ def analyze(
                     "sprintCount": sprint_count,
                     "activationArea": activation_area,
                 },
+            }
+        )
+
+    # Tactical/formation analysis: pure arithmetic on already-tracked
+    # positions, grouped by the two largest shirt-color groups (the same
+    # signal already used above for jersey-OCR track merging and
+    # pass/tackle/interception classification). Skipped for a group too
+    # small to plausibly be a real side (referee, lone goalkeeper, or
+    # color-classification noise) or if no frame ever had enough of a
+    # team's players visible at once to compute a shape.
+    color_groups = defaultdict(list)
+    for p in player_data:
+        color = p.get("teamColor")
+        if color:
+            color_groups[color].append(int(p["trackId"]))
+    top_teams = sorted(color_groups.items(), key=lambda kv: len(kv[1]), reverse=True)[:2]
+
+    tactical_teams = []
+    for color, team_track_ids in top_teams:
+        if len(team_track_ids) < MIN_TEAM_SIZE_FOR_TACTICAL:
+            continue
+        shape = _team_shape(tracks, team_track_ids, px_per_meter)
+        formation = _formation_lines(tracks, team_track_ids, px_per_meter)
+        if shape is None or formation is None:
+            continue
+        tactical_teams.append(
+            {
+                "teamColor": color,
+                "playerCount": len(team_track_ids),
+                "shape": shape,
+                "formation": formation,
             }
         )
 
@@ -751,6 +979,7 @@ def analyze(
         },
         "actions": actions,
         "heatmapData": {"grid": grid, "cellSize": cell_size},
+        "tacticalData": {"teams": tactical_teams},
         "summary": {
             "totalPlayers": len(player_data),
             "matchDuration": round(frame_idx / fps, 2) if fps else 0,
@@ -783,6 +1012,11 @@ def main():
         help="Disable jersey number OCR / track merging (faster, more fragmented player counts)",
     )
     parser.add_argument(
+        "--no-pose-estimation",
+        action="store_true",
+        help="Disable YOLOv8-pose keypoint estimation (faster, no pose data in output)",
+    )
+    parser.add_argument(
         "--thumbnail-dir",
         help="Directory to write one representative crop per player track (for manual review UI)",
     )
@@ -800,6 +1034,7 @@ def main():
             args.video,
             max_frames=args.max_frames,
             enable_jersey_ocr=not args.no_jersey_ocr,
+            enable_pose_estimation=not args.no_pose_estimation,
             thumbnail_dir=args.thumbnail_dir,
             sport=args.sport,
         )

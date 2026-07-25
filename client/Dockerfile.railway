@@ -1,0 +1,29 @@
+# Production build for Railway (or any static host) — client/Dockerfile is
+# deliberately dev-only (runs the CRA dev server, matching docker-compose's
+# bind-mount workflow); this is a separate multi-stage build that produces
+# an optimized static bundle and serves it, no dev server involved.
+FROM node:20-bookworm-slim AS build
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+
+# CRA bakes REACT_APP_* vars into the JS bundle at build time — they can't
+# be changed at container-start time the way a normal server env var can.
+# Set this as a Build Variable in Railway's dashboard for the client
+# service (pointing at the deployed backend service's public URL + /api)
+# before building.
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+
+COPY . .
+RUN npm run build
+
+FROM node:20-bookworm-slim
+WORKDIR /app
+RUN npm install -g serve
+COPY --from=build /app/build ./build
+
+# Railway injects PORT at runtime and routes public traffic to whatever
+# the container actually listens on — don't hardcode it.
+CMD serve -s build -l tcp://0.0.0.0:${PORT:-3000}

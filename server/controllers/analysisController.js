@@ -64,6 +64,7 @@ async function persistAnalysis(video, result) {
     ballData: result.ballData || { trackingData: [], possessionStats: [] },
     actions: result.actions || [],
     heatmapData: result.heatmapData || { grid: [], cellSize: 50 },
+    tacticalData: result.tacticalData || { teams: [] },
     summary: {
       totalPlayers:
         result.summary?.totalPlayers ?? playerData.length,

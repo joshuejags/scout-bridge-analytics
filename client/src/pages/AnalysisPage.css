@@ -122,3 +122,57 @@
   background: #e6f7ec;
   color: #1a7f37;
 }
+
+.tactical-caveat {
+  color: #777;
+  font-size: 13px;
+  margin-top: -4px;
+  margin-bottom: 16px;
+}
+
+.tactical-teams {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.tactical-team-card {
+  flex: 1 1 220px;
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.tactical-team-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: capitalize;
+  margin-bottom: 10px;
+}
+
+.tactical-team-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.tactical-stats-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: #333;
+}
+
+.tactical-stats-list li {
+  padding: 2px 0;
+}
+
+.tactical-formation-label {
+  font-weight: 600;
+  font-size: 14px;
+  margin: 0;
+}

@@ -70,6 +70,29 @@ const HighlightedMomentSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const TacticalTeamSchema = new mongoose.Schema(
+  {
+    teamColor: String,
+    playerCount: Number,
+    // width/depth/compactness in meters, averaged across every sampled
+    // frame — see video_analyzer.py's _team_shape.
+    shape: {
+      width: Number,
+      depth: Number,
+      compactness: Number,
+      sampledFrames: Number,
+    },
+    // Gap-based line banding heuristic — see _formation_lines. lineup is
+    // player-count per line, ordered by increasing on-frame depth (not
+    // defense-to-attack, which isn't knowable from this data).
+    formation: {
+      lineCount: Number,
+      lineup: { type: [Number], default: [] },
+    },
+  },
+  { _id: false }
+);
+
 const AnalysisSchema = new mongoose.Schema(
   {
     video: { type: mongoose.Schema.Types.ObjectId, ref: 'Video', required: true },
@@ -82,6 +105,9 @@ const AnalysisSchema = new mongoose.Schema(
     heatmapData: {
       grid: { type: [[Number]], default: [] },
       cellSize: Number,
+    },
+    tacticalData: {
+      teams: { type: [TacticalTeamSchema], default: [] },
     },
     summary: {
       totalPlayers: Number,

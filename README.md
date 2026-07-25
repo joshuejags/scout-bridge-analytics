@@ -193,10 +193,17 @@ JWT_SECRET=your_jwt_secret_key_here
 MAX_FILE_SIZE=500000000  # 500MB
 UPLOAD_DIR=./uploads
 
+# Storage backend for uploaded video files — see "Cloud storage integration" in Roadmap
+STORAGE_BACKEND=local  # "local" (default, uses UPLOAD_DIR) or "s3"
+S3_BUCKET=
+S3_REGION=us-east-1
+S3_ENDPOINT=  # only for an S3-compatible provider that isn't AWS (MinIO, R2, Spaces)
+S3_ACCESS_KEY_ID=  # leave unset to use the AWS SDK's normal credential chain
+S3_SECRET_ACCESS_KEY=
+
 # CV/ML
 PYTHON_ENV_PATH=./venv
 YOLO_MODEL=yolov8n.pt
-OPENPOSE_MODEL_PATH=./models/openpose
 ANALYSIS_WORKER_POOL_SIZE=2  # concurrent analysis workers (see server/utils/analysisWorkerPool.js)
 ANALYZER_MAX_FRAMES=  # optional: cap frames processed, useful for smoke tests
 
@@ -249,6 +256,18 @@ Analysis is triggered by `POST /api/analysis/:videoId/process`, which spawns `se
 - Soccer's values are the original, footage-tuned defaults; the other presets are reasonable starting points that haven't been verified against real footage for that sport — confirm the ball color range against your own footage before relying on it
 - Set via `sport` on `POST /api/videos/upload` (or the Sport dropdown in the upload form); passed to the analyzer as `--sport`
 
+### Pose Estimation (YOLOv8-pose)
+- `server/cv/pose_estimator.py` runs `yolov8n-pose.pt` as a second model pass, separate from player detection/tracking — its 17-keypoint COCO detections are matched back to existing track IDs by bounding-box IoU rather than tracked independently, so it never creates identities of its own
+- Sampled every `POSE_SAMPLE_INTERVAL_FRAMES` (5) frames, not every frame, to bound the added inference cost; a nearest-frame lookup fills in each track's subsampled `trackingData` points, leaving `pose: {}` where no sample was close enough (`MAX_POSE_SAMPLE_GAP_FRAMES`) to trust
+- Disable via `--no-pose-estimation` (CLI) or `enable_pose_estimation=False` (`analyze()`)
+
+### Tactical/Formation Analysis
+- Pure arithmetic on already-tracked positions — no additional model. Players are grouped into the two largest shirt-color buckets (the same color-voting signal jersey-OCR merging already computes) and treated as the two teams
+- Team shape: width/depth/compactness in meters, computed per-frame and averaged across every frame with enough of the team visible at once (`_team_shape`)
+- Formation: a gap-based line-banding heuristic (`_formation_lines`) sorts a team by average on-pitch depth and starts a new "line" whenever consecutive players are more than `FORMATION_LINE_GAP_METERS` (4.0m) apart — this is a coarse heuristic, not a verified formation classifier: it has no attack-direction detection or positional roles, so lines are reported top-to-bottom of frame rather than defense-to-attack
+- Skipped (not a hard failure) when a color group is too small to plausibly be a real team, or no frame ever had enough of a team visible at once
+- Shown on the Analysis report page as a "Tactical shape" panel, per team, only when present
+
 ## Development Guidelines
 
 ### Backend Development
@@ -272,15 +291,20 @@ Analysis is triggered by `POST /api/analysis/:videoId/process`, which spawns `se
 ## Testing
 
 ```bash
-# Backend tests (Jest + Supertest, 98 tests: auth, password reset + email resilience, teams,
+# Backend tests (Jest + Supertest, 111 tests: auth, password reset + email resilience, teams,
 # players + comparison, videos/sport, video data isolation, chunked upload, analysis worker
-# pool, seed-data parsing, rate limiting)
+# pool, storage backend (local/S3) + controller wiring, seed-data parsing, rate limiting)
 npm test --prefix server
 
-# Frontend tests (React Testing Library, 72 tests: AuthContext, Login/Register/reset pages,
+# Frontend tests (React Testing Library, 75 tests: AuthContext, Login/Register/reset pages,
 # ProtectedRoute, LandingPage (incl. real seeded sample report), VideoList/Upload, chunked
-# upload, PlayerComparison, AnalysisPage/Heatmap/player stats table, Home navigation)
+# upload, PlayerComparison, AnalysisPage/Heatmap/player stats table/tactical shape panel,
+# Home navigation)
 npm test --prefix client -- --watchAll=false
+
+# Python CV pipeline tests (unittest, 21 tests: pose-to-track IoU matching, nearest-frame
+# pose lookup, team shape aggregation, formation-line banding — pure logic, no model load)
+cd server/cv && python -m unittest test_analysis_helpers -v
 ```
 
 Backend tests run against a disposable `scout-bridge-analytics-test` database (same `MONGODB_URI` host, different db name — set in `server/tests/setup.js`) so they never read or modify real data, and the database is dropped after each run. They talk to the Express app directly via `server/app.js` (no live server needs to be running separately — a local `mongod` reachable at `MONGODB_URI` is the only requirement).
@@ -296,10 +320,37 @@ docker compose up --build
 
 Brings up MongoDB, the Express server, and the CRA dev server. The server image includes the full Python CV stack (ultralytics/torch/opencv/easyocr) alongside Node, since the analysis pipeline is core functionality, not optional — expect a large first build (torch alone is 500+ MB) and a multi-minute build time, longer on a slow connection since pip has no build-cache equivalent for the download itself. If you don't need GPU inference (this project runs CPU-only in practice — no CUDA device is assumed anywhere in the CV code), pointing pip at the CPU-only PyTorch wheel index cuts that download substantially; see https://pytorch.org/get-started/locally/ for the current index URL. Set a real `JWT_SECRET` via a `.env` file in the project root before running in anything other than throwaway local testing; `docker-compose.yml` falls back to a placeholder so `up` doesn't hard-crash with no config, but that placeholder must not be used for real data.
 
-### Cloud Deployment
-- AWS: EC2 + RDS + S3
-- Google Cloud: Compute Engine + Cloud SQL + Cloud Storage
-- Azure: App Service + Cosmos DB + Blob Storage
+### Railway
+
+Two Railway services (server, client), each pointing at this same repo with a different **Root Directory**, plus a MongoDB database. `server/railway.json` and `client/railway.json` are already committed — Railway picks them up automatically once each service's root directory is set, so beyond the steps below there's no extra per-service configuration needed.
+
+**1. Database** — add Railway's MongoDB plugin to the project (or use an external MongoDB Atlas cluster if you'd rather not run your data on Railway). Either way you end up with a connection string to use in step 3.
+
+**2. Server service**
+- New service → this repo → **Root Directory: `server`**. Railway detects `server/Dockerfile` + `server/railway.json` automatically (build: `DOCKERFILE`, health check: `/api/health`).
+- Add a **Volume** mounted at `/app/uploads` — this is what makes uploaded videos survive a redeploy; without it, every deploy wipes local disk and any local-backend video is gone. (Cloud object storage is also supported — see `server/utils/storage.js` and the `STORAGE_BACKEND`/`S3_*` variables below — but a volume is the simpler "for now" option and the one to reach for first.)
+- Variables (Railway auto-injects `PORT`; don't set it yourself):
+  ```
+  NODE_ENV=production
+  MONGODB_URI=<your connection string from step 1>
+  JWT_SECRET=<generate one: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))">
+  CLIENT_URL=<the client service's public URL, once you have it from step 3>
+  ANALYSIS_WORKER_POOL_SIZE=1
+  ```
+  `ANALYSIS_WORKER_POOL_SIZE=1` matters more here than it did locally: each worker loads the full torch/YOLO/EasyOCR stack into memory (see the Roadmap entry below), and Railway's smaller plans don't have the headroom for 2+ of those at once the way a dev machine does. Raise it only once you've confirmed the plan's memory ceiling comfortably covers it.
+  `SMTP_*` are optional — leave unset to keep the console-fallback email behavior (see [Email](#email)) until you have real provider credentials.
+
+**3. Client service**
+- New service → this repo → **Root Directory: `client`**. Railway detects `client/railway.json`, which points the build at `client/Dockerfile.railway` (a production static build + `serve`, distinct from `client/Dockerfile`, which is dev-only and matches `docker-compose.yml`'s bind-mount workflow).
+- Build Variables (build-time, not runtime — CRA bakes `REACT_APP_*` into the JS bundle when `npm run build` runs, so this must be set *before* the client builds, which means deploying the server first to get its URL):
+  ```
+  REACT_APP_API_URL=<the server service's public URL>/api
+  ```
+- Once this service has its own public URL, go back and set the server's `CLIENT_URL` to it (used to build password-reset/email-verification links), then redeploy the server.
+
+**4. Seed data (optional)** — `node scripts/seedDemoData.js` (see [Seeding Demo Data](#seeding-demo-data)) can be run against the production `MONGODB_URI` from a Railway shell or locally with `MONGODB_URI` pointed at it, to populate the same real sample match this repo's landing page uses.
+
+Verified locally before writing this: `client/Dockerfile.railway` builds a real production bundle and serves it correctly on an arbitrary `$PORT` (confirmed via a real `docker run` with `PORT` injected, matching how Railway starts containers); `server/Dockerfile`'s dependency layer installs cleanly against the same npm version Railway's build environment uses. Neither has been deployed to an actual Railway project — that requires an authenticated `railway` CLI session or the dashboard, which needs to happen from your account.
 
 ## Performance Optimization
 
@@ -391,14 +442,15 @@ For issues and questions:
 - [x] Home navigation — audited `NavBar`'s `Home` link (`/`) → `RootRoute` → `Home` component wiring; found it already correct by inspection, then proved it with 3 new end-to-end tests (real `AuthProvider`, not a mocked hook) covering an authenticated user landing on `Home` (not the guest page), clicking "Home" from another page to get back to it, and a signed-out visitor correctly seeing `LandingPage` instead. Most likely what was reported was a stale bundle from this session's own mid-refactor server restarts, not a persistent code defect — the regression coverage is there either way.
 - [x] Real demo/seed data — `server/scripts/seedDemoData.js` seeds a real match from [Metrica Sports' public sample tracking dataset](https://github.com/metrica-sports/sample-data) (real anonymized player x,y positions + event annotations from an actual match, not synthetic data) instead of empty states or hand-typed placeholder numbers. Every seeded stat is *computed* by the exact same formulas as `video_analyzer.py` (same `PX_PER_METER`, sprint thresholds, activation-area quadrants, heatmap cell size — see `server/scripts/lib/metricaParser.js`), so a seeded player's distance/speed/sprints mean the same thing a real analysis's would — sanity-checked against real professional match ranges (≈10-12.6km/90min extrapolated, with the low-movement track correctly reading as the goalkeeper). Real match events (`PASS`/`SHOT`/`CHALLENGE`/`RECOVERY`) map onto this app's `pass`/`shot`/`tackle`/`interception` action types. Seeds into MongoDB under a dedicated `demo@scoutbridge.local` account (invisible to real users, same isolation as above) and emits a static `client/src/data/sampleAnalysis.json` snapshot for the logged-out landing page. 14 new tests on the pure parsing/stats functions.
 - [x] Interactive, populated guest landing page — the "sample report" section previously showed 3 hand-typed placeholder rows. It now renders the real seeded match: live action-type breakdown badges, an actual `Heatmap` component (the same one the real report page uses) fed with real density data, and a real stats table of the top players by distance covered — all sourced from `sampleAnalysis.json`, with a credit link back to the real dataset. 2 new tests confirm the numbers are dynamically rendered (not fixed strings) and that the source is credited.
+- [x] Cloud storage integration — uploads were local-disk-only via Multer with no path to survive a redeploy losing local disk (e.g. Railway without a Volume) or to scale storage independently of compute. `server/utils/storage.js` is a pluggable backend behind `STORAGE_BACKEND` (`local` default, zero behavior change; `s3` for AWS S3 or any S3-compatible provider — MinIO, R2, Spaces, via `S3_ENDPOINT` + `forcePathStyle`). `Video.storageBackend` records which backend actually stored *that* video, not just the current env var (which can change over a video's lifetime), so old and new videos keep working side by side after a backend switch. Wired into every file-touching path: `uploadVideo` and chunked-upload `finalize()` call `storage.storeFile()` instead of just recording Multer's local path; `deleteVideo` branches on `storageBackend` to call `storage.deleteObject()` or the old `fs.unlinkSync`; `/uploads` gets a new `serveFromCloudIfNeeded` middleware that proxies S3 objects through `pipeObjectToResponse()` (after the same ownership check as local files) instead of falling through to `express.static`, which has nothing to serve for a cloud-backed video. `verifyStorageConnection()` logs bucket reachability at startup, mirroring the existing SMTP diagnostic. 10 new tests mock `@aws-sdk/client-s3` directly (local no-op, S3 upload + local-file cleanup, delete, missing-bucket error, connection verification, response streaming/headers) plus 3 more verifying the controller wiring itself (`storageBackend`/`filePath` reflect whatever `storeFile` returns) independent of `storage.js`'s own S3 logic.
+- [x] Railway deployment prep — `server/railway.json` and `client/railway.json` (Docker-builder config-as-code Railway picks up automatically), plus `client/Dockerfile.railway` (a production static build served via `serve`, distinct from the existing dev-only `client/Dockerfile`). New [Railway](#railway) section in this README walks through both services, the MongoDB connection, the Volume-vs-S3 storage tradeoff, and build-time vs. runtime env vars (CRA bakes `REACT_APP_API_URL` in at build time, so the server must be deployed first to get its URL). Verified locally, not deployed: `Dockerfile.railway` builds a real production bundle and serves it correctly on an arbitrary `$PORT` via a real `docker run`; actual deployment needs an authenticated Railway account, which wasn't performed on the user's behalf.
+- [x] Advanced ML models: pose estimation + tactical/formation analysis — `server/cv/pose_estimator.py` runs YOLOv8-pose (`yolov8n-pose.pt`) as a second, separate model pass rather than switching player detection over to a combined detect+pose model, since `PlayerDetector`'s tracker config is specifically tuned (ReID, merge behavior) and swapping the underlying detector would risk regressing already-verified tracking accuracy. Its per-frame detections are matched back to the existing tracker's identities by bounding-box IoU (`_match_pose_to_track`, greedy highest-IoU-first) rather than creating a second, parallel identity system, throttled to every `POSE_SAMPLE_INTERVAL_FRAMES` (5) frames to bound the added inference cost, with a nearest-frame lookup (`_pose_for_frame`) filling in each subsampled `trackingData` point (capped by `MAX_POSE_SAMPLE_GAP_FRAMES` so a stale sample is left empty rather than shown drifted). `worker.py` preloads one `PoseEstimator` at startup and reuses it across jobs, mirroring the existing `JerseyReader` pattern. Tactical/formation analysis (`_team_shape`/`_formation_lines`) is pure arithmetic on the already-tracked positions, grouped by the two largest shirt-color groups (reusing the same color-voting signal already used for jersey-OCR track merging): per-frame team width/depth/compactness in meters, averaged across every frame with enough of the team visible at once, plus a gap-based line-banding heuristic (not a true formation classifier — no attack-direction detection or positional roles) reporting line count and per-line player composition. Both are opt-out (`enable_pose_estimation` / CLI `--no-pose-estimation`) and gracefully skipped, not a hard failure, when a color group is too small to plausibly be a real team. Surfaced on `AnalysisPage` as a new "Tactical shape" panel, shown only when tactical data exists so older analyses render unaffected. Verified against real footage, not just unit tests: a 60-frame run produced real keypoint data for half of all tracking points (the rest correctly empty, outside the pose-sampled window); a 300-frame run produced plausible team shapes (9 vs. 6 players, ~60-70m width, 2-line formations) from real shirt-color grouping. 21 new Python `unittest` tests (IoU matching, nearest-frame lookup, team shape aggregation, formation banding — all pure logic, no model load) plus 3 new frontend tests for the panel's render/omit behavior.
 
 **Known gaps (no work started):**
-- [ ] Nothing security-related from the original gap list remains untouched — see Larger feature gaps below for what's left, which is product functionality rather than hardening.
+- [ ] Mobile app — the only item left from the original larger-feature-gap list; explicitly deferred by the user's choice, not started.
 
 **Larger feature gaps:**
-- [ ] Cloud storage integration (uploads are local-disk only via Multer)
-- [ ] Mobile app
-- [ ] Advanced ML models (pose estimation, tactical/formation analysis) — `OPENPOSE_MODEL_PATH` is in `.env` but OpenPose was never integrated
+- [ ] Mobile app (native or PWA — not started, explicitly deferred)
 
 ## Acknowledgments
 

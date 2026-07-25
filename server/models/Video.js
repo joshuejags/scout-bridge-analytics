@@ -16,6 +16,12 @@ const videoSchema = new mongoose.Schema(
     // assigned one.
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     filePath: { type: String, required: true },
+    // Which backend actually stored this video's file — recorded per-video
+    // (not just read from the current STORAGE_BACKEND env var) since that
+    // config can change over a video's lifetime, e.g. after migrating from
+    // local disk to S3; older videos must still resolve against whichever
+    // backend they were actually written to. See utils/storage.js.
+    storageBackend: { type: String, enum: ['local', 's3'], default: 'local' },
     status: {
       type: String,
       // 'queued' means a job has been submitted but every analysis worker

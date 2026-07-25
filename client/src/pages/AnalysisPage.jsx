@@ -137,6 +137,39 @@ const AnalysisPage = () => {
         <h3>Heatmap</h3>
         <Heatmap grid={analysis.heatmapData.grid} sport={analysis.video?.sport} />
       </div>
+
+      {analysis.tacticalData?.teams?.length > 0 && (
+        <div className="analysis-panel">
+          <h3>Tactical shape</h3>
+          <p className="tactical-caveat">
+            Heuristic estimate from tracked positions grouped by shirt color — not a
+            verified formation.
+          </p>
+          <div className="tactical-teams">
+            {analysis.tacticalData.teams.map((team) => (
+              <div className="tactical-team-card" key={team.teamColor}>
+                <h4>
+                  <span
+                    className="tactical-team-swatch"
+                    style={{ backgroundColor: team.teamColor }}
+                  />
+                  {team.teamColor} ({team.playerCount} players)
+                </h4>
+                <ul className="tactical-stats-list">
+                  <li>Width: {team.shape.width} m</li>
+                  <li>Depth: {team.shape.depth} m</li>
+                  <li>Compactness: {team.shape.compactness} m</li>
+                </ul>
+                <p className="tactical-formation-label">
+                  {team.formation.lineCount} line{team.formation.lineCount === 1 ? '' : 's'}
+                  {' — '}
+                  {team.formation.lineup.join('-')}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -17,9 +17,10 @@ const { isOwnerOrAdmin } = require('../controllers/videoController');
 const authorizeUploadAccess = async (req, res, next) => {
   try {
     const segments = req.path.replace(/^\/+/, '').split('/');
+    const isThumbnail = segments[0] === 'thumbnails' && !!segments[1];
 
     let video = null;
-    if (segments[0] === 'thumbnails' && segments[1]) {
+    if (isThumbnail) {
       video = await Video.findById(segments[1]).catch(() => null);
     } else if (segments[0]) {
       video = await Video.findOne({ filename: segments[0] });
@@ -28,6 +29,10 @@ const authorizeUploadAccess = async (req, res, next) => {
     if (!video || !isOwnerOrAdmin(video, req.user)) {
       return res.status(404).end();
     }
+    // Thumbnails always live on local disk regardless of storageBackend
+    // (see utils/storage.js) — only the main video file can be s3-backed.
+    req.video = video;
+    req.isThumbnailRequest = isThumbnail;
     next();
   } catch (error) {
     res.status(500).json({ error: error.message });

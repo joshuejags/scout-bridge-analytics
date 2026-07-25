@@ -11,10 +11,11 @@ cold-start tax was routinely *larger* than the real work.
 This worker pays that cost once at startup, then reads newline-delimited
 JSON job requests from stdin and writes newline-delimited JSON
 progress/result/error messages to stdout, reusing the same EasyOCR reader
-across every job (safe: JerseyReader.read_number() is a pure per-crop call
-with no cross-video state). A fresh PlayerDetector/BallTracker is still
-built per job — cheap once the import cost is already paid, and necessary
-since YOLO's tracker keeps cross-frame identity state that must not bleed
+and PoseEstimator across every job (safe: both JerseyReader.read_number()
+and PoseEstimator.estimate() are pure per-frame/per-crop calls with no
+cross-video state). A fresh PlayerDetector/BallTracker is still built per
+job — cheap once the import cost is already paid, and necessary since
+YOLO's tracker keeps cross-frame identity state that must not bleed
 between different videos.
 
 Node's analysisWorkerPool.js spawns a small pool of these and dispatches
@@ -44,6 +45,14 @@ def main():
     except Exception as e:  # pragma: no cover - environment-dependent
         _emit({"type": "workerLog", "message": f"Jersey OCR unavailable: {e}"})
 
+    pose_estimator = None
+    try:
+        from pose_estimator import PoseEstimator
+
+        pose_estimator = PoseEstimator()
+    except Exception as e:  # pragma: no cover - environment-dependent
+        _emit({"type": "workerLog", "message": f"Pose estimation unavailable: {e}"})
+
     _emit({"type": "ready"})
 
     for raw_line in sys.stdin:
@@ -65,9 +74,11 @@ def main():
                 job["videoPath"],
                 max_frames=job.get("maxFrames"),
                 enable_jersey_ocr=job.get("enableJerseyOcr", True),
+                enable_pose_estimation=job.get("enablePoseEstimation", True),
                 thumbnail_dir=job.get("thumbnailDir"),
                 sport=job.get("sport", DEFAULT_SPORT),
                 jersey_reader=jersey_reader,
+                pose_estimator=pose_estimator,
                 progress_callback=on_progress,
             )
             _emit({"jobId": job_id, "type": "result", "data": result})

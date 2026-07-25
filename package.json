@@ -15,7 +15,7 @@
     "analytics",
     "computer-vision",
     "YOLO",
-    "OpenPose",
+    "pose-estimation",
     "player-tracking"
   ],
   "author": "",

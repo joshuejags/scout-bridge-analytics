@@ -142,3 +142,67 @@ describe('AnalysisPage player stats table', () => {
     expect(within(wrap).getAllByRole('row')).toHaveLength(1 + manyPlayers.length);
   });
 });
+
+describe('AnalysisPage tactical shape panel', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const tacticalData = {
+    teams: [
+      {
+        teamColor: 'red',
+        playerCount: 8,
+        shape: { width: 45.2, depth: 20.1, compactness: 12.4, sampledFrames: 300 },
+        formation: { lineCount: 3, lineup: [4, 3, 1] },
+      },
+      {
+        teamColor: 'blue',
+        playerCount: 7,
+        shape: { width: 40.0, depth: 18.5, compactness: 11.0, sampledFrames: 280 },
+        formation: { lineCount: 2, lineup: [4, 3] },
+      },
+    ],
+  };
+
+  it('renders a card per team with its shape metrics and formation lineup', async () => {
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/analysis/')) return Promise.resolve({ data: { ...baseAnalysis, tacticalData } });
+      return Promise.resolve({ data: [] });
+    });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Tactical shape')).toBeInTheDocument());
+    expect(screen.getByText(/red \(8 players\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/blue \(7 players\)/i)).toBeInTheDocument();
+    expect(screen.getByText('Width: 45.2 m')).toBeInTheDocument();
+    expect(screen.getByText('3 lines — 4-3-1')).toBeInTheDocument();
+    expect(screen.getByText('2 lines — 4-3')).toBeInTheDocument();
+  });
+
+  it('omits the tactical panel entirely when tacticalData has no teams', async () => {
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/analysis/'))
+        return Promise.resolve({ data: { ...baseAnalysis, tacticalData: { teams: [] } } });
+      return Promise.resolve({ data: [] });
+    });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Actions detected: 5')).toBeInTheDocument());
+    expect(screen.queryByText('Tactical shape')).not.toBeInTheDocument();
+  });
+
+  it('omits the tactical panel when tacticalData is entirely absent (older analyses)', async () => {
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/analysis/')) return Promise.resolve({ data: baseAnalysis });
+      return Promise.resolve({ data: [] });
+    });
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Actions detected: 5')).toBeInTheDocument());
+    expect(screen.queryByText('Tactical shape')).not.toBeInTheDocument();
+  });
+});

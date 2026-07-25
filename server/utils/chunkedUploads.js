@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const storage = require('./storage');
 
 // multer's existing single-shot /api/videos/upload already streams straight
 // to disk (diskStorage, not memoryStorage) — it was never actually
@@ -68,7 +69,15 @@ function appendChunk(uploadId, buffer) {
   return session.bytesReceived;
 }
 
-function finalize(uploadId, finalFilename) {
+/**
+ * Assembles the finished upload and hands it to whichever storage backend
+ * is configured (see utils/storage.js). Always lands on local disk first
+ * (the chunk-by-chunk append above only knows how to write to a local temp
+ * file) — for the local backend that IS the final destination; for s3,
+ * storage.storeFile then uploads that local file and deletes it, so
+ * nothing sits on local disk once this resolves either way.
+ */
+async function finalize(uploadId, finalFilename) {
   const session = sessions.get(uploadId);
   if (!session) {
     throw new Error('Unknown or expired upload session');
@@ -78,10 +87,10 @@ function finalize(uploadId, finalFilename) {
       `Upload incomplete: received ${session.bytesReceived} of ${session.expectedSize} declared bytes`
     );
   }
-  const finalPath = path.join(UPLOAD_DIR, finalFilename);
-  fs.renameSync(session.tempPath, finalPath);
+  const localPath = path.join(UPLOAD_DIR, finalFilename);
+  fs.renameSync(session.tempPath, localPath);
   sessions.delete(uploadId);
-  return finalPath;
+  return storage.storeFile(localPath, finalFilename);
 }
 
 function abort(uploadId) {

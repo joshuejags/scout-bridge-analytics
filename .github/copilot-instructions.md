@@ -1,10 +1,10 @@
 # Sports Analytics App - Setup Instructions
 
-Sports analytics platform built with MERN stack + Computer Vision (YOLO/OpenPose) for analyzing player performance from match highlights.
+Sports analytics platform built with MERN stack + Computer Vision (YOLOv8) for analyzing player performance from match highlights.
 
 ## Project Overview
 - **Tech Stack**: MERN (MongoDB, Express, React, Node.js)
-- **CV/ML**: YOLO (object detection), OpenPose (pose estimation)
+- **CV/ML**: YOLOv8 (object detection + tracking), YOLOv8-pose (pose estimation)
 - **Features**: Video upload, player tracking, ball tracking, action detection, performance stats, heatmaps, real-time streaming
 
 ## Setup Progress

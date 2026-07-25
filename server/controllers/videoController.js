@@ -2,6 +2,7 @@ const Video = require('../models/Video');
 const fs = require('fs');
 const path = require('path');
 const chunkedUploads = require('../utils/chunkedUploads');
+const storage = require('../utils/storage');
 
 const ALLOWED_SPORTS = ['soccer', 'basketball', 'hockey', 'rugby'];
 const ALLOWED_EXTENSIONS = ['.mp4', '.avi', '.mov', '.mkv', '.flv'];
@@ -31,11 +32,17 @@ exports.uploadVideo = async (req, res) => {
       ? [req.body.players]
       : [];
 
+    // multer's diskStorage already wrote this to local disk; storeFile is a
+    // no-op for the local backend (default) and promotes it to S3 (deleting
+    // the local temp copy) when STORAGE_BACKEND=s3 — see utils/storage.js.
+    const stored = await storage.storeFile(req.file.path, req.file.filename);
+
     const video = new Video({
       filename: req.file.filename,
       originalName: req.file.originalname,
       fileSize: req.file.size,
-      filePath: req.file.path,
+      filePath: stored.localPath || stored.key,
+      storageBackend: stored.backend,
       // The server is the source of truth for who uploaded this, not
       // whatever the client claims — uploadedBy is display-only, `user` is
       // what access control actually checks.
@@ -154,9 +161,9 @@ exports.completeChunkedUpload = async (req, res) => {
     }
 
     const finalFilename = `${Date.now()}${path.extname(session.meta.originalName)}`;
-    let finalPath;
+    let stored;
     try {
-      finalPath = chunkedUploads.finalize(uploadId, finalFilename);
+      stored = await chunkedUploads.finalize(uploadId, finalFilename);
     } catch (e) {
       return res.status(409).json({ error: e.message });
     }
@@ -165,7 +172,8 @@ exports.completeChunkedUpload = async (req, res) => {
       filename: finalFilename,
       originalName: session.meta.originalName,
       fileSize: session.expectedSize,
-      filePath: finalPath,
+      filePath: stored.localPath || stored.key,
+      storageBackend: stored.backend,
       uploadedBy: session.meta.uploadedBy,
       user: session.meta.userId,
       status: 'uploaded',
@@ -227,8 +235,14 @@ exports.deleteVideo = async (req, res) => {
       return res.status(404).json({ error: 'Video not found' });
     }
 
-    // Delete file from storage
-    if (fs.existsSync(video.filePath)) {
+    // Delete the underlying file from whichever backend actually stored
+    // it — not necessarily today's STORAGE_BACKEND, since that can change
+    // over a video's lifetime (see Video.storageBackend).
+    if (video.storageBackend === 's3') {
+      await storage.deleteObject(video.filename).catch((err) => {
+        console.error(`Failed to delete s3 object for video ${video._id}: ${err.message}`);
+      });
+    } else if (fs.existsSync(video.filePath)) {
       fs.unlinkSync(video.filePath);
     }
 

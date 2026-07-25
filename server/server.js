@@ -12,6 +12,7 @@ const app = require('./app');
 const { initSocket } = require('./utils/socket');
 const analysisWorkerPool = require('./utils/analysisWorkerPool');
 const { verifySmtpConnection } = require('./utils/email');
+const { getBackendName, verifyStorageConnection } = require('./utils/storage');
 
 const connectDB = async () => {
   try {
@@ -39,6 +40,17 @@ verifySmtpConnection().then((result) => {
     console.log(`[email] SMTP connection verified (${process.env.SMTP_HOST}).`);
   } else {
     console.error(`[email] SMTP is configured but connection/auth failed: ${result.error}`);
+  }
+});
+
+// Same idea for storage: confirm the configured backend is actually
+// reachable at startup, not only when a real user's upload fails.
+console.log(`[storage] Backend: ${getBackendName()}${getBackendName() === 'local' ? ' (uploads/)' : ''}`);
+verifyStorageConnection().then((result) => {
+  if (result && !result.ok) {
+    console.error(`[storage] S3 is configured but the bucket is unreachable: ${result.error}`);
+  } else if (result && result.ok) {
+    console.log(`[storage] S3 bucket "${process.env.S3_BUCKET}" reachable.`);
   }
 });
 
