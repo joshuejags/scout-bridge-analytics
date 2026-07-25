@@ -2,7 +2,10 @@ const mongoose = require('mongoose');
 
 const videoSchema = new mongoose.Schema(
   {
-    filename: { type: String, required: true },
+    // Indexed: looked up on every /uploads/* request (see
+    // middleware/uploadAccess.js) to resolve the requesting file back to
+    // its owning video.
+    filename: { type: String, required: true, index: true },
     originalName: { type: String, required: true },
     fileSize: { type: Number, required: true },
     duration: Number,
@@ -13,8 +16,8 @@ const videoSchema = new mongoose.Schema(
     // or fetches is scoped to this field (see videoController.js) — not
     // required, since videos created before this field existed have no
     // owner on record and are intentionally admin-only until manually
-    // assigned one.
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    // assigned one. Indexed: this is the filter on every GET /api/videos.
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     filePath: { type: String, required: true },
     // Which backend actually stored this video's file — recorded per-video
     // (not just read from the current STORAGE_BACKEND env var) since that
@@ -44,6 +47,14 @@ const videoSchema = new mongoose.Schema(
     opponentTeam: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
     players: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Player' }],
     progress: { type: Number, default: 0 },
+    // Set whenever status transitions to 'failed' — either a real analysis
+    // error, or (see analysisController.reconcileOrphanedJobs) a job lost
+    // to a server restart while queued/processing. Cleared on success, so
+    // it never shows a stale reason next to a since-succeeded analysis.
+    // Without this, the *only* place a failure reason ever existed was a
+    // transient Socket.IO event — invisible to anyone not already watching
+    // live, and gone forever after a page reload.
+    lastError: { type: String, default: null },
     analysis: { type: mongoose.Schema.Types.ObjectId, ref: 'Analysis' },
     metadata: {
       width: Number,

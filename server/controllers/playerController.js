@@ -1,13 +1,20 @@
 const mongoose = require('mongoose');
 const Player = require('../models/Player');
 const Analysis = require('../models/Analysis');
+const { friendlyMongooseError } = require('../utils/mongooseErrors');
+const { pick } = require('../utils/pick');
+
+const PLAYER_FIELDS = ['name', 'team', 'position', 'jerseyNumber'];
 
 exports.createPlayer = async (req, res) => {
   try {
-    const player = new Player(req.body);
+    const player = new Player(pick(req.body, PLAYER_FIELDS));
     await player.save();
     res.status(201).json(player);
   } catch (error) {
+    const message = friendlyMongooseError(error);
+    if (message) return res.status(400).json({ error: message });
+    console.error(error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -33,10 +40,15 @@ exports.getPlayerById = async (req, res) => {
 
 exports.updatePlayer = async (req, res) => {
   try {
-    const player = await Player.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const player = await Player.findByIdAndUpdate(req.params.id, pick(req.body, PLAYER_FIELDS), {
+      new: true,
+    });
     if (!player) return res.status(404).json({ error: 'Player not found' });
     res.json(player);
   } catch (error) {
+    const message = friendlyMongooseError(error);
+    if (message) return res.status(400).json({ error: message });
+    console.error(error);
     res.status(500).json({ error: error.message });
   }
 };

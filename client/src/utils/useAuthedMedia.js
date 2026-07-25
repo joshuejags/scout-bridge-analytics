@@ -12,6 +12,7 @@ import axios from 'axios';
 export const useAuthedMedia = (url) => {
   const [blobUrl, setBlobUrl] = useState(null);
   const [error, setError] = useState(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     if (!url) {
@@ -38,7 +39,9 @@ export const useAuthedMedia = (url) => {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [url]);
+  }, [url, retryNonce]);
 
-  return { blobUrl, error };
+  const retry = () => setRetryNonce((n) => n + 1);
+
+  return { blobUrl, error, retry };
 };

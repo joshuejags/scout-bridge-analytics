@@ -33,6 +33,14 @@ const pendingQueue = []; // jobs waiting for a free ready worker
 const activeJobs = new Map(); // jobId -> job, while a worker is running it
 let shuttingDown = false;
 
+// Without a cap, an unbounded number of jobs could pile up in memory with
+// no backpressure — a caller (see analysisLimiter in middleware/rateLimit.js
+// for the per-user side of this) gets a clear rejection instead of a job
+// that silently waits behind an ever-growing line.
+const MAX_QUEUE_LENGTH = process.env.ANALYSIS_QUEUE_MAX
+  ? Number(process.env.ANALYSIS_QUEUE_MAX)
+  : 20;
+
 function handleWorkerMessage(workerState, msg) {
   if (msg.type === 'ready') {
     workerState.ready = true;
@@ -179,6 +187,11 @@ function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(WORKER_SCRIPT)) {
       return reject(new Error(`Analyzer worker script not found at ${WORKER_SCRIPT}`));
+    }
+    if (pendingQueue.length >= MAX_QUEUE_LENGTH) {
+      return reject(
+        new Error('Analysis queue is full right now — try again in a few minutes.')
+      );
     }
     warmUp(); // no-op if already warm; lazily starts the pool otherwise
 

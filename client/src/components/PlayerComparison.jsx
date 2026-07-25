@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import LoadingSpinner from './LoadingSpinner';
 import Toast from './Toast';
@@ -33,6 +33,39 @@ const PlayerComparison = ({ playerIds, onClose }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const panelRef = useRef(null);
+  const closeBtnRef = useRef(null);
+
+  // Escape-to-close and a basic focus trap: without these, keyboard focus
+  // can wander behind the overlay onto the page underneath, and there's
+  // no keyboard-only way to dismiss the modal at all.
+  useEffect(() => {
+    closeBtnRef.current?.focus();
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !panelRef.current) return;
+      const focusable = panelRef.current.querySelectorAll(
+        'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,11 +90,16 @@ const PlayerComparison = ({ playerIds, onClose }) => {
   }, [playerIds]);
 
   return (
-    <div className="comparison-overlay" role="dialog" aria-label="Player comparison">
-      <div className="comparison-panel">
+    <div className="comparison-overlay" role="dialog" aria-modal="true" aria-label="Player comparison">
+      <div className="comparison-panel" ref={panelRef}>
         <div className="comparison-header">
           <h2>Player Comparison</h2>
-          <button className="comparison-close" onClick={onClose} aria-label="Close comparison">
+          <button
+            className="comparison-close"
+            onClick={onClose}
+            aria-label="Close comparison"
+            ref={closeBtnRef}
+          >
             &times;
           </button>
         </div>

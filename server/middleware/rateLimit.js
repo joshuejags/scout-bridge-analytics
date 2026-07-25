@@ -54,4 +54,49 @@ const forgotPasswordLimiter = rateLimit({
   skip: skipInTest,
 });
 
-module.exports = { loginLimiter, registerLimiter, forgotPasswordLimiter };
+/**
+ * Keyed by authenticated user, not IP — these routes sit behind
+ * requireAuth already, so req.user is always populated by the time this
+ * runs, and the point is capping what a single account can do, not a
+ * single network address (which IP-keying would miss for accounts behind
+ * shared/corporate NAT anyway).
+ */
+const perUserKey = (req) => String(req.user._id);
+
+/**
+ * Uploading is real storage/bandwidth cost per request (up to
+ * MAX_FILE_SIZE each) — without a cap, one account can upload unlimited
+ * large files back-to-back.
+ */
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many uploads. Try again later.' },
+  keyGenerator: perUserKey,
+  skip: skipInTest,
+});
+
+/**
+ * Analysis runs against a small fixed worker pool (ANALYSIS_WORKER_POOL_SIZE,
+ * often just 1-2) — without a cap, one account can queue enough jobs to
+ * starve every other user's analyses.
+ */
+const analysisLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many analysis requests. Try again later.' },
+  keyGenerator: perUserKey,
+  skip: skipInTest,
+});
+
+module.exports = {
+  loginLimiter,
+  registerLimiter,
+  forgotPasswordLimiter,
+  uploadLimiter,
+  analysisLimiter,
+};

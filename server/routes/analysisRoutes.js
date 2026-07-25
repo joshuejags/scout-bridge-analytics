@@ -2,11 +2,13 @@ const express = require('express');
 const { body, param } = require('express-validator');
 const analysisController = require('../controllers/analysisController');
 const validate = require('../middleware/validate');
+const { analysisLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
 router.post(
   '/:videoId/process',
+  analysisLimiter,
   [param('videoId').isMongoId().withMessage('Invalid video id')],
   validate,
   analysisController.processAnalysis

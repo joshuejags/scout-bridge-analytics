@@ -4,6 +4,7 @@
   "description": "React frontend for sports analytics platform",
   "private": true,
   "dependencies": {
+    "@sentry/react": "^10.68.0",
     "axios": "^1.3.0",
     "chart.js": "^4.2.1",
     "react": "^18.2.0",

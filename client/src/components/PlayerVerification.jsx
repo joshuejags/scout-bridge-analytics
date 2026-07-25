@@ -14,7 +14,17 @@ const uploadsBase = () =>
  * can't be called inside the parent's .map() loop).
  */
 const AuthedThumbnail = ({ src, alt }) => {
-  const { blobUrl } = useAuthedMedia(src);
+  const { blobUrl, error, retry } = useAuthedMedia(src);
+  if (error) {
+    return (
+      <div className="pv-thumb-placeholder pv-thumb-error">
+        <span>Couldn't load</span>
+        <button type="button" onClick={retry}>
+          Retry
+        </button>
+      </div>
+    );
+  }
   if (!blobUrl) {
     return <div className="pv-thumb-placeholder">Loading...</div>;
   }

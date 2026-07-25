@@ -138,6 +138,22 @@
   font-size: 12px;
 }
 
+.pv-thumb-error {
+  flex-direction: column;
+  gap: 4px;
+  color: var(--danger-color);
+}
+
+.pv-thumb-error button {
+  background: none;
+  border: 1px solid var(--danger-color);
+  color: var(--danger-color);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
 .pv-check {
   position: absolute;
   top: 6px;

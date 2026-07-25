@@ -252,11 +252,11 @@ const VideoList = ({ refreshTrigger = 0 }) => {
     setSelectedVideoName(video.originalName);
   };
 
-  const { blobUrl: previewBlobUrl } = useAuthedMedia(selectedVideoUrl);
+  const { blobUrl: previewBlobUrl, error: previewError, retry: retryPreview } = useAuthedMedia(selectedVideoUrl);
 
   const statusFilters = [
     { id: 'all', label: 'All', active: statusFilter === 'all' },
-    { id: 'pending', label: 'Pending', active: statusFilter === 'pending' },
+    { id: 'uploaded', label: 'Uploaded', active: statusFilter === 'uploaded' },
     { id: 'queued', label: 'Queued', active: statusFilter === 'queued' },
     { id: 'processing', label: 'Processing', active: statusFilter === 'processing' },
     { id: 'analyzed', label: 'Analyzed', active: statusFilter === 'analyzed' },
@@ -282,7 +282,14 @@ const VideoList = ({ refreshTrigger = 0 }) => {
       {selectedVideoUrl && (
         <div className="video-preview-panel">
           <h3>Preview: {selectedVideoName}</h3>
-          {previewBlobUrl ? (
+          {previewError ? (
+            <p className="preview-error">
+              Couldn't load this preview.{' '}
+              <button type="button" onClick={retryPreview} className="preview-retry-btn">
+                Retry
+              </button>
+            </p>
+          ) : previewBlobUrl ? (
             <video controls width="100%" src={previewBlobUrl} />
           ) : (
             <p>Loading preview...</p>
@@ -295,74 +302,79 @@ const VideoList = ({ refreshTrigger = 0 }) => {
           {videos.length === 0 ? 'No videos uploaded yet' : 'No videos match your search'}
         </p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Sport</th>
-              <th>Size</th>
-              <th>Status</th>
-              <th>Uploaded</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredVideos.map((video) => (
-              <tr key={video._id}>
-                <td>{video.originalName}</td>
-                <td className="video-sport-cell">{video.sport || 'soccer'}</td>
-                <td>{(video.fileSize / 1024 / 1024).toFixed(2)} MB</td>
-                <td>
-                  <span className={`status-badge status-${video.status}`}>
-                    {video.status === 'processing' && liveProgress[video._id] != null
-                      ? `processing (${liveProgress[video._id]}%)`
-                      : video.status}
-                  </span>
-                </td>
-                <td>{new Date(video.createdAt).toLocaleDateString()}</td>
-                <td>
-                  <button
-                    onClick={() => handleDelete(video._id)}
-                    className="delete-btn"
-                    disabled={processingId === video._id}
-                  >
-                    Delete
-                  </button>
-                  <button
-                    onClick={() => handlePreview(video)}
-                    className="preview-btn"
-                    disabled={processingId === video._id}
-                  >
-                    Preview
-                  </button>
-                  {video.status !== 'analyzed' ? (
-                    <button
-                      onClick={() => handleProcess(video._id)}
-                      className="process-btn"
-                      disabled={
-                        processingId === video._id ||
-                        video.status === 'processing' ||
-                        video.status === 'queued'
-                      }
-                    >
-                      {video.status === 'queued'
-                        ? 'Queued...'
-                        : processingId === video._id || video.status === 'processing'
-                        ? 'Processing...'
-                        : video.status === 'failed'
-                        ? 'Retry'
-                        : 'Process'}
-                    </button>
-                  ) : (
-                    <Link to={`/analysis/${video._id}`} className="view-report-btn">
-                      View Report
-                    </Link>
-                  )}
-                </td>
+        <div className="video-list-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Sport</th>
+                <th>Size</th>
+                <th>Status</th>
+                <th>Uploaded</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredVideos.map((video) => (
+                <tr key={video._id}>
+                  <td>{video.originalName}</td>
+                  <td className="video-sport-cell">{video.sport || 'soccer'}</td>
+                  <td>{(video.fileSize / 1024 / 1024).toFixed(2)} MB</td>
+                  <td>
+                    <span
+                      className={`status-badge status-${video.status}`}
+                      title={video.status === 'failed' ? video.lastError : undefined}
+                    >
+                      {video.status === 'processing' && liveProgress[video._id] != null
+                        ? `processing (${liveProgress[video._id]}%)`
+                        : video.status}
+                    </span>
+                  </td>
+                  <td>{new Date(video.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <button
+                      onClick={() => handleDelete(video._id)}
+                      className="delete-btn"
+                      disabled={processingId === video._id}
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={() => handlePreview(video)}
+                      className="preview-btn"
+                      disabled={processingId === video._id}
+                    >
+                      Preview
+                    </button>
+                    {video.status !== 'analyzed' ? (
+                      <button
+                        onClick={() => handleProcess(video._id)}
+                        className="process-btn"
+                        disabled={
+                          processingId === video._id ||
+                          video.status === 'processing' ||
+                          video.status === 'queued'
+                        }
+                      >
+                        {video.status === 'queued'
+                          ? 'Queued...'
+                          : processingId === video._id || video.status === 'processing'
+                          ? 'Processing...'
+                          : video.status === 'failed'
+                          ? 'Retry'
+                          : 'Process'}
+                      </button>
+                    ) : (
+                      <Link to={`/analysis/${video._id}`} className="view-report-btn">
+                        View Report
+                      </Link>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

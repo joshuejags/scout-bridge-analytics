@@ -18,7 +18,7 @@
     "pose-estimation",
     "player-tracking"
   ],
-  "author": "",
+  "author": "Adeolu Shobowale",
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.0.0"

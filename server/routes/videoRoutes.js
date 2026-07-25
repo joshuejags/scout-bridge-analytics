@@ -5,6 +5,7 @@ const { body, param } = require('express-validator');
 const videoController = require('../controllers/videoController');
 const validate = require('../middleware/validate');
 const { requireRole } = require('../middleware/auth');
+const { uploadLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
@@ -33,7 +34,11 @@ const upload = multer({
     if (mimetype && extname) {
       cb(null, true);
     } else {
-      cb(new Error('Only video files are allowed'));
+      // statusCode is read by app.js's global error handler — this is a
+      // client input error (wrong file type), not a server fault.
+      const err = new Error('Only video files are allowed (mp4, avi, mov, mkv, flv)');
+      err.statusCode = 400;
+      cb(err);
     }
   },
 });
@@ -56,6 +61,7 @@ const uploadMetaValidators = [
 // multipart fields before that.
 router.post(
   '/upload',
+  uploadLimiter,
   upload.single('video'),
   uploadMetaValidators,
   validate,
@@ -70,6 +76,7 @@ router.post(
 // every declared byte has arrived. See server/utils/chunkedUploads.js.
 router.post(
   '/upload/init',
+  uploadLimiter,
   [body('originalName').trim().notEmpty().withMessage('originalName is required'), ...uploadMetaValidators],
   validate,
   videoController.initChunkedUpload

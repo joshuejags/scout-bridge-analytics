@@ -51,7 +51,7 @@ const VerifyEmailPage = () => {
           </>
         )}
         <p className="auth-switch">
-          <Link to="/">Go to dashboard</Link>
+          <Link to="/">Continue to Scout Bridge Analytics</Link>
         </p>
       </div>
     </div>

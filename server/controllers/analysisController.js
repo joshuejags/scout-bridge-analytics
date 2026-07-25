@@ -70,6 +70,7 @@ async function persistAnalysis(video, result) {
         result.summary?.totalPlayers ?? playerData.length,
       matchDuration: result.summary?.matchDuration ?? 0,
       highlightedMoments: result.summary?.highlightedMoments || [],
+      qualityFlag: result.summary?.qualityFlag || null,
     },
   });
 
@@ -77,6 +78,7 @@ async function persistAnalysis(video, result) {
 
   video.analysis = analysis._id;
   video.status = 'analyzed';
+  video.lastError = null;
   if (result.metadata) {
     video.metadata = {
       width: result.metadata.width,
@@ -92,32 +94,42 @@ async function persistAnalysis(video, result) {
 
 exports.processAnalysis = async (req, res) => {
   const { videoId } = req.params;
-  const video = await Video.findById(videoId);
+  let video;
+  try {
+    video = await Video.findById(videoId);
 
-  if (!video || !isOwnerOrAdmin(video, req.user)) {
-    return res.status(404).json({ error: 'Video not found' });
-  }
-
-  // Idempotent: if the video already has an analysis attached, return it.
-  if (video.status === 'analyzed' && video.analysis) {
-    const existing = await Analysis.findById(video.analysis);
-    if (existing) {
-      return res.status(200).json(existing);
+    if (!video || !isOwnerOrAdmin(video, req.user)) {
+      return res.status(404).json({ error: 'Video not found' });
     }
-    // status says analyzed but no analysis doc — fall through and reprocess
-  }
 
-  // Stale processing/queued state: allow retry by clearing the flag and continuing.
-  if (video.status === 'processing' || video.status === 'queued') {
-    console.warn(`Video ${videoId} was stuck in '${video.status}'; retrying.`);
-  }
+    // Idempotent: if the video already has an analysis attached, return it.
+    if (video.status === 'analyzed' && video.analysis) {
+      const existing = await Analysis.findById(video.analysis);
+      if (existing) {
+        return res.status(200).json(existing);
+      }
+      // status says analyzed but no analysis doc — fall through and reprocess
+    }
 
-  // Mark as queued and respond 202 immediately; the queued->processing
-  // transition happens in onDispatch below, once a worker actually picks
-  // this job up (see utils/analysisWorkerPool.js) rather than assuming one
-  // is free right now.
-  video.status = 'queued';
-  await video.save();
+    // Stale processing/queued state: allow retry by clearing the flag and continuing.
+    if (video.status === 'processing' || video.status === 'queued') {
+      console.warn(`Video ${videoId} was stuck in '${video.status}'; retrying.`);
+    }
+
+    // Mark as queued and respond 202 immediately; the queued->processing
+    // transition happens in onDispatch below, once a worker actually picks
+    // this job up (see utils/analysisWorkerPool.js) rather than assuming one
+    // is free right now.
+    video.status = 'queued';
+    await video.save();
+  } catch (error) {
+    // Everything above runs before any response is sent, so a plain 500 is
+    // safe here — unlike the background job below (which already has its
+    // own .catch()), an unhandled rejection in this part previously had
+    // nothing catching it at all and could crash the whole process.
+    console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
 
   // Resolve to an absolute file path. Multer's UPLOAD_DIR (./uploads) is
   // resolved relative to process.cwd(), which is server/ (the process is
@@ -183,6 +195,7 @@ exports.processAnalysis = async (req, res) => {
         const fresh = await Video.findById(video._id);
         if (fresh) {
           fresh.status = 'failed';
+          fresh.lastError = err.message;
           await fresh.save();
         }
       } catch (saveErr) {
@@ -367,3 +380,37 @@ exports.mergePlayerTracks = async (req, res) => {
 function round2(n) {
   return Math.round(n * 100) / 100;
 }
+
+/**
+ * Run once at server startup (see server.js). The analysis worker pool's
+ * queue is purely in-memory (see utils/analysisWorkerPool.js's pendingQueue/
+ * activeJobs) — a server restart, crash, or redeploy while any job was
+ * queued or actively running loses it with nothing left to ever pick it
+ * back up. Left alone, that video stays stuck at status 'queued'/
+ * 'processing' forever: the progress bar looks alive, VideoList disables
+ * the Process button for exactly those statuses, and the user has no way
+ * to even retry.
+ *
+ * This process's in-memory queue is necessarily empty at this point (it
+ * was just created), so any video already in 'queued'/'processing' is
+ * guaranteed to be orphaned from a previous process, not actually in
+ * flight — marking it 'failed' (rather than silently re-submitting it,
+ * which risks a crash-loop if the same input is what killed the previous
+ * process) is what makes the existing "failed -> Retry" UI affordance
+ * apply to it, so a human decides whether to try again.
+ */
+exports.reconcileOrphanedJobs = async () => {
+  const result = await Video.updateMany(
+    { status: { $in: ['queued', 'processing'] } },
+    {
+      status: 'failed',
+      lastError: 'Processing was interrupted by a server restart. Please try again.',
+    }
+  );
+  if (result.modifiedCount > 0) {
+    console.warn(
+      `[analysis] Reconciled ${result.modifiedCount} video(s) stuck in queued/processing from a previous run.`
+    );
+  }
+  return result.modifiedCount;
+};

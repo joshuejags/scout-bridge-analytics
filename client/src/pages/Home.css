@@ -52,6 +52,33 @@
   padding: 24px;
 }
 
+.home-stats-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #fff5f5;
+  border: 1px solid var(--danger-color);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  color: var(--danger-color);
+  font-size: 14px;
+}
+
+.home-stats-error button {
+  background: var(--danger-color);
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* Stats */
 .home-stats-grid {
   display: grid;

@@ -20,10 +20,12 @@ const Home = () => {
   const [stats, setStats] = useState({ total: 0, analyzed: 0, processing: 0, teams: 0, players: 0 });
   const [recentVideos, setRecentVideos] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
+  const [statsError, setStatsError] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
+    setStatsError(null);
     try {
       const [videosRes, teamsRes, playersRes] = await Promise.all([
         axios.get(`${process.env.REACT_APP_API_URL}/videos`),
@@ -41,6 +43,10 @@ const Home = () => {
       setRecentVideos([...videos].reverse().slice(0, 4));
     } catch (err) {
       console.error('Error loading home stats:', err);
+      // Without this, a failed fetch silently leaves stats at their
+      // all-zero initial state — indistinguishable from a genuinely new,
+      // empty account.
+      setStatsError(err.response?.data?.error || "Couldn't load your overview.");
     } finally {
       setLoadingStats(false);
     }
@@ -72,6 +78,13 @@ const Home = () => {
       </header>
 
       <main className="home-main">
+        {statsError && (
+          <div className="home-stats-error" role="alert">
+            <span>{statsError}</span>
+            <button onClick={fetchStats}>Retry</button>
+          </div>
+        )}
+
         {loadingStats ? (
           <LoadingSpinner message="Loading your overview..." />
         ) : (
@@ -150,6 +163,13 @@ const Home = () => {
                     to={video.status === 'analyzed' ? `/analysis/${video._id}` : '#'}
                     className="home-activity-item"
                     onClick={(e) => video.status !== 'analyzed' && e.preventDefault()}
+                    title={
+                      video.status === 'analyzed'
+                        ? undefined
+                        : video.status === 'failed'
+                        ? video.lastError || 'Analysis failed — go to the video list to retry.'
+                        : `Still ${video.status} — check back soon`
+                    }
                   >
                     <span className={`home-activity-dot status-${video.status}`} />
                     <div className="home-activity-text">

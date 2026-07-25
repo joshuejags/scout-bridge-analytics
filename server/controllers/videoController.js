@@ -1,8 +1,18 @@
 const Video = require('../models/Video');
+const Analysis = require('../models/Analysis');
 const fs = require('fs');
 const path = require('path');
 const chunkedUploads = require('../utils/chunkedUploads');
 const storage = require('../utils/storage');
+
+// Mirrors analysisController.js's THUMBNAILS_ROOT resolution exactly, so
+// the directory deleteVideo cleans up is the same one processAnalysis
+// actually wrote thumbnails into.
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
+const UPLOAD_DIR = path.resolve(
+  process.env.UPLOAD_DIR || path.join(PROJECT_ROOT, 'server', 'uploads')
+);
+const THUMBNAILS_ROOT = path.join(UPLOAD_DIR, 'thumbnails');
 
 const ALLOWED_SPORTS = ['soccer', 'basketball', 'hockey', 'rugby'];
 const ALLOWED_EXTENSIONS = ['.mp4', '.avi', '.mov', '.mkv', '.flv'];
@@ -141,11 +151,16 @@ exports.uploadChunk = (req, res) => {
 // connection) find out how many bytes the server already has, instead of
 // re-sending the whole file from the start.
 exports.getChunkedUploadStatus = (req, res) => {
-  const session = chunkedUploads.getSession(req.params.uploadId);
-  if (!session || String(session.meta.userId) !== String(req.user._id)) {
-    return res.status(404).json({ error: 'Unknown or expired upload session' });
+  try {
+    const session = chunkedUploads.getSession(req.params.uploadId);
+    if (!session || String(session.meta.userId) !== String(req.user._id)) {
+      return res.status(404).json({ error: 'Unknown or expired upload session' });
+    }
+    res.json({ bytesReceived: session.bytesReceived, expectedSize: session.expectedSize });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
   }
-  res.json({ bytesReceived: session.bytesReceived, expectedSize: session.expectedSize });
 };
 
 // Chunked upload, step 3: once every declared byte has arrived, assemble
@@ -245,6 +260,19 @@ exports.deleteVideo = async (req, res) => {
     } else if (fs.existsSync(video.filePath)) {
       fs.unlinkSync(video.filePath);
     }
+
+    // Derived data doesn't outlive the video it was derived from — same
+    // cleanup pattern scripts/seedDemoData.js already uses when it clears
+    // its own previously-seeded records.
+    if (video.analysis) {
+      await Analysis.findByIdAndDelete(video.analysis).catch((err) => {
+        console.error(`Failed to delete analysis for video ${video._id}: ${err.message}`);
+      });
+    }
+    const thumbnailDir = path.join(THUMBNAILS_ROOT, String(video._id));
+    fs.rm(thumbnailDir, { recursive: true, force: true }, (err) => {
+      if (err) console.error(`Failed to delete thumbnails for video ${video._id}: ${err.message}`);
+    });
 
     await Video.findByIdAndDelete(req.params.id);
     res.json({ message: 'Video deleted successfully' });

@@ -40,6 +40,15 @@ body {
   background-color: var(--light-bg);
 }
 
+/* Shared empty-state message, used wherever a list/panel has nothing to
+   show yet (e.g. no teams, no highlighted moments) instead of each page
+   inventing its own bare <p> styling. */
+.empty-state {
+  color: var(--text-muted);
+  font-size: 14px;
+  padding: 16px 0;
+}
+
 /* Typography */
 h1, h2, h3, h4, h5, h6 {
   color: var(--text-color);

@@ -129,6 +129,13 @@ MIN_VOTES_TO_TRUST = 2
 # Minimum EasyOCR confidence to count a reading as a vote at all.
 MIN_OCR_CONFIDENCE = 0.35
 
+# Below this many surviving player tracks, an analysis is flagged
+# "no_detections" (see the "qualityFlag" key on analyze()'s return value)
+# instead of reported as a normal, silently-empty success — poor footage,
+# an empty frame, or the wrong sport preset all land here. The frontend
+# uses this to show a clear message rather than an empty player table.
+MIN_PLAYERS_FOR_VALID_ANALYSIS = 1
+
 # --- Pose estimation tuning ---
 # Pose estimation is a second whole-frame model pass (unlike jersey OCR,
 # which only crops boxes step 1 already detected), so it's throttled
@@ -917,11 +924,15 @@ def analyze(
     # pass/tackle/interception classification). Skipped for a group too
     # small to plausibly be a real side (referee, lone goalkeeper, or
     # color-classification noise) or if no frame ever had enough of a
-    # team's players visible at once to compute a shape.
+    # team's players visible at once to compute a shape. "unknown" is
+    # _dominant_shirt_color's own low-confidence bucket (hue didn't match
+    # any color range) rather than a real shirt color, so it's excluded
+    # here too — otherwise a batch of misclassified players could show up
+    # as a fake "unknown" team in the UI.
     color_groups = defaultdict(list)
     for p in player_data:
         color = p.get("teamColor")
-        if color:
+        if color and color != "unknown":
             color_groups[color].append(int(p["trackId"]))
     top_teams = sorted(color_groups.items(), key=lambda kv: len(kv[1]), reverse=True)[:2]
 
@@ -971,6 +982,16 @@ def analyze(
         deduped.append(h)
     highlighted = deduped[:10]
 
+    quality_flag = (
+        "no_detections" if len(player_data) < MIN_PLAYERS_FOR_VALID_ANALYSIS else None
+    )
+    if quality_flag:
+        logger.warning(
+            f"Analysis produced {len(player_data)} player track(s) — below "
+            f"MIN_PLAYERS_FOR_VALID_ANALYSIS ({MIN_PLAYERS_FOR_VALID_ANALYSIS}); "
+            f"flagging as '{quality_flag}' instead of a normal empty result."
+        )
+
     return {
         "playerData": player_data,
         "ballData": {
@@ -984,6 +1005,7 @@ def analyze(
             "totalPlayers": len(player_data),
             "matchDuration": round(frame_idx / fps, 2) if fps else 0,
             "highlightedMoments": highlighted,
+            "qualityFlag": quality_flag,
         },
         "metadata": {
             "fps": float(fps),

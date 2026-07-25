@@ -9,8 +9,18 @@
   margin-bottom: 20px;
 }
 
+.video-list-table-wrap {
+  /* Scrolls horizontally instead of clipping columns/action buttons on a
+     narrow viewport — same pattern as .player-stats-table-wrap in
+     AnalysisPage.css, needed here because the app sets overflow-x: hidden
+     globally and this table has no other way to reach its hidden columns
+     on mobile. */
+  overflow-x: auto;
+}
+
 .video-list table {
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
   background-color: white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -26,7 +36,7 @@
 }
 
 .video-list th {
-  background-color: #007bff;
+  background-color: var(--primary-color);
   color: white;
   padding: 12px;
   text-align: left;
@@ -62,7 +72,7 @@
 }
 
 .delete-btn {
-  background-color: #dc3545;
+  background-color: var(--danger-color);
 }
 
 .delete-btn:hover {
@@ -70,23 +80,37 @@
 }
 
 .process-btn {
-  background-color: #007bff;
+  background-color: var(--primary-color);
 }
 
 .process-btn:hover {
-  background-color: #0056b3;
+  background-color: var(--primary-dark);
 }
 
 .view-report-btn {
-  background-color: #28a745;
+  background-color: var(--success-color);
 }
 
 .view-report-btn:hover {
   background-color: #218838;
 }
 
+.preview-error {
+  color: var(--danger-color);
+}
+
+.preview-retry-btn {
+  background: none;
+  border: 1px solid var(--danger-color);
+  color: var(--danger-color);
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
 .preview-btn {
-  background-color: #17a2b8;
+  background-color: var(--info-color);
 }
 
 .preview-btn:hover {

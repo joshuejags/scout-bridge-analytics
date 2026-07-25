@@ -8,11 +8,15 @@ const http = require('http');
 // never actually being loaded by the bare dotenv.config() default.
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
+const errorTracking = require('./utils/errorTracking');
+errorTracking.init();
+
 const app = require('./app');
 const { initSocket } = require('./utils/socket');
 const analysisWorkerPool = require('./utils/analysisWorkerPool');
 const { verifySmtpConnection } = require('./utils/email');
 const { getBackendName, verifyStorageConnection } = require('./utils/storage');
+const { reconcileOrphanedJobs } = require('./controllers/analysisController');
 
 const connectDB = async () => {
   try {
@@ -25,9 +29,29 @@ const connectDB = async () => {
     console.error('MongoDB connection error:', error);
     process.exit(1);
   }
+
+  // Isolated from the connection try/catch above: a reconciliation failure
+  // shouldn't be treated as fatal the way an actual DB-connection failure
+  // is — worst case, some videos stay stuck exactly as they would have
+  // without this fix at all, not any worse off.
+  try {
+    await reconcileOrphanedJobs();
+  } catch (error) {
+    console.error('[analysis] Failed to reconcile orphaned jobs:', error);
+  }
 };
 
 connectDB();
+
+// Safety net, not the primary fix: every code path that can reject a
+// promise should already have its own .catch() (see processAnalysis's
+// try/catch and the analysis worker pool's job .catch()). This exists so
+// a future gap of the same kind logs loudly instead of silently killing
+// the process — Node terminates on an unhandled rejection by default.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+  errorTracking.captureException(reason instanceof Error ? reason : new Error(String(reason)));
+});
 
 // Surfaces SMTP misconfiguration at startup instead of only when a real
 // user's registration/reset email silently fails later. Purely

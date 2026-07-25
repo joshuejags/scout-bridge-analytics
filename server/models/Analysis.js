@@ -95,7 +95,9 @@ const TacticalTeamSchema = new mongoose.Schema(
 
 const AnalysisSchema = new mongoose.Schema(
   {
-    video: { type: mongoose.Schema.Types.ObjectId, ref: 'Video', required: true },
+    // Indexed: looked up via Analysis.findOne({ video }) every time a
+    // report page loads (see analysisController.getAnalysisByVideo).
+    video: { type: mongoose.Schema.Types.ObjectId, ref: 'Video', required: true, index: true },
     playerData: { type: [PlayerDataSchema], default: [] },
     ballData: {
       trackingData: { type: [BallTrackingSchema], default: [] },
@@ -113,6 +115,13 @@ const AnalysisSchema = new mongoose.Schema(
       totalPlayers: Number,
       matchDuration: Number,
       highlightedMoments: { type: [HighlightedMomentSchema], default: [] },
+      // Set by video_analyzer.py when the analysis found too few player
+      // tracks to be a meaningful result (poor footage, empty frame, wrong
+      // sport) — lets the frontend show a clear message instead of a
+      // silently empty report. null/absent means a normal result.
+      // null is listed explicitly — Mongoose's enum validator otherwise
+      // rejects null even though it's this field's own default value.
+      qualityFlag: { type: String, enum: ['no_detections', null], default: null },
     },
   },
   { timestamps: true }

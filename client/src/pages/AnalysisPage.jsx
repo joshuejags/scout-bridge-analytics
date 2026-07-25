@@ -57,6 +57,14 @@ const AnalysisPage = () => {
         />
       )}
 
+      {analysis.summary?.qualityFlag === 'no_detections' && (
+        <div className="no-detections-banner" role="alert">
+          <strong>No players detected in this footage.</strong> This can happen with poor
+          lighting, an unusual camera angle, or footage that doesn't show a match in
+          progress. Try re-uploading a clearer clip — the stats below will be empty.
+        </div>
+      )}
+
       <div className="analysis-summary-card">
         <h3>Summary</h3>
         <p>Total Players: {analysis.summary.totalPlayers}</p>
@@ -81,13 +89,17 @@ const AnalysisPage = () => {
 
       <div className="analysis-panel">
         <h3>Key moments</h3>
-        <ul>
-          {analysis.summary.highlightedMoments.map((moment, index) => (
-            <li key={index}>
-              <strong>{moment.type}</strong> at frame {moment.frameNumber}: {moment.description}
-            </li>
-          ))}
-        </ul>
+        {analysis.summary.highlightedMoments.length === 0 ? (
+          <p className="empty-state">No standout moments detected in this clip.</p>
+        ) : (
+          <ul>
+            {analysis.summary.highlightedMoments.map((moment, index) => (
+              <li key={index}>
+                <strong>{moment.type}</strong> at frame {moment.frameNumber}: {moment.description}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="analysis-panel">

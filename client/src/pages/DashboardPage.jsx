@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
@@ -71,7 +72,7 @@ const DashboardPage = () => {
             {recentVideos.map((video) => (
               <div key={video._id} className="video-item">
                 <div className="video-info">
-                  <h4>{video.filename}</h4>
+                  <h4>{video.originalName}</h4>
                   <p className="video-meta">
                     Status: <span className={`status-${video.status}`}>{video.status}</span>
                   </p>
@@ -79,9 +80,9 @@ const DashboardPage = () => {
                     Uploaded: {new Date(video.createdAt).toLocaleDateString()}
                   </p>
                 </div>
-                <a href={`/analysis/${video._id}`} className="view-button">
+                <Link to={`/analysis/${video._id}`} className="view-button">
                   View Analysis →
-                </a>
+                </Link>
               </div>
             ))}
           </div>

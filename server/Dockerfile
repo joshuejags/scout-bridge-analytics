@@ -48,6 +48,14 @@ RUN pip install --no-cache-dir --no-deps -r requirements-easyocr.txt \
 # Application code
 COPY . .
 
+# Pre-download the YOLO weights into the exact directory the analysis
+# worker actually runs from (cv/ — see analysisWorkerPool.js's `cwd: CV_DIR`),
+# instead of leaving them to lazy-download on the first real analysis
+# after every fresh deploy. That made the first request after each deploy
+# slow and network-dependent, and gave no build-time signal if the
+# download ever failed — this fails the build loudly instead.
+RUN cd cv && python3 -c "from ultralytics import YOLO; YOLO('yolov8n.pt'); YOLO('yolov8n-pose.pt')"
+
 # analysisController.js resolves these via env vars in containerized
 # deployments (see its PROJECT_ROOT comment) since only server/ is copied
 # into the image, not the full repo checkout that local dev assumes.
