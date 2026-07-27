@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import VideoUpload from '../components/VideoUpload';
+import { useUpload } from '../context/UploadContext';
 import VideoList from '../components/VideoList';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { VideoIcon, CheckIcon, ClockIcon, TagIcon, UsersIcon, ChartIcon } from '../components/icons';
@@ -17,12 +17,12 @@ const timeOfDayGreeting = () => {
 
 const Home = () => {
   const { user } = useAuth();
+  const { openUpload, version: uploadVersion } = useUpload();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [stats, setStats] = useState({ total: 0, analyzed: 0, processing: 0, teams: 0, players: 0 });
   const [recentVideos, setRecentVideos] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState(null);
-  const [showUpload, setShowUpload] = useState(false);
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -57,10 +57,13 @@ const Home = () => {
     fetchStats();
   }, [fetchStats, refreshTrigger]);
 
-  const handleUploadSuccess = () => {
-    setShowUpload(false);
+  // The upload modal lives outside this page (see UploadContext) so it's
+  // reachable from the NavBar too, not just here - this is how Home finds
+  // out a video was added and refreshes its stats/video list.
+  useEffect(() => {
+    if (uploadVersion === 0) return;
     setRefreshTrigger((prev) => prev + 1);
-  };
+  }, [uploadVersion]);
 
   const firstName = user?.name?.split(' ')[0];
 
@@ -73,8 +76,8 @@ const Home = () => {
           </h1>
           <p>Here's what's happening with your match analysis today.</p>
         </div>
-        <button className="home-hero-cta" onClick={() => setShowUpload((prev) => !prev)}>
-          {showUpload ? 'Close' : '+ Upload Highlight'}
+        <button className="home-hero-cta" onClick={openUpload}>
+          + Upload Highlight
         </button>
       </header>
 
@@ -115,12 +118,6 @@ const Home = () => {
               <span className="home-stat-value">{stats.players}</span>
               <span className="home-stat-label">Players</span>
             </Link>
-          </section>
-        )}
-
-        {showUpload && (
-          <section className="home-upload-panel">
-            <VideoUpload onUploadSuccess={handleUploadSuccess} />
           </section>
         )}
 

@@ -127,26 +127,6 @@
   letter-spacing: 0.5px;
 }
 
-/* Upload panel */
-.home-upload-panel {
-  background: white;
-  border-radius: 12px;
-  box-shadow: var(--box-shadow);
-  padding: 4px;
-  margin-bottom: 24px;
-  animation: home-slide-down 0.25s ease;
-}
-
-@keyframes home-slide-down {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 /* Two-column layout */
 .home-columns {

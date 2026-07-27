@@ -4,7 +4,9 @@ import NavBar from './components/NavBar';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import EmailVerificationBanner from './components/EmailVerificationBanner';
+import UploadModal from './components/UploadModal';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { UploadProvider } from './context/UploadContext';
 import LoadingSpinner from './components/LoadingSpinner';
 import './App.css';
 
@@ -39,55 +41,58 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <ErrorBoundary>
-          <div className="App">
-            <NavBar />
-            <EmailVerificationBanner />
-            <Suspense fallback={<LoadingSpinner fullScreen message="Loading..." />}>
-              <Routes>
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
-                <Route path="/verify-email" element={<VerifyEmailPage />} />
-                <Route path="/" element={<RootRoute />} />
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <DashboardPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/analysis/:videoId"
-                  element={
-                    <ProtectedRoute>
-                      <AnalysisPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/teams"
-                  element={
-                    <ProtectedRoute>
-                      <TeamsPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/players"
-                  element={
-                    <ProtectedRoute>
-                      <PlayersPage />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
-            </Suspense>
-          </div>
-        </ErrorBoundary>
+        <UploadProvider>
+          <ErrorBoundary>
+            <div className="App">
+              <NavBar />
+              <EmailVerificationBanner />
+              <UploadModal />
+              <Suspense fallback={<LoadingSpinner fullScreen message="Loading..." />}>
+                <Routes>
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
+                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
+                  <Route path="/verify-email" element={<VerifyEmailPage />} />
+                  <Route path="/" element={<RootRoute />} />
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <ProtectedRoute>
+                        <DashboardPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/analysis/:videoId"
+                    element={
+                      <ProtectedRoute>
+                        <AnalysisPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/teams"
+                    element={
+                      <ProtectedRoute>
+                        <TeamsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/players"
+                    element={
+                      <ProtectedRoute>
+                        <PlayersPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </Suspense>
+            </div>
+          </ErrorBoundary>
+        </UploadProvider>
       </AuthProvider>
     </Router>
   );

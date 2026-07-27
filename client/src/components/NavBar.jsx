@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useUpload } from '../context/UploadContext';
 import './NavBar.css';
 
 const NavBar = () => {
   const { isAuthenticated, user, logout } = useAuth();
+  const { openUpload } = useUpload();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const closeMenu = () => setMenuOpen(false);
+
+  const handleUploadClick = () => {
+    closeMenu();
+    openUpload();
+  };
 
   const handleLogout = () => {
     closeMenu();
@@ -39,6 +46,9 @@ const NavBar = () => {
             <Link to="/dashboard" onClick={closeMenu}>Dashboard</Link>
             <Link to="/teams" onClick={closeMenu}>Teams</Link>
             <Link to="/players" onClick={closeMenu}>Players</Link>
+            <button type="button" className="nav-upload-btn" onClick={handleUploadClick}>
+              + Upload Video
+            </button>
             <span className="nav-user">{user?.name}</span>
             <button className="nav-logout-btn" onClick={handleLogout}>
               Logout

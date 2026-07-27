@@ -64,3 +64,32 @@ describe('Home navigation', () => {
     expect(screen.queryByText(/here's what's happening with your match analysis/i)).not.toBeInTheDocument();
   });
 });
+
+describe('Upload access', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    window.localStorage.clear();
+  });
+
+  // Upload used to only exist as a toggle panel on Home - nowhere else in
+  // the app could add a video. The NavBar's "+ Upload Video" button (see
+  // UploadContext/UploadModal) is meant to fix that by being reachable
+  // from any authenticated page, not just Home.
+  it('opens the upload form from the nav bar while on a page that has no upload UI of its own', async () => {
+    window.localStorage.setItem('sba_token', 'a-valid-token');
+    window.history.pushState({}, '', '/teams');
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/auth/me')) {
+        return Promise.resolve({ data: { name: 'Ada Scout', email: 'ada@example.com', role: 'scout' } });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<App />);
+
+    const uploadButton = await screen.findByRole('button', { name: '+ Upload Video' });
+    await userEvent.click(uploadButton);
+
+    expect(await screen.findByLabelText('Highlight File')).toBeInTheDocument();
+  });
+});
