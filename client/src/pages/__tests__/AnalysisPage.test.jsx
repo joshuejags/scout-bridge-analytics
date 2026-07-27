@@ -177,8 +177,8 @@ describe('AnalysisPage tactical shape panel', () => {
     expect(screen.getByText(/red \(8 players\)/i)).toBeInTheDocument();
     expect(screen.getByText(/blue \(7 players\)/i)).toBeInTheDocument();
     expect(screen.getByText('Width: 45.2 m')).toBeInTheDocument();
-    expect(screen.getByText('3 lines — 4-3-1')).toBeInTheDocument();
-    expect(screen.getByText('2 lines — 4-3')).toBeInTheDocument();
+    expect(screen.getByText('3 lines (4-3-1)')).toBeInTheDocument();
+    expect(screen.getByText('2 lines (4-3)')).toBeInTheDocument();
   });
 
   it('omits the tactical panel entirely when tacticalData has no teams', async () => {

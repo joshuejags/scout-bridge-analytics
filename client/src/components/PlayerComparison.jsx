@@ -154,7 +154,7 @@ const PlayerComparison = ({ playerIds, onClose }) => {
 
             {data.every((d) => d.matchesPlayed === 0) && (
               <p className="comparison-empty-note">
-                None of these players appear in an analyzed video yet — stats will populate once
+                None of these players appear in an analyzed video yet. Stats will populate once
                 their tracks are identified (via jersey OCR or manual verification) in at least
                 one analysis.
               </p>

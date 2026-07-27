@@ -53,17 +53,18 @@ process.on('unhandledRejection', (reason) => {
   errorTracking.captureException(reason instanceof Error ? reason : new Error(String(reason)));
 });
 
-// Surfaces SMTP misconfiguration at startup instead of only when a real
+// Surfaces email misconfiguration at startup instead of only when a real
 // user's registration/reset email silently fails later. Purely
 // informational — never blocks startup, since console-fallback mode
-// (no SMTP configured) is a valid, deliberate state for local dev.
+// (no provider configured) is a valid, deliberate state for local dev.
 verifySmtpConnection().then((result) => {
+  const provider = process.env.RESEND_API_KEY ? 'Resend' : process.env.SMTP_HOST;
   if (result === null) {
-    console.log('[email] No SMTP configured — emails will be logged to this console instead of sent.');
+    console.log('[email] No email provider configured, emails will be logged to this console instead of sent.');
   } else if (result.ok) {
-    console.log(`[email] SMTP connection verified (${process.env.SMTP_HOST}).`);
+    console.log(`[email] Connection verified (${provider}).`);
   } else {
-    console.error(`[email] SMTP is configured but connection/auth failed: ${result.error}`);
+    console.error(`[email] Configured (${provider}) but connection/auth failed: ${result.error}`);
   }
 });
 

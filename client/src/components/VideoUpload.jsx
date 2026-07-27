@@ -12,7 +12,9 @@ const SPORTS = [
 ];
 
 const VideoUpload = ({ onUploadSuccess }) => {
+  const [mode, setMode] = useState('file');
   const [file, setFile] = useState(null);
+  const [videoUrl, setVideoUrl] = useState('');
   const [teams, setTeams] = useState([]);
   const [players, setPlayers] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState('');
@@ -51,43 +53,69 @@ const VideoUpload = ({ onUploadSuccess }) => {
     setSelectedPlayers(selected);
   };
 
+  const resetFormFields = () => {
+    setFile(null);
+    setVideoUrl('');
+    setSelectedTeam('');
+    setSelectedOpponent('');
+    setSelectedPlayers([]);
+    setSport('soccer');
+    setProgress(0);
+  };
+
   const handleUpload = async (e) => {
     e.preventDefault();
 
-    if (!file) {
+    if (mode === 'file' && !file) {
       setError('Please select a file');
+      return;
+    }
+    if (mode === 'url' && !videoUrl.trim()) {
+      setError('Please paste a video URL');
       return;
     }
 
     setUploading(true);
     setProgress(0);
+    setError(null);
 
     try {
-      // Uploaded as a sequence of chunks rather than one long-lived
-      // multipart POST — see utils/chunkedUpload.js for why (resilience
-      // against a dropped connection, and reverse-proxy/load-balancer
-      // idle-timeout limits on very large single requests).
-      const video = await uploadFileInChunks(
-        file,
-        {
+      if (mode === 'file') {
+        // Uploaded as a sequence of chunks rather than one long-lived
+        // multipart POST — see utils/chunkedUpload.js for why (resilience
+        // against a dropped connection, and reverse-proxy/load-balancer
+        // idle-timeout limits on very large single requests).
+        const video = await uploadFileInChunks(
+          file,
+          {
+            sport,
+            team: selectedTeam || undefined,
+            opponentTeam: selectedOpponent || undefined,
+            players: selectedPlayers,
+          },
+          { onProgress: setProgress }
+        );
+        setMessage('Upload succeeded!');
+        if (onUploadSuccess) onUploadSuccess(video);
+      } else {
+        // The server responds as soon as the import is queued (202) and
+        // downloads the file in the background; see
+        // videoController.importVideoFromUrl. VideoList picks up progress
+        // from there over the video:import:* socket events.
+        const response = await axios.post(`${process.env.REACT_APP_API_URL}/videos/import-url`, {
+          url: videoUrl.trim(),
           sport,
           team: selectedTeam || undefined,
           opponentTeam: selectedOpponent || undefined,
           players: selectedPlayers,
-        },
-        { onProgress: setProgress }
-      );
+        });
+        setMessage('Import started. The video will appear once the download finishes.');
+        if (onUploadSuccess) onUploadSuccess(response.data);
+      }
 
-      setFile(null);
-      setSelectedTeam('');
-      setSelectedOpponent('');
-      setSelectedPlayers([]);
-      setSport('soccer');
-      setProgress(0);
-      setMessage('Upload succeeded!');
-      if (onUploadSuccess) onUploadSuccess(video);
+      resetFormFields();
     } catch (err) {
-      setError(err.response?.data?.error || 'Upload failed');
+      setError(err.response?.data?.error || (mode === 'file' ? 'Upload failed' : 'Import failed'));
     } finally {
       setUploading(false);
     }
@@ -164,19 +192,64 @@ const VideoUpload = ({ onUploadSuccess }) => {
           </select>
         </div>
 
-        <div className="form-row">
-          <label htmlFor="videoFile">Highlight File</label>
-          <input
-            id="videoFile"
-            type="file"
-            onChange={handleFileChange}
-            accept="video/*"
+        <div className="form-row upload-mode-toggle" role="group" aria-label="Video source">
+          <button
+            type="button"
+            className={mode === 'file' ? 'upload-mode-btn active' : 'upload-mode-btn'}
+            onClick={() => setMode('file')}
             disabled={uploading}
-          />
+          >
+            Upload file
+          </button>
+          <button
+            type="button"
+            className={mode === 'url' ? 'upload-mode-btn active' : 'upload-mode-btn'}
+            onClick={() => setMode('url')}
+            disabled={uploading}
+          >
+            From URL
+          </button>
         </div>
 
-        <button type="submit" disabled={uploading || !file}>
-          {uploading ? `Uploading... ${progress}%` : 'Upload Video'}
+        {mode === 'file' ? (
+          <div className="form-row">
+            <label htmlFor="videoFile">Highlight File</label>
+            <input
+              id="videoFile"
+              type="file"
+              onChange={handleFileChange}
+              accept="video/*"
+              disabled={uploading}
+            />
+          </div>
+        ) : (
+          <div className="form-row">
+            <label htmlFor="videoUrl">Video URL</label>
+            <input
+              id="videoUrl"
+              type="url"
+              value={videoUrl}
+              onChange={(e) => {
+                setVideoUrl(e.target.value);
+                setError(null);
+              }}
+              placeholder="https://www.youtube.com/watch?v=..."
+              disabled={uploading}
+            />
+            <p className="upload-url-hint">
+              Works with YouTube, Instagram, TikTok, Facebook, X/Twitter, and Vimeo links.
+            </p>
+          </div>
+        )}
+
+        <button type="submit" disabled={uploading || (mode === 'file' ? !file : !videoUrl.trim())}>
+          {uploading
+            ? mode === 'file'
+              ? `Uploading... ${progress}%`
+              : 'Starting import...'
+            : mode === 'file'
+            ? 'Upload Video'
+            : 'Import Video'}
         </button>
       </form>
       {message && <Toast type="success" message={message} onClose={() => setMessage(null)} />}

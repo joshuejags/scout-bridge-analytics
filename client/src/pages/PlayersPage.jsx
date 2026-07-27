@@ -168,7 +168,10 @@ const PlayersPage = () => {
                 <div>
                   <strong>{player.name}</strong>
                   <p>{player.team?.name || 'No team assigned'}</p>
-                  <p>{player.position || 'Position not set'} — #{player.jerseyNumber || '-'}</p>
+                  <p>
+                    {player.position || 'Position not set'}
+                    {player.jerseyNumber != null ? `, #${player.jerseyNumber}` : ', no jersey number set'}
+                  </p>
                 </div>
                 <button onClick={() => handleDelete(player._id)}>Delete</button>
               </li>

@@ -61,7 +61,7 @@ const AnalysisPage = () => {
         <div className="no-detections-banner" role="alert">
           <strong>No players detected in this footage.</strong> This can happen with poor
           lighting, an unusual camera angle, or footage that doesn't show a match in
-          progress. Try re-uploading a clearer clip — the stats below will be empty.
+          progress. Try re-uploading a clearer clip; the stats below will be empty.
         </div>
       )}
 
@@ -130,7 +130,7 @@ const AnalysisPage = () => {
                   return (
                     <tr key={player.playerId?._id || player.trackId || index}>
                       <td>{label}</td>
-                      <td>{player.teamColor || '—'}</td>
+                      <td>{player.teamColor || 'N/A'}</td>
                       <td>{player.statistics.distanceCovered}</td>
                       <td>{player.statistics.averageSpeed}</td>
                       <td>{player.statistics.sprintCount}</td>
@@ -154,7 +154,7 @@ const AnalysisPage = () => {
         <div className="analysis-panel">
           <h3>Tactical shape</h3>
           <p className="tactical-caveat">
-            Heuristic estimate from tracked positions grouped by shirt color — not a
+            Heuristic estimate from tracked positions grouped by shirt color, not a
             verified formation.
           </p>
           <div className="tactical-teams">
@@ -174,8 +174,9 @@ const AnalysisPage = () => {
                 </ul>
                 <p className="tactical-formation-label">
                   {team.formation.lineCount} line{team.formation.lineCount === 1 ? '' : 's'}
-                  {' — '}
+                  {' ('}
                   {team.formation.lineup.join('-')}
+                  {')'}
                 </p>
               </div>
             ))}

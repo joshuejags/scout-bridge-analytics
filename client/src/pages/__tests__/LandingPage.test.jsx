@@ -38,12 +38,12 @@ describe('LandingPage', () => {
     renderPage();
 
     // First step starts open by default (openStep initialized to 0).
-    expect(screen.getByText(/drop in a match video/i)).toBeInTheDocument();
+    expect(screen.getByText(/paste a link from youtube/i)).toBeInTheDocument();
 
     const secondStepButton = screen.getByRole('button', { name: /let it analyze/i });
     await userEvent.click(secondStepButton);
     expect(screen.getByText(/analyzed in the background/i)).toBeInTheDocument();
-    expect(screen.queryByText(/drop in a match video/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/paste a link from youtube/i)).not.toBeInTheDocument();
 
     // Clicking the open step again collapses it.
     await userEvent.click(secondStepButton);

@@ -2,6 +2,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   background: linear-gradient(135deg, #3b4cca 0%, #2d3a9e 100%);
   color: white;
   padding: 16px 24px;
@@ -10,6 +11,25 @@
   position: sticky;
   top: 0;
   z-index: 100;
+}
+
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: transparent;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.nav-toggle span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background-color: white;
+  border-radius: 2px;
 }
 
 .nav-brand {
@@ -88,14 +108,38 @@
     font-size: 16px;
   }
 
+  .nav-toggle {
+    display: flex;
+  }
+
   .nav-links {
-    gap: 16px;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    width: 100%;
     font-size: 14px;
+    margin-top: 12px;
+  }
+
+  .nav-links-open {
+    display: flex;
+  }
+
+  .nav-links a,
+  .nav-links .nav-logout-btn,
+  .nav-links .nav-user {
+    width: 100%;
+    text-align: left;
   }
 
   .nav-links a {
     font-size: 14px;
-    padding: 6px 10px;
+    padding: 10px 12px;
+  }
+
+  .nav-logout-btn {
+    padding: 10px 12px;
   }
 }
 
@@ -109,12 +153,11 @@
   }
 
   .nav-links {
-    gap: 12px;
     font-size: 12px;
   }
 
   .nav-links a {
-    font-size: 12px;
-    padding: 4px 8px;
+    font-size: 13px;
+    padding: 10px 12px;
   }
 }

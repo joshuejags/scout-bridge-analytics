@@ -19,7 +19,7 @@
 }
 
 .error-icon {
-  font-size: 48px;
+  color: var(--danger-color);
   margin-bottom: 16px;
 }
 

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import VideoUpload from '../components/VideoUpload';
 import VideoList from '../components/VideoList';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { VideoIcon, CheckIcon, ClockIcon, TagIcon, UsersIcon, ChartIcon } from '../components/icons';
 import './Home.css';
 
 const timeOfDayGreeting = () => {
@@ -90,27 +91,27 @@ const Home = () => {
         ) : (
           <section className="home-stats-grid">
             <Link to="/dashboard" className="home-stat-card">
-              <span className="home-stat-icon">🎬</span>
+              <span className="home-stat-icon"><VideoIcon size={28} /></span>
               <span className="home-stat-value">{stats.total}</span>
               <span className="home-stat-label">Videos</span>
             </Link>
             <Link to="/dashboard" className="home-stat-card">
-              <span className="home-stat-icon">✅</span>
+              <span className="home-stat-icon"><CheckIcon size={28} /></span>
               <span className="home-stat-value">{stats.analyzed}</span>
               <span className="home-stat-label">Analyzed</span>
             </Link>
             <Link to="/dashboard" className="home-stat-card">
-              <span className="home-stat-icon">⏳</span>
+              <span className="home-stat-icon"><ClockIcon size={28} /></span>
               <span className="home-stat-value">{stats.processing}</span>
               <span className="home-stat-label">Processing</span>
             </Link>
             <Link to="/teams" className="home-stat-card">
-              <span className="home-stat-icon">🏷️</span>
+              <span className="home-stat-icon"><TagIcon size={28} /></span>
               <span className="home-stat-value">{stats.teams}</span>
               <span className="home-stat-label">Teams</span>
             </Link>
             <Link to="/players" className="home-stat-card">
-              <span className="home-stat-icon">👥</span>
+              <span className="home-stat-icon"><UsersIcon size={28} /></span>
               <span className="home-stat-value">{stats.players}</span>
               <span className="home-stat-label">Players</span>
             </Link>
@@ -132,21 +133,21 @@ const Home = () => {
             <div className="home-quick-actions">
               <h3>Quick actions</h3>
               <Link to="/teams" className="home-action-card">
-                <span>🏷️</span>
+                <span><TagIcon size={22} /></span>
                 <div>
                   <strong>Manage Teams</strong>
                   <p>Add or edit team rosters</p>
                 </div>
               </Link>
               <Link to="/players" className="home-action-card">
-                <span>👥</span>
+                <span><UsersIcon size={22} /></span>
                 <div>
                   <strong>Manage Players</strong>
                   <p>Add profiles &amp; jersey numbers</p>
                 </div>
               </Link>
               <Link to="/dashboard" className="home-action-card">
-                <span>📊</span>
+                <span><ChartIcon size={22} /></span>
                 <div>
                   <strong>Full Dashboard</strong>
                   <p>See all-time analytics</p>
@@ -167,8 +168,8 @@ const Home = () => {
                       video.status === 'analyzed'
                         ? undefined
                         : video.status === 'failed'
-                        ? video.lastError || 'Analysis failed — go to the video list to retry.'
-                        : `Still ${video.status} — check back soon`
+                        ? video.lastError || 'Analysis failed. Go to the video list to retry.'
+                        : `Still ${video.status}. Check back soon.`
                     }
                   >
                     <span className={`home-activity-dot status-${video.status}`} />

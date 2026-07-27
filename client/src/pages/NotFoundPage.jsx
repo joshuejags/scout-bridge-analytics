@@ -1,12 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { CompassIcon } from '../components/icons';
 import './NotFoundPage.css';
 
 const NotFoundPage = () => {
   return (
     <div className="not-found">
       <div className="not-found-container">
-        <div className="not-found-icon">🧭</div>
+        <div className="not-found-icon">
+          <CompassIcon size={48} />
+        </div>
         <h2>Page not found</h2>
         <p className="not-found-message">
           We couldn't find that page. It may have been moved, or the link might be out of date.

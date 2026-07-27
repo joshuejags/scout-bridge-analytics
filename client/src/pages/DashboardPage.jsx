@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
+import { VideoIcon, CheckIcon, UsersIcon, TagIcon } from '../components/icons';
 import './DashboardPage.css';
 
 const DashboardPage = () => {
@@ -57,10 +58,10 @@ const DashboardPage = () => {
       {error && <Toast type="error" message={error} onClose={() => setError(null)} />}
 
       <div className="stats-grid">
-        <StatCard icon="🎬" label="Total Videos" value={stats.totalVideos} />
-        <StatCard icon="✅" label="Analyzed" value={stats.analyzedVideos} />
-        <StatCard icon="👥" label="Teams" value={stats.totalTeams} />
-        <StatCard icon="⚽" label="Players" value={stats.totalPlayers} />
+        <StatCard icon={<VideoIcon size={32} />} label="Total Videos" value={stats.totalVideos} />
+        <StatCard icon={<CheckIcon size={32} />} label="Analyzed" value={stats.analyzedVideos} />
+        <StatCard icon={<TagIcon size={32} />} label="Teams" value={stats.totalTeams} />
+        <StatCard icon={<UsersIcon size={32} />} label="Players" value={stats.totalPlayers} />
       </div>
 
       <div className="recent-section">

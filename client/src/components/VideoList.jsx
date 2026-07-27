@@ -74,17 +74,38 @@ const VideoList = ({ refreshTrigger = 0 }) => {
       setProcessingId((current) => (current === videoId ? null : current));
     };
 
+    // Same idea as the analysis:* events above, but for a video imported
+    // from a URL (see VideoUpload's "From URL" mode): the file itself is
+    // still downloading server-side when the row first appears, so
+    // 'importing' stays live until it either lands (import:complete, ready
+    // to Process like any other upload) or fails.
+    const handleImportComplete = async ({ videoId }) => {
+      const data = await refreshVideos();
+      const updated = data.find((v) => v._id === videoId);
+      setStatusMessage(updated ? 'Video import complete. You can now process it.' : null);
+    };
+    const handleImportFailed = ({ videoId, error: importError }) => {
+      setVideos((prev) =>
+        prev.map((v) => (v._id === videoId ? { ...v, status: 'failed' } : v))
+      );
+      setError(importError || 'Video import failed.');
+    };
+
     socket.on('analysis:queued', handleQueued);
     socket.on('analysis:started', handleStarted);
     socket.on('analysis:progress', handleProgress);
     socket.on('analysis:complete', handleComplete);
     socket.on('analysis:failed', handleFailed);
+    socket.on('video:import:complete', handleImportComplete);
+    socket.on('video:import:failed', handleImportFailed);
     return () => {
       socket.off('analysis:queued', handleQueued);
       socket.off('analysis:started', handleStarted);
       socket.off('analysis:progress', handleProgress);
       socket.off('analysis:complete', handleComplete);
       socket.off('analysis:failed', handleFailed);
+      socket.off('video:import:complete', handleImportComplete);
+      socket.off('video:import:failed', handleImportFailed);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket]);
@@ -256,6 +277,7 @@ const VideoList = ({ refreshTrigger = 0 }) => {
 
   const statusFilters = [
     { id: 'all', label: 'All', active: statusFilter === 'all' },
+    { id: 'importing', label: 'Importing', active: statusFilter === 'importing' },
     { id: 'uploaded', label: 'Uploaded', active: statusFilter === 'uploaded' },
     { id: 'queued', label: 'Queued', active: statusFilter === 'queued' },
     { id: 'processing', label: 'Processing', active: statusFilter === 'processing' },
@@ -317,9 +339,9 @@ const VideoList = ({ refreshTrigger = 0 }) => {
             <tbody>
               {filteredVideos.map((video) => (
                 <tr key={video._id}>
-                  <td>{video.originalName}</td>
+                  <td>{video.originalName || 'Importing from URL'}</td>
                   <td className="video-sport-cell">{video.sport || 'soccer'}</td>
-                  <td>{(video.fileSize / 1024 / 1024).toFixed(2)} MB</td>
+                  <td>{video.fileSize ? `${(video.fileSize / 1024 / 1024).toFixed(2)} MB` : 'Pending'}</td>
                   <td>
                     <span
                       className={`status-badge status-${video.status}`}
@@ -342,7 +364,7 @@ const VideoList = ({ refreshTrigger = 0 }) => {
                     <button
                       onClick={() => handlePreview(video)}
                       className="preview-btn"
-                      disabled={processingId === video._id}
+                      disabled={processingId === video._id || video.status === 'importing'}
                     >
                       Preview
                     </button>
@@ -353,10 +375,13 @@ const VideoList = ({ refreshTrigger = 0 }) => {
                         disabled={
                           processingId === video._id ||
                           video.status === 'processing' ||
-                          video.status === 'queued'
+                          video.status === 'queued' ||
+                          video.status === 'importing'
                         }
                       >
-                        {video.status === 'queued'
+                        {video.status === 'importing'
+                          ? 'Importing...'
+                          : video.status === 'queued'
                           ? 'Queued...'
                           : processingId === video._id || video.status === 'processing'
                           ? 'Processing...'

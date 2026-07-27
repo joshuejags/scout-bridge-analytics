@@ -412,5 +412,22 @@ exports.reconcileOrphanedJobs = async () => {
       `[analysis] Reconciled ${result.modifiedCount} video(s) stuck in queued/processing from a previous run.`
     );
   }
-  return result.modifiedCount;
+
+  // Same problem, one step earlier: a video whose URL download was still
+  // running (see videoController.importVideoFromUrl) when the process
+  // exited has nothing left to resume it either.
+  const importResult = await Video.updateMany(
+    { status: 'importing' },
+    {
+      status: 'failed',
+      lastError: 'Import from URL was interrupted by a server restart. Please try again.',
+    }
+  );
+  if (importResult.modifiedCount > 0) {
+    console.warn(
+      `[analysis] Reconciled ${importResult.modifiedCount} video(s) stuck importing from a previous run.`
+    );
+  }
+
+  return result.modifiedCount + importResult.modifiedCount;
 };

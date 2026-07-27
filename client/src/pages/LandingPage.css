@@ -136,7 +136,8 @@
 }
 
 .landing-feature-icon {
-  font-size: 22px;
+  color: var(--primary-color);
+  display: flex;
 }
 
 .landing-feature-tab strong {
@@ -161,7 +162,7 @@
 }
 
 .landing-feature-detail-icon {
-  font-size: 36px;
+  color: var(--primary-color);
   display: block;
   margin-bottom: 12px;
 }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import Toast from './Toast';
 import { useAuthedMedia } from '../utils/useAuthedMedia';
+import { CheckIcon } from './icons';
 import './PlayerVerification.css';
 
 const uploadsBase = () =>
@@ -193,7 +194,11 @@ const PlayerVerification = ({ analysis, players, onAnalysisUpdate }) => {
                 ) : (
                   <div className="pv-thumb-placeholder">No image</div>
                 )}
-                {isSelected && <div className="pv-check">✓</div>}
+                {isSelected && (
+                  <div className="pv-check">
+                    <CheckIcon size={14} />
+                  </div>
+                )}
               </div>
 
               <div className="pv-card-body">

@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const chunkedUploads = require('../utils/chunkedUploads');
 const storage = require('../utils/storage');
+const videoUrlImport = require('../utils/videoUrlImport');
+const { emitEvent } = require('../utils/socket');
 
 // Mirrors analysisController.js's THUMBNAILS_ROOT resolution exactly, so
 // the directory deleteVideo cleans up is the same one processAnalysis
@@ -203,6 +205,83 @@ exports.completeChunkedUpload = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Import a video from a URL (YouTube, Instagram, TikTok, Facebook,
+// X/Twitter, Vimeo) instead of a direct file upload. The Video document is
+// created and returned immediately with status 'importing' - the actual
+// download runs in the background afterward (runUrlImport below) and
+// reports back over Socket.IO, the same "don't hold the request open"
+// pattern analysisController uses for /process.
+exports.importVideoFromUrl = async (req, res) => {
+  try {
+    const { url } = req.body;
+    const players = Array.isArray(req.body.players)
+      ? req.body.players
+      : req.body.players
+      ? [req.body.players]
+      : [];
+
+    const video = new Video({
+      status: 'importing',
+      sourceUrl: url,
+      uploadedBy: req.user.email,
+      user: req.user._id,
+      team: req.body.team || null,
+      opponentTeam: req.body.opponentTeam || null,
+      players,
+      sport: req.body.sport || 'soccer',
+    });
+    await video.save();
+    res.status(202).json(video);
+
+    runUrlImport(video._id, url);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+async function runUrlImport(videoId, url) {
+  const videoIdStr = String(videoId);
+  emitEvent('video:import:queued', { videoId: videoIdStr });
+
+  try {
+    const outputTemplate = path.join(UPLOAD_DIR, `${videoIdStr}.%(ext)s`);
+    const result = await videoUrlImport.importFromUrl(url, outputTemplate);
+
+    const ext = path.extname(result.filePath).toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      throw new Error(`Downloaded file has an unsupported format (${ext || 'unknown'})`);
+    }
+
+    // Read the size before storage.storeFile potentially uploads-and-deletes
+    // the local copy (STORAGE_BACKEND=s3) - nothing to stat afterward.
+    const fileSize = fs.statSync(result.filePath).size;
+    const filename = path.basename(result.filePath);
+    const stored = await storage.storeFile(result.filePath, filename);
+
+    const video = await Video.findById(videoId);
+    if (!video) return; // deleted while the download was still running
+
+    video.filename = filename;
+    video.originalName = result.title || url;
+    video.fileSize = fileSize;
+    video.filePath = stored.localPath || stored.key;
+    video.storageBackend = stored.backend;
+    video.duration = result.duration || undefined;
+    video.metadata = { width: result.width, height: result.height };
+    video.status = 'uploaded';
+    video.lastError = null;
+    await video.save();
+
+    emitEvent('video:import:complete', { videoId: videoIdStr });
+  } catch (error) {
+    console.error(`[video-import] Failed for video ${videoIdStr}: ${error.message}`);
+    await Video.findByIdAndUpdate(videoId, { status: 'failed', lastError: error.message }).catch((e) => {
+      console.error(`[video-import] Also failed to mark video ${videoIdStr} as failed: ${e.message}`);
+    });
+    emitEvent('video:import:failed', { videoId: videoIdStr, error: error.message });
+  }
+}
 
 // Get all videos — scoped to the requesting user (admins see everything).
 exports.getVideos = async (req, res) => {

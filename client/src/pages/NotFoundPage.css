@@ -19,7 +19,7 @@
 }
 
 .not-found-icon {
-  font-size: 48px;
+  color: var(--text-muted);
   margin-bottom: 16px;
 }
 

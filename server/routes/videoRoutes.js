@@ -74,6 +74,25 @@ router.post(
 // init declares the file and its metadata up front; chunk is called
 // repeatedly with raw binary bodies; complete assembles the result once
 // every declared byte has arrived. See server/utils/chunkedUploads.js.
+// Import a video by URL (YouTube, Instagram, TikTok, Facebook, X/Twitter,
+// Vimeo) instead of uploading a file directly - see
+// videoController.importVideoFromUrl and utils/videoUrlImport.js. Kept on
+// the same rate limiter as file uploads: it costs the same bandwidth and
+// storage regardless of which path the video came in through.
+router.post(
+  '/import-url',
+  uploadLimiter,
+  [
+    body('url').trim().notEmpty().withMessage('url is required').isURL({
+      protocols: ['http', 'https'],
+      require_protocol: true,
+    }).withMessage('url must be a valid http(s) URL'),
+    ...uploadMetaValidators,
+  ],
+  validate,
+  videoController.importVideoFromUrl
+);
+
 router.post(
   '/upload/init',
   uploadLimiter,

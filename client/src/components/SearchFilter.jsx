@@ -1,4 +1,5 @@
 import React from 'react';
+import { SearchIcon } from './icons';
 import './SearchFilter.css';
 
 const SearchFilter = ({ 
@@ -19,7 +20,9 @@ const SearchFilter = ({
           onChange={(e) => onChange(e.target.value)}
           className="search-input"
         />
-        <span className="search-icon">🔍</span>
+        <span className="search-icon">
+          <SearchIcon size={18} />
+        </span>
       </div>
       {filters.length > 0 && (
         <div className="filter-buttons">
