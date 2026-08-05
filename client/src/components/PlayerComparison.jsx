@@ -46,6 +46,50 @@ const getTrendSeries = (player, metricKey) => {
   }));
 };
 
+const buildComparisonInsights = (rows) => {
+  const metrics = [
+    { key: 'averageDistancePerMatch', label: 'Avg distance / match', unit: 'm' },
+    { key: 'totalActions', label: 'Total actions', unit: '' },
+    { key: 'verifiedTracks', label: 'Verified tracks', unit: '' },
+  ];
+
+  const leaders = metrics
+    .map((metric) => {
+      const rankedRows = rows
+        .filter((row) => typeof row[metric.key] === 'number' && row[metric.key] > 0)
+        .sort((a, b) => b[metric.key] - a[metric.key]);
+      const leader = rankedRows[0];
+      return leader
+        ? {
+            label: metric.label,
+            value: leader[metric.key],
+            unit: metric.unit,
+            playerName: leader.player?.name || 'Player',
+          }
+        : null;
+    })
+    .filter(Boolean);
+
+  const primaryLeader = leaders[0];
+  const secondaryLeader = leaders[1];
+  const headline = primaryLeader
+    ? `${primaryLeader.playerName} leads the comparison on ${primaryLeader.label.toLowerCase()} with ${primaryLeader.value}${primaryLeader.unit}.`
+    : 'Comparison insight will appear once at least one player has match data.';
+
+  const keySignals = [
+    primaryLeader && `${primaryLeader.playerName} is the strongest volume signal across the selected players.`,
+    secondaryLeader && `${secondaryLeader.playerName} is the next strongest signal on ${secondaryLeader.label.toLowerCase()}.`,
+    rows.some((row) => row.matchesPlayed > 0)
+      ? 'More analyzed matches create better trend certainty, so added clips will sharpen the recommendation.'
+      : 'Add at least one analyzed match to turn the view into a richer scouting brief.',
+  ].filter(Boolean);
+
+  return {
+    headline,
+    keySignals,
+  };
+};
+
 const PlayerComparison = ({ playerIds, onClose, variant = 'modal' }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -103,6 +147,8 @@ const PlayerComparison = ({ playerIds, onClose, variant = 'modal' }) => {
     };
   }, [playerIds]);
 
+  const insights = data ? buildComparisonInsights(data) : null;
+
   const panel = (
     <div className={`comparison-panel ${variant === 'page' ? 'comparison-panel--page' : ''}`} ref={panelRef}>
       <div className="comparison-header">
@@ -156,6 +202,27 @@ const PlayerComparison = ({ playerIds, onClose, variant = 'modal' }) => {
                   </article>
                 );
               })}
+            </div>
+          </section>
+
+          <section className="comparison-insights">
+            <div className="comparison-insights__copy">
+              <h3>Decision-ready reading</h3>
+              <p>{insights?.headline || 'Comparison insight will appear once the profile data is ready.'}</p>
+            </div>
+            <div className="comparison-insights__grid">
+              <article className="comparison-insights__card">
+                <h4>What stands out</h4>
+                <ul>
+                  {insights?.keySignals.map((signal) => (
+                    <li key={signal}>{signal}</li>
+                  ))}
+                </ul>
+              </article>
+              <article className="comparison-insights__card">
+                <h4>Recommended use</h4>
+                <p>Use the narrative summary to narrow the shortlist before the next live review or report export.</p>
+              </article>
             </div>
           </section>
 
