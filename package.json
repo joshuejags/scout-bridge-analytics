@@ -9,6 +9,7 @@
     "build": "npm run build --prefix client",
     "server": "npm run dev --prefix server",
     "client": "npm run start --prefix client"
+    ,"analysis-daemon": "node server/scripts/analysisDaemon.js"
   },
   "keywords": [
     "sports",
@@ -22,5 +23,8 @@
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.0.0"
+  }
+  ,"dependencies": {
+    "uuid": "^9.0.0"
   }
 }

@@ -100,6 +100,30 @@ router.post(
   validate,
   videoController.initChunkedUpload
 );
+
+// Presigned multipart endpoints for direct-to-S3 uploads. These are
+// optional and return 400 when STORAGE_BACKEND != 's3' so dev/local users
+// aren't blocked.
+router.post(
+  '/upload/presign-multipart/init',
+  uploadLimiter,
+  [body('filename').trim().notEmpty().withMessage('filename is required'), body('partCount').isInt({ min: 1, max: 10000 }).withMessage('partCount must be a positive integer')],
+  validate,
+  videoController.presignMultipartInit
+);
+router.post(
+  '/upload/presign-multipart/complete',
+  uploadLimiter,
+  [
+    body('filename').trim().notEmpty().withMessage('filename is required'),
+    body('uploadId').trim().notEmpty().withMessage('uploadId is required'),
+    body('fileSize').isInt({ min: 1 }).withMessage('fileSize is required and must be positive'),
+    body('parts').isArray().withMessage('parts must be an array of { PartNumber, ETag }'),
+  ],
+  validate,
+  videoController.completePresignedMultipartUpload
+);
+
 router.post(
   '/upload/:uploadId/chunk',
   express.raw({ type: '*/*', limit: '10mb' }),

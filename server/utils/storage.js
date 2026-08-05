@@ -5,7 +5,12 @@ const {
   GetObjectCommand,
   DeleteObjectCommand,
   HeadBucketCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
 } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 /**
  * Pluggable storage backend for uploaded video files (thumbnails, which
@@ -52,6 +57,12 @@ function getS3Client() {
   return s3Client;
 }
 
+// Expose a couple of higher-level multipart helpers so the API can support
+// direct-to-S3 multipart uploads (client does chunk uploads with presigned
+// URLs, then asks the server to complete the multipart upload and create
+// the Video record). All of this is optional — the server still supports
+// local and server-assembled chunked uploads when STORAGE_BACKEND != 's3'.
+
 function requireBucket() {
   const bucket = process.env.S3_BUCKET;
   if (!bucket) {
@@ -84,6 +95,57 @@ async function storeFile(localPath, key) {
   fs.unlink(localPath, () => {}); // best-effort cleanup; S3 already has the durable copy
   return { backend: 's3', key, localPath: null };
 }
+
+/**
+ * Create a multipart upload and return presigned URLs for each part.
+ * key: object key to create
+ * partCount: number of parts the client expects to upload
+ * contentType: optional Content-Type hint
+ * Returns: { uploadId, key, presignedUrls: [{ partNumber, url }] }
+ */
+async function createMultipartPresignedUrls(key, partCount, contentType) {
+  if (!isCloudBackend()) throw new Error('createMultipartPresignedUrls requires STORAGE_BACKEND=s3');
+  const bucket = requireBucket();
+  const client = getS3Client();
+  const createResp = await client.send(new CreateMultipartUploadCommand({ Bucket: bucket, Key: key, ContentType: contentType }));
+  const uploadId = createResp.UploadId;
+  const presignedUrls = [];
+  for (let part = 1; part <= partCount; part++) {
+    const cmd = new UploadPartCommand({ Bucket: bucket, Key: key, PartNumber: part, UploadId: uploadId });
+    const url = await getSignedUrl(client, cmd, { expiresIn: 3600 });
+    presignedUrls.push({ partNumber: part, url });
+  }
+  return { uploadId, key, presignedUrls };
+}
+
+/**
+ * Complete a multipart upload given the parts array [{ ETag, PartNumber }]
+ * Returns the S3 response object for CompleteMultipartUpload
+ */
+async function completeMultipartUpload(key, uploadId, parts) {
+  if (!isCloudBackend()) throw new Error('completeMultipartUpload requires STORAGE_BACKEND=s3');
+  const bucket = requireBucket();
+  const client = getS3Client();
+  // AWS expects parts sorted by PartNumber
+  const sortedParts = Array.isArray(parts) ? parts.slice().sort((a, b) => a.PartNumber - b.PartNumber) : [];
+  const resp = await client.send(
+    new CompleteMultipartUploadCommand({
+      Bucket: bucket,
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: { Parts: sortedParts },
+    })
+  );
+  return resp;
+}
+
+async function abortMultipartUpload(key, uploadId) {
+  if (!isCloudBackend()) throw new Error('abortMultipartUpload requires STORAGE_BACKEND=s3');
+  const bucket = requireBucket();
+  const client = getS3Client();
+  await client.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }));
+}
+
 
 /**
  * Streams an S3 object straight into an Express response (headers +
@@ -137,4 +199,8 @@ module.exports = {
   pipeObjectToResponse,
   deleteObject,
   verifyStorageConnection,
+  // multipart helpers for presigned direct-to-s3 uploads
+  createMultipartPresignedUrls,
+  completeMultipartUpload,
+  abortMultipartUpload,
 };

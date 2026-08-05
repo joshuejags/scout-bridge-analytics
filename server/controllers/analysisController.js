@@ -25,6 +25,15 @@ const THUMBNAILS_ROOT = path.join(UPLOAD_DIR, 'thumbnails');
  * parent video. Returns the saved Analysis.
  */
 async function persistAnalysis(video, result) {
+  const { validateAnalysisResult } = require('../utils/validateResult');
+  const validation = validateAnalysisResult(result);
+  if (!validation.valid) {
+    console.warn('analysis result validation failed', validation.errors);
+    video.status = 'failed';
+    video.lastError = 'analysis result validation failed';
+    await video.save();
+    return null;
+  }
   // Map schema: the analyzer emits per-track data with an OCR-read jersey
   // number (when legible) and a dominant shirt color. Match each track to
   // a real Player document by jersey number, scoped to the video's team(s)
@@ -75,6 +84,29 @@ async function persistAnalysis(video, result) {
   });
 
   await analysis.save();
+
+  // Offload large per-track trackingData to object storage to avoid
+  // bloating the MongoDB documents. Replace the in-document array with
+  // a pointer to the uploaded artifact if it's larger than the
+  // configurable threshold.
+  try {
+    const { uploadJsonObject } = require('../utils/artifactStore');
+    const THRESHOLD = Number(process.env.TRACKING_OFFLOAD_THRESHOLD || 500);
+    const bucket = process.env.S3_BUCKET || null;
+    let updated = false;
+    for (let i = 0; i < analysis.playerData.length; i++) {
+      const p = analysis.playerData[i];
+      if (Array.isArray(p.trackingData) && p.trackingData.length > THRESHOLD) {
+        const key = `artifacts/analysis/${analysis._id}/player-${p.trackId || i}-tracking.json`;
+        await uploadJsonObject(key, p.trackingData);
+        p.trackingData = { s3: bucket ? `s3://${bucket}/${key}` : key };
+        updated = true;
+      }
+    }
+    if (updated) await analysis.save();
+  } catch (err) {
+    console.warn('artifact offload failed:', err.message);
+  }
 
   video.analysis = analysis._id;
   video.status = 'analyzed';
@@ -171,39 +203,17 @@ exports.processAnalysis = async (req, res) => {
     Video.updateOne({ _id: video._id }, { status: 'processing' }).catch(() => {});
   };
 
-  workerPool
-    .submitJob(
-      {
-        videoPath,
-        maxFrames,
-        thumbnailDir,
-        sport: video.sport,
-        enableJerseyOcr: true,
-      },
-      { onProgress, onQueued, onDispatch }
-    )
-    .then(async (result) => {
-      const analysis = await persistAnalysis(video, result);
-      console.log(
-        `Analysis complete for video ${video._id} (${result._runtimeSeconds ?? '?'}s)`
-      );
-      emitEvent('analysis:complete', { videoId: videoIdStr, analysisId: String(analysis._id) });
-    })
-    .catch(async (err) => {
-      console.error(`Analysis failed for video ${video._id}: ${err.message}`);
-      try {
-        const fresh = await Video.findById(video._id);
-        if (fresh) {
-          fresh.status = 'failed';
-          fresh.lastError = err.message;
-          await fresh.save();
-        }
-      } catch (saveErr) {
-        console.error(`Failed to mark video ${video._id} as failed: ${saveErr.message}`);
-      }
-      emitEvent('analysis:failed', { videoId: videoIdStr, error: err.message });
-    });
+  // Previously this controller directly invoked the in-process worker
+  // pool (workerPool.submitJob) which kept the queue purely in-memory.
+  // To make analysis durable across restarts we only mark the Video as
+  // 'queued' here and return; a separate analysis daemon will claim
+  // queued videos and run them. The daemon uses an atomic
+  // findOneAndUpdate to avoid duplicate processing across processes.
 };
+
+// Export helper so external daemons can persist analysis results after
+// running the analyzer (used by server/scripts/analysisDaemon.js).
+module.exports.persistAnalysis = persistAnalysis;
 
 exports.getAnalysisByVideo = async (req, res) => {
   try {
