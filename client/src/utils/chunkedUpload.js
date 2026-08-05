@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { apiUrl } from './api';
 
 const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024; // 5MB, overridden by the server's chunkSizeHint if given
 
@@ -16,9 +17,7 @@ const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024; // 5MB, overridden by the server's c
  * onProgress(percent): called after each chunk finishes uploading
  */
 export const uploadFileInChunks = async (file, meta = {}, { onProgress } = {}) => {
-  const apiUrl = process.env.REACT_APP_API_URL;
-
-  const initRes = await axios.post(`${apiUrl}/videos/upload/init`, {
+  const initRes = await axios.post(apiUrl('/videos/upload/init'), {
     originalName: file.name,
     fileSize: file.size,
     ...meta,
@@ -29,13 +28,13 @@ export const uploadFileInChunks = async (file, meta = {}, { onProgress } = {}) =
   let offset = 0;
   while (offset < file.size) {
     const chunk = file.slice(offset, offset + chunkSize);
-    await axios.post(`${apiUrl}/videos/upload/${uploadId}/chunk`, chunk, {
+    await axios.post(apiUrl(`/videos/upload/${uploadId}/chunk`), chunk, {
       headers: { 'Content-Type': 'application/octet-stream' },
     });
     offset += chunk.size;
     if (onProgress) onProgress(Math.min(100, Math.round((offset / file.size) * 100)));
   }
 
-  const completeRes = await axios.post(`${apiUrl}/videos/upload/${uploadId}/complete`);
+  const completeRes = await axios.post(apiUrl(`/videos/upload/${uploadId}/complete`));
   return completeRes.data;
 };

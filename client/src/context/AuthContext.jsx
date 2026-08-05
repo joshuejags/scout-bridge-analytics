@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { connectSocket, disconnectSocket } from '../utils/socket';
+import { apiUrl } from '../utils/api';
 
 const AuthContext = createContext(null);
 
@@ -24,7 +25,7 @@ export const AuthProvider = ({ children }) => {
       return;
     }
     axios
-      .get(`${process.env.REACT_APP_API_URL}/auth/me`, {
+      .get(apiUrl('/auth/me'), {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => setUser(res.data))
@@ -53,7 +54,7 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   const login = async (email, password) => {
-    const response = await axios.post(`${process.env.REACT_APP_API_URL}/auth/login`, {
+    const response = await axios.post(apiUrl('/auth/login'), {
       email,
       password,
     });
@@ -64,7 +65,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (name, email, password) => {
-    const response = await axios.post(`${process.env.REACT_APP_API_URL}/auth/register`, {
+    const response = await axios.post(apiUrl('/auth/register'), {
       name,
       email,
       password,
@@ -76,14 +77,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const forgotPassword = async (email) => {
-    const response = await axios.post(`${process.env.REACT_APP_API_URL}/auth/forgot-password`, {
+    const response = await axios.post(apiUrl('/auth/forgot-password'), {
       email,
     });
     return response.data;
   };
 
   const resetPassword = async (resetToken, password) => {
-    const response = await axios.post(`${process.env.REACT_APP_API_URL}/auth/reset-password`, {
+    const response = await axios.post(apiUrl('/auth/reset-password'), {
       token: resetToken,
       password,
     });
@@ -91,7 +92,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const verifyEmail = async (verifyToken) => {
-    const response = await axios.post(`${process.env.REACT_APP_API_URL}/auth/verify-email`, {
+    const response = await axios.post(apiUrl('/auth/verify-email'), {
       token: verifyToken,
     });
     // If the verified account happens to be the currently logged-in user,
@@ -106,7 +107,7 @@ export const AuthProvider = ({ children }) => {
 
   const resendVerification = async () => {
     const response = await axios.post(
-      `${process.env.REACT_APP_API_URL}/auth/resend-verification`,
+      apiUrl('/auth/resend-verification'),
       {},
       { headers: { Authorization: `Bearer ${token}` } }
     );

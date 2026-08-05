@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useUpload } from '../context/UploadContext';
 import './NavBar.css';
@@ -17,6 +17,11 @@ const NavBar = () => {
     openUpload();
   };
 
+  const openCommandPalette = () => {
+    closeMenu();
+    window.dispatchEvent(new Event('sba:open-command-palette'));
+  };
+
   const handleLogout = () => {
     closeMenu();
     logout();
@@ -25,8 +30,12 @@ const NavBar = () => {
 
   return (
     <nav className="nav-bar">
-      <Link to="/" className="nav-brand" onClick={closeMenu}>
-        Scout Bridge Analytics
+      <Link to="/" className="nav-brand" onClick={closeMenu} aria-label="Scout Bridge Analytics home">
+        <span className="nav-brand-mark" aria-hidden="true" />
+        <span>
+          <strong>ScoutBridge</strong>
+          <small>Football scouting OS</small>
+        </span>
       </Link>
       <button
         type="button"
@@ -42,22 +51,38 @@ const NavBar = () => {
       <div className={`nav-links ${menuOpen ? 'nav-links-open' : ''}`}>
         {isAuthenticated ? (
           <>
-            <Link to="/" onClick={closeMenu}>Home</Link>
-            <Link to="/dashboard" onClick={closeMenu}>Dashboard</Link>
-            <Link to="/teams" onClick={closeMenu}>Teams</Link>
-            <Link to="/players" onClick={closeMenu}>Players</Link>
-            <button type="button" className="nav-upload-btn" onClick={handleUploadClick}>
-              + Upload Video
+            <NavLink to="/" end onClick={closeMenu}>
+              Home
+            </NavLink>
+            <NavLink to="/dashboard" onClick={closeMenu}>
+              Dashboard
+            </NavLink>
+            <NavLink to="/teams" onClick={closeMenu}>
+              Teams
+            </NavLink>
+            <NavLink to="/players" onClick={closeMenu}>
+              Players
+            </NavLink>
+            <button type="button" className="nav-search-btn" onClick={openCommandPalette}>
+              Search
+              <span className="nav-shortcut">Ctrl K</span>
             </button>
-            <span className="nav-user">{user?.name}</span>
-            <button className="nav-logout-btn" onClick={handleLogout}>
+            <button type="button" className="nav-upload-btn" onClick={handleUploadClick}>
+              + Upload video
+            </button>
+            <span className="nav-user">{user?.name || 'Scout'}</span>
+            <button type="button" className="nav-logout-btn" onClick={handleLogout}>
               Logout
             </button>
           </>
         ) : (
           <>
-            <Link to="/login" onClick={closeMenu}>Login</Link>
-            <Link to="/register" onClick={closeMenu}>Register</Link>
+            <NavLink to="/login" onClick={closeMenu}>
+              Login
+            </NavLink>
+            <NavLink to="/register" onClick={closeMenu} className="nav-register-btn">
+              Create account
+            </NavLink>
           </>
         )}
       </div>

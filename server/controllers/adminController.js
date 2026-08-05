@@ -1,4 +1,57 @@
 const Video = require('../models/Video');
+const User = require('../models/User');
+const Team = require('../models/Team');
+const Player = require('../models/Player');
+
+async function getSummary(req, res) {
+  const [totalUsers, totalTeams, totalPlayers, totalVideos, analyzedVideos, processingVideos, failedVideos, queuedVideos, pendingVerification, recentUsers, recentVideos, adminUsers, scoutUsers, teamUsers, playerUsers] =
+    await Promise.all([
+      User.countDocuments(),
+      Team.countDocuments(),
+      Player.countDocuments(),
+      Video.countDocuments(),
+      Video.countDocuments({ status: 'analyzed' }),
+      Video.countDocuments({ status: 'processing' }),
+      Video.countDocuments({ status: 'failed' }),
+      Video.countDocuments({ status: 'queued' }),
+      User.countDocuments({ emailVerified: false }),
+      User.find().sort({ createdAt: -1 }).limit(5).select('name email role emailVerified createdAt'),
+      Video.find()
+        .sort({ updatedAt: -1 })
+        .limit(6)
+        .select('originalName status uploadedBy createdAt updatedAt lastError'),
+      User.countDocuments({ role: 'admin' }),
+      User.countDocuments({ role: 'scout' }),
+      User.countDocuments({ role: 'team' }),
+      User.countDocuments({ role: 'player' }),
+    ]);
+
+  res.json({
+    users: {
+      total: totalUsers,
+      pendingVerification,
+      byRole: {
+        admin: adminUsers,
+        scout: scoutUsers,
+        team: teamUsers,
+        player: playerUsers,
+      },
+      recent: recentUsers,
+    },
+    content: {
+      teams: totalTeams,
+      players: totalPlayers,
+      videos: totalVideos,
+    },
+    jobs: {
+      analyzed: analyzedVideos,
+      processing: processingVideos,
+      failed: failedVideos,
+      queued: queuedVideos,
+    },
+    recentVideos,
+  });
+}
 
 async function listJobs(req, res) {
   const state = req.query.state;
@@ -28,4 +81,4 @@ async function retryJob(req, res) {
   res.json({ ok: true, id: video._id });
 }
 
-module.exports = { listJobs, retryJob };
+module.exports = { getSummary, listJobs, retryJob };

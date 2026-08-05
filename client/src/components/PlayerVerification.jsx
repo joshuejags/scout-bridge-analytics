@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import Toast from './Toast';
 import { useAuthedMedia } from '../utils/useAuthedMedia';
+import { apiUrl, API_BASE_URL } from '../utils/api';
 import { CheckIcon } from './icons';
 import './PlayerVerification.css';
 
-const uploadsBase = () =>
-  (process.env.REACT_APP_API_URL || '').replace(/\/api\/?$/, '');
+const uploadsBase = () => API_BASE_URL.replace(/\/api\/?$/, '');
 
 /**
  * Thumbnails live behind the protected /uploads route, and a plain <img>
@@ -79,7 +79,7 @@ const PlayerVerification = ({ analysis, players, onAnalysisUpdate }) => {
         playerId: draftPlayerId === '' ? null : draftPlayerId,
       };
       const response = await axios.patch(
-        `${process.env.REACT_APP_API_URL}/analysis/${analysisId}/tracks/${trackId}`,
+        apiUrl(`/analysis/${analysisId}/tracks/${trackId}`),
         body
       );
       onAnalysisUpdate(response.data);
@@ -99,7 +99,7 @@ const PlayerVerification = ({ analysis, players, onAnalysisUpdate }) => {
     setError(null);
     try {
       const response = await axios.post(
-        `${process.env.REACT_APP_API_URL}/analysis/${analysisId}/tracks/merge`,
+        apiUrl(`/analysis/${analysisId}/tracks/merge`),
         { sourceTrackId, targetTrackId }
       );
       onAnalysisUpdate(response.data);

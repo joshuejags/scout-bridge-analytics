@@ -30,7 +30,9 @@ router.post('/', createBody, validate, playerController.createPlayer);
 router.get('/', playerController.getPlayers);
 // Must come before /:id — otherwise Express would try to match "compare"
 // itself as a player id and fail the isMongoId validation.
+router.get('/overview', playerController.getPlayerOverview);
 router.get('/compare', playerController.comparePlayers);
+router.get('/:id/profile', [idParam], validate, playerController.getPlayerProfile);
 router.get('/:id', [idParam], validate, playerController.getPlayerById);
 router.put('/:id', [idParam, ...updateBody], validate, playerController.updatePlayer);
 router.delete('/:id', requireRole('admin'), [idParam], validate, playerController.deletePlayer);

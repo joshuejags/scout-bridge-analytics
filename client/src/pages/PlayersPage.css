@@ -1,65 +1,68 @@
 .players-page {
-  max-width: 960px;
-  margin: 20px auto;
-  padding: 20px;
+  display: grid;
+  gap: 18px;
 }
 
-.players-page h2 {
-  margin-bottom: 18px;
+.players-form-card,
+.players-list-card {
+  padding: 22px;
 }
 
-.player-form,
-.player-list {
-  margin-bottom: 24px;
+.players-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
 }
 
 .form-row {
-  margin-bottom: 14px;
+  display: grid;
+  gap: 6px;
 }
 
 .form-row label {
-  display: block;
-  margin-bottom: 6px;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 13px;
 }
 
 .form-row input,
 .form-row select {
   width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: #f8fbff;
 }
 
-.player-form button {
-  padding: 10px 18px;
-  background: var(--primary-color);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.player-list ul {
-  list-style: none;
-  padding: 0;
-}
-
-.player-card {
+.compare-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 16px;
-  border: 1px solid #eee;
-  border-radius: 10px;
-  margin-bottom: 12px;
-  background: #fff;
+  gap: 12px;
+  padding: 16px 18px;
 }
 
-.player-card > div {
-  flex: 1;
+.compare-bar-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.players-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.player-card {
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.player-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .player-compare-checkbox {
@@ -70,62 +73,73 @@
 .player-compare-checkbox input {
   width: 18px;
   height: 18px;
-  cursor: pointer;
 }
 
-.compare-bar {
-  position: sticky;
-  top: 0;
-  z-index: 5;
+.player-card-name {
+  flex: 1;
+}
+
+.player-card-name strong {
+  display: block;
+  font-size: 16px;
+}
+
+.player-card-name p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.player-card-badges {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: #eef4ff;
-  border: 1px solid #cfe0ff;
-  border-radius: 8px;
-  padding: 10px 16px;
-  margin-bottom: 16px;
-  font-weight: 600;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
-.compare-bar-actions {
+.player-card-summary {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.player-card-actions {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
-.compare-btn {
-  padding: 8px 16px;
-  background: var(--primary-color);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
+.player-card-actions .button {
+  flex: 1 1 0;
 }
 
-.compare-btn:disabled {
-  background: #a9c6ee;
-  cursor: not-allowed;
+@media (max-width: 1100px) {
+  .players-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-.compare-clear-btn {
-  padding: 8px 16px;
-  background: transparent;
-  color: #555;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  cursor: pointer;
-}
+@media (max-width: 720px) {
+  .players-form-card,
+  .players-list-card {
+    padding: 18px;
+  }
 
-.player-card button {
-  background: var(--danger-color);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 14px;
-  cursor: pointer;
-}
+  .players-form-grid {
+    grid-template-columns: 1fr;
+  }
 
-.player-card button:hover {
-  background: #c82333;
+  .compare-bar,
+  .player-card-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .compare-bar-actions,
+  .player-card-actions {
+    width: 100%;
+  }
+
+  .player-card-actions .button {
+    width: 100%;
+  }
 }

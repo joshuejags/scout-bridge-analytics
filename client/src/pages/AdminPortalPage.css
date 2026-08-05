@@ -1,0 +1,85 @@
+.admin-portal {
+  display: grid;
+  gap: 20px;
+}
+
+.admin-kpi-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.admin-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.8fr);
+  gap: 20px;
+}
+
+.admin-card {
+  padding: 22px;
+}
+
+.admin-side {
+  display: grid;
+  gap: 20px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.admin-card select {
+  width: 100%;
+  min-width: 130px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.admin-role-list,
+.admin-job-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-role-item,
+.admin-job-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #f8fbff;
+  border: 1px solid rgba(214, 222, 233, 0.75);
+}
+
+.admin-role-item strong,
+.admin-job-item strong {
+  display: block;
+  font-size: 14px;
+}
+
+.admin-role-item p,
+.admin-job-item p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 1080px) {
+  .admin-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-card {
+    padding: 18px;
+  }
+
+  .admin-role-item,
+  .admin-job-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

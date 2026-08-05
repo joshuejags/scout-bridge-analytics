@@ -45,7 +45,9 @@ router.patch(
   requireRole('admin'),
   [
     param('id').isMongoId().withMessage('Invalid user id'),
-    body('role').isIn(['admin', 'scout']).withMessage('role must be "admin" or "scout"'),
+    body('role')
+      .isIn(['admin', 'scout', 'team', 'player'])
+      .withMessage('role must be one of "admin", "scout", "team", or "player"'),
   ],
   validate,
   authController.setUserRole

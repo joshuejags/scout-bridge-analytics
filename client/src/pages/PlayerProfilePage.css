@@ -1,0 +1,67 @@
+.player-profile-page {
+  display: grid;
+  gap: 18px;
+}
+
+.player-profile-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.player-profile-summary {
+  padding: 22px;
+}
+
+.player-profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.player-profile-matches {
+  display: grid;
+  gap: 12px;
+}
+
+.player-profile-match {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.player-profile-match strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.player-profile-match p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.player-profile-match-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .player-profile-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .player-profile-summary {
+    padding: 18px;
+  }
+
+  .player-profile-match {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

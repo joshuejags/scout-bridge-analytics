@@ -21,7 +21,17 @@ Upload a match video, or import one from a YouTube, Instagram, TikTok, Facebook,
 - **Jersey OCR**: automatic jersey-number reading and shirt-color classification, with a manual verification UI to fill the gaps OCR can't reach
 - **Tactical Shape**: heuristic team width/depth/compactness and formation-line grouping from tracked positions
 - **Teams & Players**: roster management for teams, player profiles, positions, and jersey numbers
-- **Accounts**: JWT auth with role-based access (admin/scout), email verification, and password reset
+- **Accounts**: JWT auth with role-based access (admin/scout/team/player), email verification, and password reset
+- **Workspace Shell**: role-aware sidebar navigation, breadcrumbs, quick search (Ctrl/Cmd + K), and personalized portal entry points
+- **Admin Portal**: user-role management, platform health overview, and video-job moderation tools
+- **Scout Portal**: persistent recruitment board with watchlists, fit scoring, live-view stages, and next-action notes
+- **Team Portal**: squad-focused hub for roster depth, team-linked video context, and recent match review
+- **Player Portal**: player-facing performance hub for highlighted profiles, tracked output, and recent reports
+- **Saved Reports**: persistent scouting-report history with reusable titles, executive summaries, and tags
+- **Saved Filter Presets**: reusable filter bundles across players, scouting boards, and report history so analysts can switch between scouting views instantly
+- **Global Search Workspace**: a premium search surface for players, teams, videos, and reports with quick facet filtering and reusable search views
+- **Report Templates & Export**: structured report modes for scout summaries, recruitment decisions, and player development, with markdown export
+- **Recruitment Intelligence**: derived decision scores, confidence bands, tactical notes, standout profiles, and development themes generated from tracked events and team shape
 - **Performance Analytics**: distance covered, speed, sprint counts, per-player heatmaps
 - **Player Comparison**: side-by-side cross-match stat comparison for two or more players
 - **Action Detection**: shots, passes, tackles, and interceptions, inferred from ball-possession transfers
@@ -39,6 +49,86 @@ Upload a match video, or import one from a YouTube, Instagram, TikTok, Facebook,
 **Storage**: local disk by default; AWS S3 or any S3-compatible object store as a drop-in alternative
 
 **Email**: Resend by default, with any SMTP provider (including Gmail) as a fallback; see [Email](#email)
+
+## Architecture Overview
+
+ScoutBridge now follows a role-aware product architecture instead of a single generic dashboard.
+
+### Product architecture
+
+- **Public marketing surface**: landing page, auth, onboarding, and verification flows
+- **Authenticated workspace shell**: sidebar navigation, breadcrumbs, command palette, upload modal, and shared chrome for signed-in users
+- **Role-based portals**
+  - **Admin portal**: user management, role changes, video-job moderation, and platform summary metrics
+  - **Scout portal**: recruitment board, watchlists, fit scoring, live-view stages, and next-action notes
+  - **Team portal**: squad depth, team-linked match context, and team workflow shortcuts
+  - **Player portal**: highlighted profiles, recent reports, and performance-oriented review surfaces
+  - **Shared analytics workspace**: dashboard, player profiles, player comparison, teams, and analysis reports
+  - **Saved filter presets**: persistent filter bundles for players, scouting boards, and reports that can be applied from the shared workspace shell
+  - **Computer-vision analysis pipeline**: upload/import -> queue -> worker pool -> stored analysis -> report surfaces
+
+### Frontend architecture
+
+`client/src/` is organized around app shell + page domains:
+
+- **App routing**: [App.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/App.jsx)
+  - public routes
+  - authenticated shell routes
+  - role-gated routes (`admin`, `scout`, `team`, `player`)
+- **Shared workspace shell**:
+  - [WorkspaceLayout.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/components/WorkspaceLayout.jsx)
+  - [CommandPalette.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/components/CommandPalette.jsx)
+  - [UploadContext.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/context/UploadContext.jsx)
+  - [workspace.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/config/workspace.js)
+- **Portal pages**:
+  - [AdminPortalPage.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/pages/AdminPortalPage.jsx)
+  - [ScoutPortalPage.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/pages/ScoutPortalPage.jsx)
+  - [TeamPortalPage.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/pages/TeamPortalPage.jsx)
+  - [PlayerPortalPage.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/pages/PlayerPortalPage.jsx)
+  - [Home.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/pages/Home.jsx)
+  - [DashboardPage.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/pages/DashboardPage.jsx)
+  - [PlayersPage.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/pages/PlayersPage.jsx)
+  - [PlayerProfilePage.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/pages/PlayerProfilePage.jsx)
+  - [PlayerComparisonPage.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/pages/PlayerComparisonPage.jsx)
+  - [AnalysisPage.jsx](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/pages/AnalysisPage.jsx)
+- **Shared API access**:
+  - [api.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/utils/api.js) centralizes the backend base URL and local-dev fallback
+
+### Backend architecture
+
+`server/` is split by domain routes, controllers, models, and infrastructure utilities:
+
+- **Auth and roles**
+  - [authRoutes.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/routes/authRoutes.js)
+  - [authController.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/controllers/authController.js)
+  - [auth.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/middleware/auth.js)
+- **Admin operations**
+  - [adminRoutes.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/routes/adminRoutes.js)
+  - [adminController.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/controllers/adminController.js)
+- **Scouting workflow**
+  - [scoutingRoutes.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/routes/scoutingRoutes.js)
+  - [scoutingController.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/controllers/scoutingController.js)
+  - [ScoutingTarget.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/models/ScoutingTarget.js)
+- **Core football data**
+  - [playerRoutes.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/routes/playerRoutes.js)
+  - [teamRoutes.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/routes/teamRoutes.js)
+  - [videoRoutes.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/routes/videoRoutes.js)
+  - [analysisRoutes.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/routes/analysisRoutes.js)
+- **Infrastructure**
+  - [server.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/server.js): startup, Mongo connection, worker warmup, storage/email verification
+  - [app.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/app.js): Express middleware, route mounting, auth boundaries, and error handling
+  - [analysisWorkerPool.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/utils/analysisWorkerPool.js): persistent Python worker orchestration
+  - [socket.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/server/utils/socket.js): live job progress and realtime workspace updates
+
+### End-to-end request flow
+
+1. A signed-in user enters the workspace through the authenticated shell.
+2. Role-aware navigation determines which portal actions are primary.
+3. The React client calls domain APIs via [api.js](C:/Users/Adeolu/Documents/scout-bridge-analytics.worktrees/football-scouting-platform-redesign/client/src/utils/api.js).
+4. Express applies auth/role middleware, then hands requests to the matching controller.
+5. Controllers read/write MongoDB models and return product-ready aggregates for dashboards, scouting boards, reports, and recruitment-intelligence snapshots.
+6. Video analysis jobs are queued to the Python worker pool and streamed back over Socket.IO.
+7. Finished analysis feeds the dashboard, player profile, comparison, admin, and scout portal surfaces.
 
 ## Getting Started
 
@@ -210,7 +300,7 @@ curl -X POST http://localhost:5000/api/analysis/<videoId>/process \
 curl http://localhost:5000/api/analysis/<videoId> -H "Authorization: Bearer <token>"
 ```
 
-From there, the Analysis report page lets you review/verify player tracks, compare players across matches, and view heatmaps and tactical shape.
+From there, the Analysis report page lets you review/verify player tracks, compare players across matches, and view heatmaps and tactical shape. Scouts can run the in-app scout portal to manage watchlists and live-view notes, and admins can open the admin portal to manage user roles (`admin`, `scout`, `team`, `player`) and retry failed video-processing jobs.
 
 ### API Reference
 
@@ -221,7 +311,7 @@ All routes except `/api/auth/register`, `/api/auth/login`, `/api/auth/forgot-pas
 - `POST /api/auth/login`: `{ email, password }` → `{ token, user }`
 - `GET /api/auth/me`: current authenticated user
 - `GET /api/auth/users` **(admin)**: list all accounts
-- `PATCH /api/auth/users/:id/role` **(admin)**: `{ role: 'admin' | 'scout' }`
+- `PATCH /api/auth/users/:id/role` **(admin)**: `{ role: 'admin' | 'scout' | 'team' | 'player' }`
 - `POST /api/auth/verify-email`: `{ token }` (single-use, 24h expiry)
 - `POST /api/auth/resend-verification`: requires auth
 - `POST /api/auth/forgot-password`: `{ email }` → always `200` (no account-enumeration leak); rate-limited to 5/15min per IP+email
@@ -243,6 +333,13 @@ All routes except `/api/auth/register`, `/api/auth/login`, `/api/auth/forgot-pas
 **Teams**: `GET/POST /api/teams`, `GET/PUT /api/teams/:id`, `DELETE /api/teams/:id` **(admin)**
 
 **Players**: `GET/POST /api/players`, `GET/PUT /api/players/:id`, `DELETE /api/players/:id` **(admin)**, `GET /api/players/compare?ids=id1,id2,...`
+
+**Scouting**: `GET /api/scouting/board`, `POST /api/scouting/targets`, `PATCH /api/scouting/targets/:id`, `DELETE /api/scouting/targets/:id` **(admin/scout)**
+
+**Portal overviews**: `GET /api/teams/overview`, `GET /api/players/overview`
+
+**Saved reports**: `GET /api/reports/saved`, `POST /api/reports/saved`, `PATCH /api/reports/saved/:id`, `GET /api/reports/saved/:id/export`, `DELETE /api/reports/saved/:id`
+  - saved reports now persist an `insightSnapshot` with recommendation score, confidence, event breakdown, recruitment signals, tactical notes, standout profiles, and development priorities
 
 **Media**: `GET /uploads/*`: serves video files and verification thumbnails; requires the same Bearer token as the API, scoped to the requesting user's own videos (admins see all)
 

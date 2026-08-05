@@ -28,6 +28,62 @@ exports.getPlayers = async (req, res) => {
   }
 };
 
+exports.getPlayerOverview = async (req, res) => {
+  try {
+    const players = await Player.find().populate('team').sort({ createdAt: -1 });
+    const analyses = await Analysis.find({ 'playerData.0': { $exists: true } }).populate(
+      'video',
+      'originalName createdAt status sport'
+    );
+
+    const playerSummaries = players.map((player) => ({
+      player: {
+        _id: player._id,
+        name: player.name,
+        position: player.position,
+        jerseyNumber: player.jerseyNumber,
+        team: player.team,
+      },
+      summary: aggregatePlayerSummary(String(player._id), analyses),
+    }));
+
+    const trackedProfiles = playerSummaries.filter((item) => item.summary.matchesPlayed > 0);
+    const analyzedMatchIds = new Set();
+    analyses.forEach((analysis) => {
+      if (analysis.video?._id) analyzedMatchIds.add(String(analysis.video._id));
+    });
+
+    res.json({
+      summary: {
+        totalPlayers: players.length,
+        trackedProfiles: trackedProfiles.length,
+        analyzedMatches: analyzedMatchIds.size,
+        verifiedTracks: trackedProfiles.reduce((sum, item) => sum + item.summary.verifiedTracks, 0),
+      },
+      featuredPlayers: [...playerSummaries]
+        .sort((a, b) => {
+          const scoreA = a.summary.matchesPlayed * 3 + a.summary.totalActions + a.summary.totalDistanceCovered / 1000;
+          const scoreB = b.summary.matchesPlayed * 3 + b.summary.totalActions + b.summary.totalDistanceCovered / 1000;
+          return scoreB - scoreA;
+        })
+        .slice(0, 6),
+      recentMatches: [...analyses]
+        .filter((analysis) => analysis.video)
+        .sort((a, b) => new Date(b.video.createdAt) - new Date(a.video.createdAt))
+        .slice(0, 6)
+        .map((analysis) => ({
+          analysisId: analysis._id,
+          video: analysis.video,
+          trackedPlayers: analysis.playerData.length,
+          actionCount: analysis.actions.length,
+        })),
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 exports.getPlayerById = async (req, res) => {
   try {
     const player = await Player.findById(req.params.id).populate('team');
@@ -112,6 +168,7 @@ exports.comparePlayers = async (req, res) => {
       let verifiedTracks = 0;
       const actionCounts = { pass: 0, shot: 0, tackle: 0, interception: 0 };
       const matches = [];
+      const trendPoints = [];
 
       analyses.forEach((analysis) => {
         const tracks = analysis.playerData.filter(
@@ -132,11 +189,16 @@ exports.comparePlayers = async (req, res) => {
         totalDistance += matchDistance;
 
         let matchActionCount = 0;
+        let matchSprints = 0;
         analysis.actions.forEach((a) => {
           if (a.playerId && trackIds.has(a.playerId) && actionCounts[a.type] !== undefined) {
             actionCounts[a.type] += 1;
             matchActionCount += 1;
           }
+        });
+
+        tracks.forEach((track) => {
+          matchSprints += track.statistics?.sprintCount || 0;
         });
 
         matches.push({
@@ -145,6 +207,14 @@ exports.comparePlayers = async (req, res) => {
             : null,
           distanceCovered: round2(matchDistance),
           actionCount: matchActionCount,
+          sprints: round2(matchSprints),
+        });
+
+        trendPoints.push({
+          label: analysis.video?.originalName || `Match ${trendPoints.length + 1}`,
+          distance: round2(matchDistance),
+          actions: matchActionCount,
+          sprints: round2(matchSprints),
         });
       });
 
@@ -170,6 +240,11 @@ exports.comparePlayers = async (req, res) => {
         totalActions: Object.values(actionCounts).reduce((a, b) => a + b, 0),
         verifiedTracks,
         matches,
+        trendSeries: {
+          distance: trendPoints.map((point) => ({ label: point.label, value: point.distance })),
+          actions: trendPoints.map((point) => ({ label: point.label, value: point.actions })),
+          sprints: trendPoints.map((point) => ({ label: point.label, value: point.sprints })),
+        },
       };
     });
 
@@ -180,6 +255,112 @@ exports.comparePlayers = async (req, res) => {
   }
 };
 
+exports.getPlayerProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid player id' });
+    }
+
+    const player = await Player.findById(id).populate('team');
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    const analyses = await Analysis.find({ 'playerData.playerId': id }).populate(
+      'video',
+      'originalName createdAt status sport'
+    );
+    const summary = aggregatePlayerSummary(id, analyses);
+
+    res.json({
+      player: {
+        _id: player._id,
+        name: player.name,
+        position: player.position,
+        jerseyNumber: player.jerseyNumber,
+        team: player.team,
+        createdAt: player.createdAt,
+        updatedAt: player.updatedAt,
+      },
+      summary,
+      recentMatches: summary.matches.slice(0, 6),
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 function round2(n) {
   return Math.round(n * 100) / 100;
+}
+
+function aggregatePlayerSummary(id, analyses) {
+  let matchesPlayed = 0;
+  let totalDistance = 0;
+  let totalSprints = 0;
+  const speedSamples = [];
+  let verifiedTracks = 0;
+  const actionCounts = { pass: 0, shot: 0, tackle: 0, interception: 0 };
+  const matches = [];
+
+  analyses.forEach((analysis) => {
+    const tracks = analysis.playerData.filter((pd) => pd.playerId && String(pd.playerId) === id);
+    if (tracks.length === 0) return;
+
+    matchesPlayed += 1;
+    const trackIds = new Set();
+    let matchDistance = 0;
+
+    tracks.forEach((track) => {
+      matchDistance += track.statistics?.distanceCovered || 0;
+      totalSprints += track.statistics?.sprintCount || 0;
+      if (track.statistics?.averageSpeed) speedSamples.push(track.statistics.averageSpeed);
+      if (track.verified) verifiedTracks += 1;
+      if (track.trackId) trackIds.add(track.trackId);
+    });
+
+    totalDistance += matchDistance;
+
+    let matchActionCount = 0;
+    analysis.actions.forEach((action) => {
+      if (action.playerId && trackIds.has(action.playerId) && actionCounts[action.type] !== undefined) {
+        actionCounts[action.type] += 1;
+        matchActionCount += 1;
+      }
+    });
+
+    matches.push({
+      analysisId: analysis._id,
+      video: analysis.video
+        ? {
+            _id: analysis.video._id,
+            originalName: analysis.video.originalName,
+            createdAt: analysis.video.createdAt,
+            status: analysis.video.status,
+            sport: analysis.video.sport,
+          }
+        : null,
+      distanceCovered: round2(matchDistance),
+      actionCount: matchActionCount,
+    });
+  });
+
+  const averageSpeed = speedSamples.length
+    ? round2(speedSamples.reduce((sum, value) => sum + value, 0) / speedSamples.length)
+    : 0;
+
+  return {
+    matchesPlayed,
+    totalDistanceCovered: round2(totalDistance),
+    averageDistancePerMatch: matchesPlayed ? round2(totalDistance / matchesPlayed) : 0,
+    averageSpeed,
+    totalSprints,
+    averageSprintsPerMatch: matchesPlayed ? round2(totalSprints / matchesPlayed) : 0,
+    actions: actionCounts,
+    totalActions: Object.values(actionCounts).reduce((sum, value) => sum + value, 0),
+    verifiedTracks,
+    matches,
+  };
 }

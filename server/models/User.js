@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
     password: { type: String, required: true, minlength: 8, select: false },
-    role: { type: String, enum: ['admin', 'scout'], default: 'scout' },
+    role: { type: String, enum: ['admin', 'scout', 'team', 'player'], default: 'scout' },
 
     emailVerified: { type: Boolean, default: false },
     // Only the SHA-256 hash of each token is stored, matching how the

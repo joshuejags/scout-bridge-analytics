@@ -1,0 +1,55 @@
+.operational-pulse-card {
+  padding: 22px;
+  display: grid;
+  gap: 16px;
+}
+
+.operational-pulse-list {
+  display: grid;
+  gap: 12px;
+}
+
+.operational-pulse-row {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  border: 1px solid rgba(214, 222, 233, 0.8);
+}
+
+.operational-pulse-row__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.operational-pulse-row__head span {
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+}
+
+.operational-pulse-row__head strong {
+  color: var(--primary-color, #0f62fe);
+}
+
+.operational-pulse-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.operational-pulse-bar__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22c55e 0%, #0f766e 100%);
+}
+
+.operational-pulse-row p {
+  margin: 0;
+  color: var(--text-muted, #64748b);
+  font-size: 0.9rem;
+}

@@ -1,190 +1,274 @@
 .analysis-page {
-  max-width: 1000px;
-  margin: 24px auto;
-  padding: 20px;
+  display: grid;
+  gap: 18px;
 }
 
 .analysis-header {
-  margin-bottom: 20px;
+  margin-bottom: 6px;
 }
 
-.analysis-header h2 {
-  margin-bottom: 8px;
+.analysis-error {
+  margin: 0;
+  color: var(--danger-color);
 }
 
-.analysis-sport-tag {
-  text-transform: capitalize;
-  color: #555;
+.analysis-legacy-summary {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
-.pv-toggle-btn {
-  margin-top: 8px;
-  padding: 8px 16px;
-  background: var(--primary-color);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: var(--transition);
+.analysis-banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #7a4b00;
 }
 
-.pv-toggle-btn:hover {
-  background: var(--primary-dark);
+.analysis-kpis {
+  margin-top: 6px;
 }
 
-.analysis-summary-card,
-.analysis-panel,
-.heatmap-card {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
-  margin-bottom: 20px;
+.analysis-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: 18px;
 }
 
-.player-stats-table-wrap {
-  /* Bounds the panel's height regardless of player count (a real match can
-     easily have 25+ tracked players) and scrolls both directions instead
-     of stretching the page or clipping columns on a narrow viewport. */
-  max-height: 420px;
-  overflow: auto;
-  border: 1px solid #e9ecef;
-  border-radius: 10px;
+.analysis-panel {
+  padding: 22px;
 }
 
-.player-stats-table {
+.analysis-verification-panel {
+  padding: 0;
+}
+
+.analysis-save-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.analysis-save-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.analysis-save-form label {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--text-secondary, #93a1bf);
+}
+
+.analysis-save-form input,
+.analysis-save-form select,
+.analysis-save-form textarea {
   width: 100%;
-  min-width: 640px;
-  border-collapse: collapse;
-  font-size: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  background: rgba(9, 14, 24, 0.65);
+  color: var(--text-primary, #f8fafc);
+  padding: 0.85rem 1rem;
+  font: inherit;
 }
 
-.player-stats-table th,
-.player-stats-table td {
-  padding: 10px 14px;
-  text-align: left;
-  white-space: nowrap;
-  border-bottom: 1px solid #e9ecef;
+.analysis-save-form__actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
-.player-stats-table thead th {
-  position: sticky;
-  top: 0;
-  background: #f8f9fa;
-  font-weight: 700;
-  z-index: 1;
+.analysis-moment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
 }
 
-.player-stats-table tbody tr:hover {
-  background: #f8f9fa;
+.analysis-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
 }
 
-.error {
-  color: #dc3545;
-  font-size: 16px;
+.analysis-insight-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #f8fbff;
+  border: 1px solid rgba(214, 222, 233, 0.8);
 }
 
-.no-detections-banner {
-  background: #fff8e1;
-  border: 1px solid #ffc107;
-  border-left: 4px solid #ffc107;
-  border-radius: 8px;
-  padding: 14px 16px;
-  margin-bottom: 20px;
-  color: #7a5b00;
-  font-size: 14px;
-  line-height: 1.5;
+.analysis-insight-card strong {
+  font-size: 1.05rem;
 }
 
-.action-breakdown {
+.analysis-insight-card p,
+.analysis-insight-card small {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.analysis-insight-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.analysis-insight-list {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(9, 14, 24, 0.04);
+}
+
+.analysis-insight-list h3 {
+  margin: 0 0 10px;
+  font-size: 0.98rem;
+}
+
+.analysis-insight-list ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+}
+
+.analysis-moment-card {
+  padding: 16px;
+  border-radius: 16px;
+  background: #f8fbff;
+  border: 1px solid rgba(214, 222, 233, 0.8);
+}
+
+.analysis-moment-card strong {
+  display: block;
+  margin: 10px 0 6px;
+}
+
+.analysis-moment-card p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.analysis-player-list {
+  display: grid;
+  gap: 10px;
+}
+
+.analysis-player-card {
+  padding: 14px;
+  border-radius: 16px;
+  background: #f8fbff;
+  display: grid;
+  gap: 10px;
+}
+
+.analysis-player-card strong {
+  display: block;
+}
+
+.analysis-player-card span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.analysis-player-values {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.analysis-player-values span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: white;
+  border: 1px solid rgba(214, 222, 233, 0.85);
+  color: var(--text-color);
+}
+
+.analysis-profile-link {
+  width: fit-content;
+}
+
+.analysis-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 8px;
 }
 
 .action-badge {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
   text-transform: capitalize;
-  background: #e9ecef;
-  color: #333;
 }
 
-.action-badge-shot {
-  background: #ffe3e3;
-  color: #c0392b;
+.analysis-sidebar {
+  display: grid;
+  gap: 18px;
 }
 
-.action-badge-pass {
-  background: #e3f2ff;
-  color: #1565c0;
+.heatmap-card {
+  padding: 22px;
 }
 
-.action-badge-tackle {
-  background: #fff3cd;
-  color: #8a6500;
+.player-stats-table {
+  min-width: 980px;
 }
 
-.action-badge-interception {
-  background: #e6f7ec;
-  color: #1a7f37;
-}
-
-.tactical-caveat {
-  color: #666;
-  font-size: 13px;
-  margin-top: -4px;
-  margin-bottom: 16px;
+.player-stats-table a {
+  color: var(--primary-color);
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .tactical-teams {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
 }
 
 .tactical-team-card {
-  flex: 1 1 220px;
-  border: 1px solid #e9ecef;
-  border-radius: 10px;
-  padding: 14px 16px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(214, 222, 233, 0.8);
+  background: #f8fbff;
 }
 
-.tactical-team-card h4 {
+.tactical-team-card h3 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  margin: 0 0 12px;
   text-transform: capitalize;
-  margin-bottom: 10px;
 }
 
 .tactical-team-swatch {
-  display: inline-block;
   width: 14px;
   height: 14px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  flex-shrink: 0;
 }
 
 .tactical-stats-list {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 10px;
-  font-size: 14px;
-  color: #333;
-}
-
-.tactical-stats-list li {
-  padding: 2px 0;
+  margin: 0 0 12px;
+  padding-left: 18px;
+  color: var(--text-muted);
 }
 
 .tactical-formation-label {
-  font-weight: 600;
-  font-size: 14px;
   margin: 0;
+  font-weight: 700;
+}
+
+@media (max-width: 1080px) {
+  .analysis-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .analysis-panel,
+  .heatmap-card {
+    padding: 18px;
+  }
 }

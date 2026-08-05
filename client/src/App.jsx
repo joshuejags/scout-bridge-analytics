@@ -5,6 +5,9 @@ import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/ProtectedRoute';
 import EmailVerificationBanner from './components/EmailVerificationBanner';
 import UploadModal from './components/UploadModal';
+import CommandPalette from './components/CommandPalette';
+import RoleGuard from './components/RoleGuard';
+import WorkspaceLayout from './components/WorkspaceLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UploadProvider } from './context/UploadContext';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -18,6 +21,14 @@ const LandingPage = lazy(() => import('./pages/LandingPage'));
 const AnalysisPage = lazy(() => import('./pages/AnalysisPage'));
 const TeamsPage = lazy(() => import('./pages/TeamsPage'));
 const PlayersPage = lazy(() => import('./pages/PlayersPage'));
+const PlayerComparisonPage = lazy(() => import('./pages/PlayerComparisonPage'));
+const PlayerProfilePage = lazy(() => import('./pages/PlayerProfilePage'));
+const AdminPortalPage = lazy(() => import('./pages/AdminPortalPage'));
+const ScoutPortalPage = lazy(() => import('./pages/ScoutPortalPage'));
+const SavedReportsPage = lazy(() => import('./pages/SavedReportsPage'));
+const SearchWorkspacePage = lazy(() => import('./pages/SearchWorkspacePage'));
+const TeamPortalPage = lazy(() => import('./pages/TeamPortalPage'));
+const PlayerPortalPage = lazy(() => import('./pages/PlayerPortalPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
@@ -34,7 +45,35 @@ const RootRoute = () => {
   if (loading) {
     return <LoadingSpinner fullScreen message="Loading..." />;
   }
-  return isAuthenticated ? <Home /> : <LandingPage />;
+  return isAuthenticated ? (
+    <WorkspaceLayout>
+      <Home />
+    </WorkspaceLayout>
+  ) : (
+    <LandingPage />
+  );
+};
+
+const ShellRoute = ({ children, allowedRoles }) => (
+  <ProtectedRoute>
+    <RoleGuard allowedRoles={allowedRoles}>
+      <WorkspaceLayout>{children}</WorkspaceLayout>
+    </RoleGuard>
+  </ProtectedRoute>
+);
+
+const AppChrome = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+
+  return (
+    <div className="App">
+      {(!isAuthenticated || loading) && <NavBar />}
+      <EmailVerificationBanner />
+      <UploadModal />
+      <CommandPalette />
+      {children}
+    </div>
+  );
 };
 
 function App() {
@@ -43,10 +82,7 @@ function App() {
       <AuthProvider>
         <UploadProvider>
           <ErrorBoundary>
-            <div className="App">
-              <NavBar />
-              <EmailVerificationBanner />
-              <UploadModal />
+            <AppChrome>
               <Suspense fallback={<LoadingSpinner fullScreen message="Loading..." />}>
                 <Routes>
                   <Route path="/login" element={<LoginPage />} />
@@ -58,39 +94,103 @@ function App() {
                   <Route
                     path="/dashboard"
                     element={
-                      <ProtectedRoute>
+                      <ShellRoute>
                         <DashboardPage />
-                      </ProtectedRoute>
+                      </ShellRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin"
+                    element={
+                      <ShellRoute allowedRoles={['admin']}>
+                        <AdminPortalPage />
+                      </ShellRoute>
+                    }
+                  />
+                  <Route
+                    path="/scouting"
+                    element={
+                      <ShellRoute allowedRoles={['admin', 'scout']}>
+                        <ScoutPortalPage />
+                      </ShellRoute>
+                    }
+                  />
+                  <Route
+                    path="/reports"
+                    element={
+                      <ShellRoute>
+                        <SavedReportsPage />
+                      </ShellRoute>
+                    }
+                  />
+                  <Route
+                    path="/search"
+                    element={
+                      <ShellRoute>
+                        <SearchWorkspacePage />
+                      </ShellRoute>
+                    }
+                  />
+                  <Route
+                    path="/team-portal"
+                    element={
+                      <ShellRoute allowedRoles={['admin', 'team']}>
+                        <TeamPortalPage />
+                      </ShellRoute>
+                    }
+                  />
+                  <Route
+                    path="/player-portal"
+                    element={
+                      <ShellRoute allowedRoles={['admin', 'player']}>
+                        <PlayerPortalPage />
+                      </ShellRoute>
                     }
                   />
                   <Route
                     path="/analysis/:videoId"
                     element={
-                      <ProtectedRoute>
+                      <ShellRoute>
                         <AnalysisPage />
-                      </ProtectedRoute>
+                      </ShellRoute>
                     }
                   />
                   <Route
                     path="/teams"
                     element={
-                      <ProtectedRoute>
+                      <ShellRoute>
                         <TeamsPage />
-                      </ProtectedRoute>
+                      </ShellRoute>
                     }
                   />
                   <Route
                     path="/players"
                     element={
-                      <ProtectedRoute>
+                      <ShellRoute>
                         <PlayersPage />
-                      </ProtectedRoute>
+                      </ShellRoute>
+                    }
+                  />
+                  <Route
+                    path="/players/compare"
+                    element={
+                      <ShellRoute>
+                        <PlayerComparisonPage />
+                      </ShellRoute>
+                    }
+                  />
+                  <Route
+                    path="/players/:playerId"
+                    element={
+                      <ShellRoute>
+                        <PlayerProfilePage />
+                      </ShellRoute>
                     }
                   />
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
               </Suspense>
-            </div>
+            </AppChrome>
           </ErrorBoundary>
         </UploadProvider>
       </AuthProvider>

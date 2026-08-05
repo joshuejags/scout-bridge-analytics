@@ -1,0 +1,117 @@
+.role-portal-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.role-portal-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.role-portal-kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: rgba(88, 145, 255, 0.12);
+  color: var(--accent, #5891ff);
+}
+
+.role-portal-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.95fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.role-portal-card {
+  padding: 1.4rem;
+}
+
+.role-portal-side {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.role-portal-grid,
+.role-portal-feed,
+.role-portal-actions {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.role-portal-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.role-portal-entity-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 18px;
+  background: rgba(9, 14, 24, 0.72);
+}
+
+.role-portal-entity-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.role-portal-entity-card p,
+.role-portal-feed-item span,
+.role-portal-footnote,
+.role-portal-metrics span {
+  margin: 0;
+  color: var(--text-secondary, #93a1bf);
+}
+
+.role-portal-metrics {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.92rem;
+}
+
+.role-portal-feed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 16px;
+  text-decoration: none;
+  color: inherit;
+  background: rgba(9, 14, 24, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.role-portal-feed-item strong {
+  display: block;
+}
+
+.role-portal-inline-action {
+  width: fit-content;
+}
+
+@media (max-width: 1080px) {
+  .role-portal-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .role-portal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .role-portal-feed-item,
+  .role-portal-entity-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

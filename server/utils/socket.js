@@ -1,6 +1,7 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { getJwtSecret } = require('./jwt');
 
 let io = null;
 
@@ -24,7 +25,7 @@ function initSocket(server) {
     try {
       const token = socket.handshake.auth?.token;
       if (!token) return next(new Error('Authentication required'));
-      const payload = jwt.verify(token, process.env.JWT_SECRET);
+      const payload = jwt.verify(token, getJwtSecret());
       const user = await User.findById(payload.id);
       if (!user) return next(new Error('User no longer exists'));
       socket.userId = String(user._id);

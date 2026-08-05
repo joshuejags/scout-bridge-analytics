@@ -230,3 +230,97 @@ describe('Player comparison (GET /api/players/compare)', () => {
     expect(result2.verifiedTracks).toBe(0);
   });
 });
+
+describe('Player profile (GET /api/players/:id/profile)', () => {
+  it('returns aggregated summary data for a player with analysis history', async () => {
+    const { token } = await registerAdmin('profile@example.com');
+    const player = await request(app)
+      .post('/api/players')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Profile Player', jerseyNumber: 10 });
+
+    const video = await Video.create({
+      filename: `${Date.now()}-profile.mp4`,
+      originalName: 'profile-match.mp4',
+      fileSize: 1024,
+      filePath: '/tmp/profile-match.mp4',
+      status: 'analyzed',
+    });
+
+    await Analysis.create({
+      video: video._id,
+      playerData: [
+        {
+          playerId: player.body._id,
+          trackId: 'track-1',
+          verified: true,
+          statistics: {
+            distanceCovered: 1800,
+            averageSpeed: 5.5,
+            sprintCount: 4,
+            activationArea: 'Center',
+          },
+        },
+      ],
+      actions: [{ type: 'shot', playerId: 'track-1', frameNumber: 12, confidence: 0.9 }],
+    });
+
+    const res = await request(app)
+      .get(`/api/players/${player.body._id}/profile`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.player.name).toBe('Profile Player');
+    expect(res.body.summary.matchesPlayed).toBe(1);
+    expect(res.body.summary.totalDistanceCovered).toBe(1800);
+    expect(res.body.recentMatches).toHaveLength(1);
+    expect(res.body.recentMatches[0].video.originalName).toBe('profile-match.mp4');
+  });
+});
+
+describe('Player overview (GET /api/players/overview)', () => {
+  it('returns player hub summary data with featured players', async () => {
+    const { token } = await registerAdmin('overview@example.com');
+    const player = await request(app)
+      .post('/api/players')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Overview Player', jerseyNumber: 8, position: 'Midfielder' });
+
+    const video = await Video.create({
+      filename: `${Date.now()}-overview.mp4`,
+      originalName: 'overview-match.mp4',
+      fileSize: 1024,
+      filePath: '/tmp/overview-match.mp4',
+      status: 'analyzed',
+    });
+
+    await Analysis.create({
+      video: video._id,
+      playerData: [
+        {
+          playerId: player.body._id,
+          trackId: 'overview-track',
+          verified: true,
+          statistics: {
+            distanceCovered: 1400,
+            averageSpeed: 5.1,
+            sprintCount: 3,
+            activationArea: 'Center',
+          },
+        },
+      ],
+      actions: [{ type: 'pass', playerId: 'overview-track', frameNumber: 9, confidence: 0.88 }],
+    });
+
+    const res = await request(app)
+      .get('/api/players/overview')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(res.body.summary.totalPlayers).toBe(1);
+    expect(res.body.summary.trackedProfiles).toBe(1);
+    expect(res.body.summary.analyzedMatches).toBe(1);
+    expect(res.body.featuredPlayers[0].player.name).toBe('Overview Player');
+    expect(res.body.featuredPlayers[0].summary.totalActions).toBe(1);
+  });
+});

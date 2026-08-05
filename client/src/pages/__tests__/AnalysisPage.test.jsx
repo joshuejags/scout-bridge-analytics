@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import axios from 'axios';
 import AnalysisPage from '../AnalysisPage';
@@ -18,6 +19,20 @@ const baseAnalysis = {
     { type: 'tackle', playerId: '3', frameNumber: 40, confidence: 0.5 },
     { type: 'interception', playerId: '4', frameNumber: 50, confidence: 0.5 },
   ],
+  reportInsights: {
+    suggestedSummary: 'Recommendation: Shortlist review. Tracked 5 players over 90 seconds with 5 logged actions.',
+    recommendation: {
+      label: 'Shortlist review',
+      score: 67,
+      reason: 'Built from tracked players, verified tracks, logged actions, and tactical shape signals.',
+    },
+    confidence: { label: 'Medium confidence', score: 58 },
+    metrics: { trackedPlayers: 5, verifiedTracks: 2, totalActions: 5, highlightedMoments: 0 },
+    recruitmentSignals: ['2 shots flagged final-third involvement worth a second pass.'],
+    tacticalSignals: ['Red held 45.2m width with 12.4m compactness across 3 lines (4-3-1).'],
+    developmentAreas: ['Final-third end product, shot timing, and decision quality.'],
+    standoutPlayers: [{ label: 'Sam Striker', distanceCovered: 1500, sprintCount: 4, activationArea: 'Center' }],
+  },
 };
 
 const renderPage = () =>
@@ -58,7 +73,7 @@ describe('AnalysisPage action breakdown', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByText('Actions detected: 0')).toBeInTheDocument());
-    expect(screen.queryByText(/shot/i)).not.toBeInTheDocument();
+    expect(document.querySelectorAll('.action-badge')).toHaveLength(0);
   });
 });
 
@@ -204,5 +219,73 @@ describe('AnalysisPage tactical shape panel', () => {
 
     await waitFor(() => expect(screen.getByText('Actions detected: 5')).toBeInTheDocument());
     expect(screen.queryByText('Tactical shape')).not.toBeInTheDocument();
+  });
+});
+
+describe('AnalysisPage saved reports workflow', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('AnalysisPage recruitment intelligence panel', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('renders the derived recruitment intelligence section from report insights', async () => {
+      axios.get.mockImplementation((url) => {
+        if (url.includes('/analysis/')) {
+          return Promise.resolve({
+            data: {
+              ...baseAnalysis,
+              playerData: [
+                {
+                  trackId: '1',
+                  playerId: { _id: 'p1', name: 'Sam Striker' },
+                  verified: true,
+                  statistics: { distanceCovered: 1500, averageSpeed: 5.2, sprintCount: 4, activationArea: 'Center' },
+                },
+              ],
+            },
+          });
+        }
+        return Promise.resolve({ data: [] });
+      });
+
+      renderPage();
+
+      expect(await screen.findByText('Recruitment intelligence')).toBeInTheDocument();
+      expect(screen.getByText('Shortlist review')).toBeInTheDocument();
+      expect(screen.getByText('67/100 decision score')).toBeInTheDocument();
+      expect(screen.getByText('Recruitment signals')).toBeInTheDocument();
+      expect(screen.getByText(/final-third involvement/i)).toBeInTheDocument();
+    });
+  });
+
+  it('prefills and submits the saved report form', async () => {
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/analysis/')) return Promise.resolve({ data: { ...baseAnalysis, video: { _id: 'vid1', originalName: 'match.mp4', sport: 'soccer' } } });
+      return Promise.resolve({ data: [] });
+    });
+    axios.post.mockResolvedValue({ data: { _id: 'saved-1' } });
+
+    renderPage();
+
+    expect(await screen.findByText('Actions detected: 5')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save report' }));
+
+    expect(screen.getByDisplayValue('match.mp4 scouting report')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save to reports' }));
+
+    await waitFor(() =>
+      expect(axios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/reports/saved'),
+        expect.objectContaining({
+          videoId: 'vid1',
+          template: 'scout-summary',
+          title: 'match.mp4 scouting report',
+        })
+      )
+    );
   });
 });

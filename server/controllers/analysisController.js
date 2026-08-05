@@ -6,6 +6,7 @@ const Player = require('../models/Player');
 const { emitEvent } = require('../utils/socket');
 const workerPool = require('../utils/analysisWorkerPool');
 const { isOwnerOrAdmin } = require('./videoController');
+const { buildReportInsights } = require('../utils/reportInsights');
 
 // Project root is one level up from server/ (this file lives in
 // server/controllers/) when running from a full repo checkout — true for
@@ -228,7 +229,9 @@ exports.getAnalysisByVideo = async (req, res) => {
       return res.status(404).json({ error: 'Analysis not found' });
     }
 
-    res.json(analysis);
+    const analysisObject = analysis.toObject();
+    analysisObject.reportInsights = buildReportInsights(analysisObject);
+    res.json(analysisObject);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { apiUrl } from '../utils/api';
 import './DashboardSummary.css';
 
 const DashboardSummary = ({ refreshTrigger = 0 }) => {
@@ -11,7 +12,7 @@ const DashboardSummary = ({ refreshTrigger = 0 }) => {
     const fetchSummary = async () => {
       setLoading(true);
       try {
-        const response = await axios.get(`${process.env.REACT_APP_API_URL}/videos`);
+        const response = await axios.get(apiUrl('/videos'));
         const videos = response.data;
         const total = videos.length;
         const processed = videos.filter((video) => video.status === 'analyzed').length;
