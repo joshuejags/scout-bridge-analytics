@@ -21,6 +21,13 @@ const PlayersPage = () => {
   const [teamId, setTeamId] = useState('');
   const [position, setPosition] = useState('');
   const [jerseyNumber, setJerseyNumber] = useState('');
+  const [age, setAge] = useState('');
+  const [heightCm, setHeightCm] = useState('');
+  const [weightKg, setWeightKg] = useState('');
+  const [nationality, setNationality] = useState('');
+  const [preferredFoot, setPreferredFoot] = useState('');
+  const [contractStatus, setContractStatus] = useState('');
+  const [profileSummary, setProfileSummary] = useState('');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
@@ -93,12 +100,26 @@ const PlayersPage = () => {
         team: teamId || null,
         position,
         jerseyNumber: jerseyNumber ? Number(jerseyNumber) : undefined,
+       age: age ? Number(age) : undefined,
+       heightCm: heightCm ? Number(heightCm) : undefined,
+       weightKg: weightKg ? Number(weightKg) : undefined,
+       nationality: nationality || undefined,
+       preferredFoot: preferredFoot || undefined,
+       contractStatus: contractStatus || undefined,
+       profileSummary: profileSummary || undefined,
       });
       setPlayers((prev) => [...prev, response.data]);
       setName('');
       setTeamId('');
       setPosition('');
       setJerseyNumber('');
+      setAge('');
+      setHeightCm('');
+      setWeightKg('');
+      setNationality('');
+      setPreferredFoot('');
+      setContractStatus('');
+      setProfileSummary('');
       setMessage('Player added successfully.');
     } catch (err) {
       setError(err.response?.data?.error || 'Unable to create player.');
@@ -204,6 +225,34 @@ const PlayersPage = () => {
                 onChange={(e) => setJerseyNumber(e.target.value)}
               />
             </div>
+            <div className="form-row">
+              <label htmlFor="playerAge">Age</label>
+              <input id="playerAge" type="number" min="0" max="60" value={age} onChange={(e) => setAge(e.target.value)} />
+            </div>
+            <div className="form-row">
+              <label htmlFor="playerHeight">Height (cm)</label>
+              <input id="playerHeight" type="number" min="130" max="220" value={heightCm} onChange={(e) => setHeightCm(e.target.value)} />
+            </div>
+            <div className="form-row">
+              <label htmlFor="playerWeight">Weight (kg)</label>
+              <input id="playerWeight" type="number" min="40" max="180" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
+            </div>
+            <div className="form-row">
+              <label htmlFor="playerNationality">Nationality</label>
+              <input id="playerNationality" value={nationality} onChange={(e) => setNationality(e.target.value)} />
+            </div>
+            <div className="form-row">
+              <label htmlFor="playerPreferredFoot">Preferred foot</label>
+              <input id="playerPreferredFoot" value={preferredFoot} onChange={(e) => setPreferredFoot(e.target.value)} />
+            </div>
+            <div className="form-row">
+              <label htmlFor="playerContractStatus">Contract status</label>
+              <input id="playerContractStatus" value={contractStatus} onChange={(e) => setContractStatus(e.target.value)} />
+            </div>
+            <div className="form-row">
+              <label htmlFor="playerProfileSummary">Profile summary</label>
+              <input id="playerProfileSummary" value={profileSummary} onChange={(e) => setProfileSummary(e.target.value)} />
+            </div>
           </div>
           <button type="submit" className="button button-primary">
             Create player
@@ -283,9 +332,11 @@ const PlayersPage = () => {
 
                 <p className="player-card-summary">
                   {player.position || 'Position not set'}
-                  {player.jerseyNumber != null
-                    ? ` · jersey #${player.jerseyNumber}`
-                    : ' · no jersey number set'}
+                  {player.jerseyNumber != null ? ` · jersey #${player.jerseyNumber}` : ' · no jersey number set'}
+                  {player.age ? ` · ${player.age}y` : ''}
+                  {player.heightCm ? ` · ${player.heightCm}cm` : ''}
+                  {player.weightKg ? ` · ${player.weightKg}kg` : ''}
+                  {player.nationality ? ` · ${player.nationality}` : ''}
                 </p>
 
                 <div className="player-card-actions">

@@ -15,6 +15,10 @@ const createBody = [
     .optional({ values: 'null' })
     .isInt({ min: 0, max: 99 })
     .withMessage('Jersey number must be between 0 and 99'),
+  body('age').optional({ values: 'null' }).isInt({ min: 0, max: 60 }).withMessage('Age must be between 0 and 60'),
+  body('heightCm').optional({ values: 'null' }).isInt({ min: 130, max: 220 }).withMessage('Height must be between 130 and 220 cm'),
+  body('weightKg').optional({ values: 'null' }).isInt({ min: 40, max: 180 }).withMessage('Weight must be between 40 and 180 kg'),
+  body('marketValue').optional({ values: 'null' }).isInt({ min: 0 }).withMessage('Market value must be a non-negative number'),
 ];
 const updateBody = [
   body('name').optional().trim().notEmpty().withMessage('Player name cannot be empty'),
@@ -24,6 +28,10 @@ const updateBody = [
     .optional({ values: 'null' })
     .isInt({ min: 0, max: 99 })
     .withMessage('Jersey number must be between 0 and 99'),
+  body('age').optional({ values: 'null' }).isInt({ min: 0, max: 60 }).withMessage('Age must be between 0 and 60'),
+  body('heightCm').optional({ values: 'null' }).isInt({ min: 130, max: 220 }).withMessage('Height must be between 130 and 220 cm'),
+  body('weightKg').optional({ values: 'null' }).isInt({ min: 40, max: 180 }).withMessage('Weight must be between 40 and 180 kg'),
+  body('marketValue').optional({ values: 'null' }).isInt({ min: 0 }).withMessage('Market value must be a non-negative number'),
 ];
 
 router.post('/', createBody, validate, playerController.createPlayer);

@@ -14,8 +14,26 @@ const templateLabels = {
   'player-development': 'Player development',
 };
 
+const DEFAULT_REPORT_FORM = {
+  videoId: '',
+  title: '',
+  summary: '',
+  template: 'scout-summary',
+  status: 'draft',
+  recommendationScore: '0',
+  scoutingNotes: '',
+  tagsText: '',
+  strengthsText: '',
+  weaknessesText: '',
+  technicalEvaluation: '',
+  tacticalEvaluation: '',
+  physicalEvaluation: '',
+  mentalEvaluation: '',
+};
+
 const SavedReportsPage = () => {
   const [reports, setReports] = useState([]);
+  const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,12 +41,18 @@ const SavedReportsPage = () => {
   const [templateFilter, setTemplateFilter] = useState('all');
   const [toast, setToast] = useState(null);
   const [updatingReportId, setUpdatingReportId] = useState(null);
+  const [creatingReport, setCreatingReport] = useState(false);
+  const [composer, setComposer] = useState(DEFAULT_REPORT_FORM);
 
   useEffect(() => {
     const loadReports = async () => {
       try {
-        const response = await axios.get(apiUrl('/reports/saved'));
-        setReports(response.data);
+        const [reportResponse, videoResponse] = await Promise.all([
+          axios.get(apiUrl('/reports/saved')),
+          axios.get(apiUrl('/videos')),
+        ]);
+        setReports(reportResponse.data);
+        setVideos(videoResponse.data || []);
       } catch (err) {
         console.error('Error loading saved reports:', err);
         setError(err.response?.data?.error || 'Unable to load saved reports.');
@@ -110,6 +134,41 @@ const SavedReportsPage = () => {
     }
   };
 
+  const handleCreateReport = async (event) => {
+    event.preventDefault();
+    setCreatingReport(true);
+    try {
+      const payload = {
+        videoId: composer.videoId,
+        title: composer.title.trim(),
+        summary: composer.summary.trim(),
+        template: composer.template,
+        status: composer.status,
+        recommendationScore: Number(composer.recommendationScore || 0),
+        scoutingNotes: composer.scoutingNotes.trim(),
+        tags: composer.tagsText.split(',').map((tag) => tag.trim()).filter(Boolean),
+        reportSections: {
+          strengths: composer.strengthsText.split(',').map((item) => item.trim()).filter(Boolean),
+          weaknesses: composer.weaknessesText.split(',').map((item) => item.trim()).filter(Boolean),
+          technicalEvaluation: composer.technicalEvaluation.trim(),
+          tacticalEvaluation: composer.tacticalEvaluation.trim(),
+          physicalEvaluation: composer.physicalEvaluation.trim(),
+          mentalEvaluation: composer.mentalEvaluation.trim(),
+        },
+      };
+
+      const response = await axios.post(apiUrl('/reports/saved'), payload);
+      setReports((prev) => [response.data, ...prev]);
+      setComposer(DEFAULT_REPORT_FORM);
+      setToast({ type: 'success', message: 'Report drafted and saved.' });
+    } catch (err) {
+      console.error('Error creating report:', err);
+      setToast({ type: 'error', message: err.response?.data?.error || 'Unable to create a scouting report.' });
+    } finally {
+      setCreatingReport(false);
+    }
+  };
+
   if (loading) {
     return <LoadingSpinner fullScreen message="Loading saved reports..." />;
   }
@@ -130,6 +189,96 @@ const SavedReportsPage = () => {
       </div>
 
       <SavedFilterPresets scope="reports" currentFilters={currentReportFilters} onApplyPreset={handleApplyPreset} />
+
+      <section className="surface-card saved-reports-composer">
+        <div className="card-title-row">
+          <div>
+            <h2 className="card-title">Build a scouting report</h2>
+            <p className="card-subtitle">Draft a structured report from any video analysis with status, score, and evaluation sections.</p>
+          </div>
+        </div>
+
+        <form className="saved-reports-composer__form" onSubmit={handleCreateReport}>
+          <label>
+            <span>Video</span>
+            <select value={composer.videoId} onChange={(event) => setComposer((prev) => ({ ...prev, videoId: event.target.value }))} required>
+              <option value="">Select a video</option>
+              {videos.map((video) => (
+                <option key={video._id} value={video._id}>
+                  {video.originalName || video._id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Title</span>
+            <input value={composer.title} onChange={(event) => setComposer((prev) => ({ ...prev, title: event.target.value }))} placeholder="Report title" required />
+          </label>
+          <label>
+            <span>Template</span>
+            <select value={composer.template} onChange={(event) => setComposer((prev) => ({ ...prev, template: event.target.value }))}>
+              {Object.entries(templateLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Status</span>
+            <select value={composer.status} onChange={(event) => setComposer((prev) => ({ ...prev, status: event.target.value }))}>
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
+          <label>
+            <span>Recommendation score</span>
+            <input type="number" min="0" max="100" value={composer.recommendationScore} onChange={(event) => setComposer((prev) => ({ ...prev, recommendationScore: event.target.value }))} />
+          </label>
+          <label className="saved-reports-composer__field--wide">
+            <span>Summary</span>
+            <textarea rows="3" value={composer.summary} onChange={(event) => setComposer((prev) => ({ ...prev, summary: event.target.value }))} placeholder="High-level scouting summary" />
+          </label>
+          <label className="saved-reports-composer__field--wide">
+            <span>Scouting notes</span>
+            <textarea rows="3" value={composer.scoutingNotes} onChange={(event) => setComposer((prev) => ({ ...prev, scoutingNotes: event.target.value }))} placeholder="Additional notes for the report" />
+          </label>
+          <label className="saved-reports-composer__field--wide">
+            <span>Tags</span>
+            <input value={composer.tagsText} onChange={(event) => setComposer((prev) => ({ ...prev, tagsText: event.target.value }))} placeholder="comma separated tags" />
+          </label>
+          <label className="saved-reports-composer__field--wide">
+            <span>Strengths</span>
+            <input value={composer.strengthsText} onChange={(event) => setComposer((prev) => ({ ...prev, strengthsText: event.target.value }))} placeholder="comma separated strengths" />
+          </label>
+          <label className="saved-reports-composer__field--wide">
+            <span>Weaknesses</span>
+            <input value={composer.weaknessesText} onChange={(event) => setComposer((prev) => ({ ...prev, weaknessesText: event.target.value }))} placeholder="comma separated weaknesses" />
+          </label>
+          <label className="saved-reports-composer__field--wide">
+            <span>Technical evaluation</span>
+            <textarea rows="2" value={composer.technicalEvaluation} onChange={(event) => setComposer((prev) => ({ ...prev, technicalEvaluation: event.target.value }))} />
+          </label>
+          <label className="saved-reports-composer__field--wide">
+            <span>Tactical evaluation</span>
+            <textarea rows="2" value={composer.tacticalEvaluation} onChange={(event) => setComposer((prev) => ({ ...prev, tacticalEvaluation: event.target.value }))} />
+          </label>
+          <label className="saved-reports-composer__field--wide">
+            <span>Physical evaluation</span>
+            <textarea rows="2" value={composer.physicalEvaluation} onChange={(event) => setComposer((prev) => ({ ...prev, physicalEvaluation: event.target.value }))} />
+          </label>
+          <label className="saved-reports-composer__field--wide">
+            <span>Mental evaluation</span>
+            <textarea rows="2" value={composer.mentalEvaluation} onChange={(event) => setComposer((prev) => ({ ...prev, mentalEvaluation: event.target.value }))} />
+          </label>
+          <div className="saved-reports-composer__actions">
+            <button type="submit" className="button button-primary" disabled={creatingReport}>
+              {creatingReport ? 'Saving...' : 'Save report'}
+            </button>
+          </div>
+        </form>
+      </section>
 
       <SearchFilter
         title="Report filters"

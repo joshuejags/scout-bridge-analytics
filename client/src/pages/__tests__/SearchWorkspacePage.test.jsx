@@ -40,6 +40,18 @@ describe('SearchWorkspacePage', () => {
     await userEvent.type(searchInput, 'sam');
 
     await waitFor(() => expect(screen.getByText('Sam Striker')).toBeInTheDocument());
-    expect(screen.getByText('Arsenal')).toBeInTheDocument();
+    expect(screen.getAllByText('Arsenal').length).toBeGreaterThan(0);
+  });
+
+  it('renders the advanced filter controls for scouting workflows', async () => {
+    render(
+      <MemoryRouter>
+        <SearchWorkspacePage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole('combobox', { name: /club/i })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /league/i })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /country/i })).toBeInTheDocument();
   });
 });

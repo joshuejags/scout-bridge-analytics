@@ -27,6 +27,12 @@ const SearchWorkspacePage = () => {
   const [entityType, setEntityType] = useState('all');
   const [positionFilter, setPositionFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [clubFilter, setClubFilter] = useState('all');
+  const [leagueFilter, setLeagueFilter] = useState('all');
+  const [countryFilter, setCountryFilter] = useState('all');
+  const [ageFilter, setAgeFilter] = useState('all');
+  const [heightFilter, setHeightFilter] = useState('all');
+  const [weightFilter, setWeightFilter] = useState('all');
 
   useEffect(() => {
     const loadWorkspaceSearchData = async () => {
@@ -87,6 +93,27 @@ const SearchWorkspacePage = () => {
     return ['all', ...Array.from(new Set(values))];
   }, [videos]);
 
+  const clubOptions = useMemo(() => {
+    const values = teams.map((team) => team.name).filter(Boolean).sort();
+    return ['all', ...Array.from(new Set(values))];
+  }, [teams]);
+
+  const leagueOptions = useMemo(() => {
+    const values = teams
+      .map((team) => team.league)
+      .filter(Boolean)
+      .sort();
+    return ['all', ...Array.from(new Set(values))];
+  }, [teams]);
+
+  const countryOptions = useMemo(() => {
+    const values = [
+      ...players.map((player) => player.nationality).filter(Boolean),
+      ...teams.map((team) => team.country).filter(Boolean),
+    ].sort();
+    return ['all', ...Array.from(new Set(values))];
+  }, [players, teams]);
+
   const results = useMemo(() => {
     const queryText = query.trim().toLowerCase();
 
@@ -94,21 +121,36 @@ const SearchWorkspacePage = () => {
       .filter((player) => {
         const matchesQuery = !queryText || buildSearchText(player).includes(queryText);
         const matchesPosition = positionFilter === 'all' || player.position === positionFilter;
-        return matchesQuery && matchesPosition;
+        const matchesClub = clubFilter === 'all' || player.team?.name === clubFilter;
+        const matchesLeague = leagueFilter === 'all' || player.team?.league === leagueFilter;
+        const matchesCountry = countryFilter === 'all' || player.nationality === countryFilter;
+        const matchesAge = evaluateAge(player.age, ageFilter);
+        const matchesHeight = evaluateHeight(player.heightCm, heightFilter);
+        const matchesWeight = evaluateWeight(player.weightKg, weightFilter);
+        return matchesQuery && matchesPosition && matchesClub && matchesLeague && matchesCountry && matchesAge && matchesHeight && matchesWeight;
       })
       .map((player) => ({
         id: player._id,
         type: 'player',
         title: player.name,
         subtitle: player.team?.name || 'Unassigned club',
-        meta: [player.position, player.jerseyNumber ? `#${player.jerseyNumber}` : null].filter(Boolean).join(' • '),
+        meta: [
+          player.position,
+          player.jerseyNumber ? `#${player.jerseyNumber}` : null,
+          player.age ? `${player.age}y` : null,
+          player.heightCm ? `${player.heightCm}cm` : null,
+          player.weightKg ? `${player.weightKg}kg` : null,
+        ].filter(Boolean).join(' • '),
         to: `/players/${player._id}`,
       }));
 
     const teamResults = teams
       .filter((team) => {
         const matchesQuery = !queryText || buildSearchText(team).includes(queryText);
-        return matchesQuery;
+        const matchesClub = clubFilter === 'all' || team.name === clubFilter;
+        const matchesLeague = leagueFilter === 'all' || team.league === leagueFilter;
+        const matchesCountry = countryFilter === 'all' || team.country === countryFilter;
+        return matchesQuery && matchesClub && matchesLeague && matchesCountry;
       })
       .map((team) => ({
         id: team._id,
@@ -153,7 +195,7 @@ const SearchWorkspacePage = () => {
       return groupedResults;
     }
     return groupedResults.filter((result) => result.type === entityType);
-  }, [entityType, players, positionFilter, query, reports, statusFilter, teams, videos]);
+  }, [ageFilter, clubFilter, countryFilter, entityType, heightFilter, leagueFilter, players, positionFilter, query, reports, statusFilter, teams, videos, weightFilter]);
 
   const currentFilters = useMemo(
     () => ({
@@ -161,8 +203,14 @@ const SearchWorkspacePage = () => {
       entityType,
       positionFilter,
       statusFilter,
+      clubFilter,
+      leagueFilter,
+      countryFilter,
+      ageFilter,
+      heightFilter,
+      weightFilter,
     }),
-    [entityType, positionFilter, query, statusFilter]
+    [ageFilter, clubFilter, countryFilter, entityType, heightFilter, leagueFilter, positionFilter, query, statusFilter, weightFilter]
   );
 
   const handleApplyPreset = (preset) => {
@@ -170,6 +218,12 @@ const SearchWorkspacePage = () => {
     setEntityType(preset.filters?.entityType || 'all');
     setPositionFilter(preset.filters?.positionFilter || 'all');
     setStatusFilter(preset.filters?.statusFilter || 'all');
+    setClubFilter(preset.filters?.clubFilter || 'all');
+    setLeagueFilter(preset.filters?.leagueFilter || 'all');
+    setCountryFilter(preset.filters?.countryFilter || 'all');
+    setAgeFilter(preset.filters?.ageFilter || 'all');
+    setHeightFilter(preset.filters?.heightFilter || 'all');
+    setWeightFilter(preset.filters?.weightFilter || 'all');
   };
 
   const resetFilters = () => {
@@ -177,6 +231,12 @@ const SearchWorkspacePage = () => {
     setEntityType('all');
     setPositionFilter('all');
     setStatusFilter('all');
+    setClubFilter('all');
+    setLeagueFilter('all');
+    setCountryFilter('all');
+    setAgeFilter('all');
+    setHeightFilter('all');
+    setWeightFilter('all');
   };
 
   if (loading) {
@@ -220,6 +280,70 @@ const SearchWorkspacePage = () => {
                   {option === 'all' ? 'All positions' : option}
                 </option>
               ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Club</span>
+            <select value={clubFilter} onChange={(event) => setClubFilter(event.target.value)}>
+              {clubOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option === 'all' ? 'All clubs' : option}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>League</span>
+            <select value={leagueFilter} onChange={(event) => setLeagueFilter(event.target.value)}>
+              {leagueOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option === 'all' ? 'All leagues' : option}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Country</span>
+            <select value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}>
+              {countryOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option === 'all' ? 'All countries' : option}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label>
+            <span>Age</span>
+            <select value={ageFilter} onChange={(event) => setAgeFilter(event.target.value)}>
+              <option value="all">All ages</option>
+              <option value="under-20">Under 20</option>
+              <option value="20-24">20-24</option>
+              <option value="25-29">25-29</option>
+              <option value="30+">30+</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Height</span>
+            <select value={heightFilter} onChange={(event) => setHeightFilter(event.target.value)}>
+              <option value="all">Any height</option>
+              <option value="under-180">Under 180cm</option>
+              <option value="180-188">180-188cm</option>
+              <option value="188+">188cm+</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Weight</span>
+            <select value={weightFilter} onChange={(event) => setWeightFilter(event.target.value)}>
+              <option value="all">Any weight</option>
+              <option value="under-70">Under 70kg</option>
+              <option value="70-80">70-80kg</option>
+              <option value="80+">80kg+</option>
             </select>
           </label>
 
@@ -321,6 +445,31 @@ function buildSearchText(item) {
     ...(Array.isArray(item.tags) ? item.tags : []),
   ];
   return values.filter(Boolean).join(' ').toLowerCase();
+}
+
+function evaluateAge(age, ageFilter) {
+  if (ageFilter === 'all' || age == null) return true;
+  if (ageFilter === 'under-20') return age < 20;
+  if (ageFilter === '20-24') return age >= 20 && age <= 24;
+  if (ageFilter === '25-29') return age >= 25 && age <= 29;
+  if (ageFilter === '30+') return age >= 30;
+  return true;
+}
+
+function evaluateHeight(height, heightFilter) {
+  if (heightFilter === 'all' || height == null) return true;
+  if (heightFilter === 'under-180') return height < 180;
+  if (heightFilter === '180-188') return height >= 180 && height <= 188;
+  if (heightFilter === '188+') return height >= 188;
+  return true;
+}
+
+function evaluateWeight(weight, weightFilter) {
+  if (weightFilter === 'all' || weight == null) return true;
+  if (weightFilter === 'under-70') return weight < 70;
+  if (weightFilter === '70-80') return weight >= 70 && weight <= 80;
+  if (weightFilter === '80+') return weight >= 80;
+  return true;
 }
 
 export default SearchWorkspacePage;

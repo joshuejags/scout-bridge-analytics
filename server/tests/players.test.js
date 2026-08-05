@@ -222,6 +222,8 @@ describe('Player comparison (GET /api/players/compare)', () => {
     expect(result1.actions).toEqual({ pass: 1, shot: 1, tackle: 0, interception: 0 });
     expect(result1.totalActions).toBe(2);
     expect(result1.verifiedTracks).toBe(2);
+    expect(result1.evaluation.scoutingScore).toBeGreaterThan(0);
+    expect(result1.evaluation.recommendation).toBeDefined();
 
     expect(result2.player.name).toBe('Aggregate Player Two');
     expect(result2.matchesPlayed).toBe(1);

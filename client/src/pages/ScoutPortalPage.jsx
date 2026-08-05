@@ -11,12 +11,14 @@ import './ScoutPortalPage.css';
 
 const DEFAULT_FORM = {
   playerId: '',
-  stage: 'watchlist',
+  stage: 'discovered',
   priority: 'medium',
   fitScore: 75,
   note: '',
   nextAction: '',
   dueDate: '',
+  handoffNote: '',
+  collaborationNote: '',
 };
 
 const DEFAULT_FILTERS = {
@@ -300,6 +302,24 @@ const ScoutPortalPage = () => {
                   placeholder="What makes this player worth tracking?"
                 />
               </label>
+              <label className="scout-portal__field--wide">
+                Handoff note
+                <textarea
+                  rows="2"
+                  value={createForm.handoffNote}
+                  onChange={(event) => setCreateForm((prev) => ({ ...prev, handoffNote: event.target.value }))}
+                  placeholder="Capture the coach handoff or live-view requirement"
+                />
+              </label>
+              <label className="scout-portal__field--wide">
+                Collaboration note
+                <textarea
+                  rows="2"
+                  value={createForm.collaborationNote}
+                  onChange={(event) => setCreateForm((prev) => ({ ...prev, collaborationNote: event.target.value }))}
+                  placeholder="Add a note for analysts, coaches, or technical staff"
+                />
+              </label>
               <label>
                 Next action
                 <input
@@ -531,9 +551,25 @@ const ScoutPortalPage = () => {
                 <label>
                   Scout note
                   <textarea
-                    rows="5"
+                    rows="4"
                     value={editorState.note}
                     onChange={(event) => setEditorState((prev) => ({ ...prev, note: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Handoff note
+                  <textarea
+                    rows="3"
+                    value={editorState.handoffNote}
+                    onChange={(event) => setEditorState((prev) => ({ ...prev, handoffNote: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Collaboration note
+                  <textarea
+                    rows="3"
+                    value={editorState.collaborationNote}
+                    onChange={(event) => setEditorState((prev) => ({ ...prev, collaborationNote: event.target.value }))}
                   />
                 </label>
                 <div className="scout-portal__editor-actions">
@@ -576,6 +612,8 @@ function targetToForm(target) {
     note: target.note || '',
     nextAction: target.nextAction || '',
     dueDate: target.dueDate ? String(target.dueDate).slice(0, 10) : '',
+    handoffNote: target.handoffNote || '',
+    collaborationNote: target.collaborationNote || '',
   };
 }
 

@@ -4,7 +4,7 @@ const Video = require('../models/Video');
 const { friendlyMongooseError } = require('../utils/mongooseErrors');
 const { pick } = require('../utils/pick');
 
-const TEAM_FIELDS = ['name', 'description'];
+const TEAM_FIELDS = ['name', 'description', 'league', 'country', 'tier'];
 
 exports.createTeam = async (req, res) => {
   try {

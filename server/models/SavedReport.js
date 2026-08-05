@@ -13,6 +13,21 @@ const savedReportSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true },
     summary: { type: String, trim: true, default: '' },
     tags: { type: [String], default: [] },
+    status: {
+      type: String,
+      enum: ['draft', 'published', 'archived'],
+      default: 'draft',
+    },
+    recommendationScore: { type: Number, min: 0, max: 100, default: 0 },
+    reportSections: {
+      strengths: { type: [String], default: [] },
+      weaknesses: { type: [String], default: [] },
+      technicalEvaluation: { type: String, trim: true, default: '' },
+      tacticalEvaluation: { type: String, trim: true, default: '' },
+      physicalEvaluation: { type: String, trim: true, default: '' },
+      mentalEvaluation: { type: String, trim: true, default: '' },
+    },
+    scoutingNotes: { type: String, trim: true, default: '' },
     insightSnapshot: {
       suggestedSummary: { type: String, default: '' },
       recommendation: {

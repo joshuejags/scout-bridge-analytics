@@ -8,6 +8,14 @@ const playerSchema = new mongoose.Schema(
     team: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', index: true },
     position: String,
     jerseyNumber: Number,
+    age: { type: Number, min: 0, max: 60 },
+    heightCm: { type: Number, min: 130, max: 220 },
+    weightKg: { type: Number, min: 40, max: 180 },
+    nationality: { type: String, trim: true, default: '' },
+    preferredFoot: { type: String, trim: true, default: '' },
+    contractStatus: { type: String, trim: true, default: '' },
+    marketValue: { type: Number, min: 0, default: 0 },
+    profileSummary: { type: String, trim: true, default: '' },
   },
   { timestamps: true }
 );

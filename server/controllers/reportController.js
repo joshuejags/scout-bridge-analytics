@@ -46,6 +46,10 @@ exports.saveReport = async (req, res) => {
         title: req.body.title?.trim() || `${video.originalName} scouting report`,
         summary: req.body.summary?.trim() || generatedSummary,
         tags: normalizeTags(req.body.tags),
+        status: normalizeStatus(req.body.status),
+        recommendationScore: normalizeScore(req.body.recommendationScore, insightSnapshot.recommendation?.score || 0),
+        reportSections: normalizeSections(req.body.reportSections),
+        scoutingNotes: req.body.scoutingNotes?.trim() || '',
         insightSnapshot,
       },
       { upsert: true, new: true, setDefaultsOnInsert: true, runValidators: true }
@@ -70,6 +74,10 @@ exports.updateSavedReport = async (req, res) => {
         title: req.body.title?.trim(),
         summary: req.body.summary?.trim(),
         tags: req.body.tags ? normalizeTags(req.body.tags) : undefined,
+        status: normalizeStatus(req.body.status),
+        recommendationScore: normalizeScore(req.body.recommendationScore),
+        reportSections: normalizeSections(req.body.reportSections),
+        scoutingNotes: req.body.scoutingNotes?.trim(),
       },
       { new: true, runValidators: true }
     )
@@ -132,6 +140,38 @@ function normalizeTags(tags) {
 
 function normalizeTemplate(template) {
   return REPORT_TEMPLATES.includes(template) ? template : 'scout-summary';
+}
+
+function normalizeStatus(status) {
+  return ['draft', 'published', 'archived'].includes(status) ? status : 'draft';
+}
+
+function normalizeScore(score, fallback = 0) {
+  const numericScore = Number(score ?? fallback);
+  if (Number.isNaN(numericScore)) return fallback;
+  return Math.max(0, Math.min(100, Math.round(numericScore)));
+}
+
+function normalizeSections(reportSections) {
+  if (!reportSections || typeof reportSections !== 'object') {
+    return {
+      strengths: [],
+      weaknesses: [],
+      technicalEvaluation: '',
+      tacticalEvaluation: '',
+      physicalEvaluation: '',
+      mentalEvaluation: '',
+    };
+  }
+
+  return {
+    strengths: Array.isArray(reportSections.strengths) ? reportSections.strengths : [],
+    weaknesses: Array.isArray(reportSections.weaknesses) ? reportSections.weaknesses : [],
+    technicalEvaluation: String(reportSections.technicalEvaluation || '').trim(),
+    tacticalEvaluation: String(reportSections.tacticalEvaluation || '').trim(),
+    physicalEvaluation: String(reportSections.physicalEvaluation || '').trim(),
+    mentalEvaluation: String(reportSections.mentalEvaluation || '').trim(),
+  };
 }
 
 function buildGeneratedSummary(analysis, insightSnapshot) {

@@ -6,8 +6,8 @@ const scoutingTargetSchema = new mongoose.Schema(
     player: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', required: true, index: true },
     stage: {
       type: String,
-      enum: ['discovery', 'watchlist', 'shortlist', 'live', 'decision'],
-      default: 'discovery',
+      enum: ['discovered', 'under-review', 'shortlisted', 'scouted', 'recommended', 'trial', 'signed', 'rejected'],
+      default: 'discovered',
     },
     priority: {
       type: String,
@@ -18,6 +18,21 @@ const scoutingTargetSchema = new mongoose.Schema(
     note: { type: String, trim: true, default: '' },
     nextAction: { type: String, trim: true, default: '' },
     dueDate: Date,
+    handoffNote: { type: String, trim: true, default: '' },
+    collaborationNote: { type: String, trim: true, default: '' },
+    activityLog: {
+      type: [
+        new mongoose.Schema(
+          {
+            type: { type: String, trim: true, default: 'update' },
+            message: { type: String, trim: true, default: '' },
+            createdAt: { type: Date, default: Date.now },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

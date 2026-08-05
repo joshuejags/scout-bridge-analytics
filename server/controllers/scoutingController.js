@@ -10,7 +10,8 @@ const BOARD_POPULATE = {
   },
 };
 
-const STAGE_ORDER = ['discovery', 'watchlist', 'shortlist', 'live', 'decision'];
+const STAGE_ORDER = ['discovered', 'under-review', 'shortlisted', 'scouted', 'recommended', 'trial', 'signed', 'rejected'];
+const ACTIVE_STAGE_SET = new Set(['scouted', 'recommended', 'trial', 'signed']);
 
 const getOwnerFilter = (user) => (user.role === 'admin' ? {} : { owner: user._id });
 
@@ -30,7 +31,7 @@ exports.getBoard = async (req, res) => {
     const summary = {
       totalTargets: targets.length,
       highPriority: targets.filter((target) => target.priority === 'high').length,
-      activeDecisions: targets.filter((target) => target.stage === 'live' || target.stage === 'decision').length,
+      activeDecisions: targets.filter((target) => ACTIVE_STAGE_SET.has(target.stage)).length,
       dueThisWeek: targets.filter((target) => isDueThisWeek(target.dueDate)).length,
       byStage: STAGE_ORDER.reduce((acc, stage) => {
         acc[stage] = targets.filter((target) => target.stage === stage).length;
@@ -57,6 +58,16 @@ exports.upsertTarget = async (req, res) => {
       return res.status(404).json({ error: 'Player not found' });
     }
 
+    const existingTarget = await ScoutingTarget.findOne({ owner: req.user._id, player: req.body.playerId });
+    const activityLog = [
+      ...(existingTarget?.activityLog || []),
+      {
+        type: 'created',
+        message: req.body.note?.trim() || 'Added to scouting board',
+        createdAt: new Date(),
+      },
+    ].slice(-6);
+
     const target = await ScoutingTarget.findOneAndUpdate(
       {
         owner: req.user._id,
@@ -71,6 +82,9 @@ exports.upsertTarget = async (req, res) => {
         note: req.body.note,
         nextAction: req.body.nextAction,
         dueDate: req.body.dueDate || null,
+        handoffNote: req.body.handoffNote || '',
+        collaborationNote: req.body.collaborationNote || '',
+        activityLog,
       },
       {
         new: true,
@@ -101,6 +115,16 @@ exports.updateTarget = async (req, res) => {
             owner: req.user._id,
           };
 
+    const existingTarget = await ScoutingTarget.findOne(filter);
+    const activityLog = [
+      ...(existingTarget?.activityLog || []),
+      {
+        type: 'updated',
+        message: req.body.note?.trim() || 'Updated scouting target',
+        createdAt: new Date(),
+      },
+    ].slice(-6);
+
     const target = await ScoutingTarget.findOneAndUpdate(
       filter,
       {
@@ -110,6 +134,9 @@ exports.updateTarget = async (req, res) => {
         note: req.body.note,
         nextAction: req.body.nextAction,
         dueDate: req.body.dueDate || null,
+        handoffNote: req.body.handoffNote || '',
+        collaborationNote: req.body.collaborationNote || '',
+        activityLog,
       },
       {
         new: true,

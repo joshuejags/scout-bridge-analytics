@@ -94,11 +94,14 @@ export const roleExperience = {
 };
 
 export const scoutingStages = [
-  { value: 'discovery', label: 'Discovery' },
-  { value: 'watchlist', label: 'Watchlist' },
-  { value: 'shortlist', label: 'Shortlist' },
-  { value: 'live', label: 'Live view' },
-  { value: 'decision', label: 'Decision' },
+  { value: 'discovered', label: 'Discovered' },
+  { value: 'under-review', label: 'Under review' },
+  { value: 'shortlisted', label: 'Shortlisted' },
+  { value: 'scouted', label: 'Scouted' },
+  { value: 'recommended', label: 'Recommended' },
+  { value: 'trial', label: 'Trial' },
+  { value: 'signed', label: 'Signed' },
+  { value: 'rejected', label: 'Rejected' },
 ];
 
 export const scoutingPriorities = [

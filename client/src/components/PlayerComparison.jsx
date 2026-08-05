@@ -239,6 +239,29 @@ const PlayerComparison = ({ playerIds, onClose, variant = 'modal' }) => {
                     <span className="pill pill--neutral">{matches.length ? `${matches.length} match history` : 'No matches yet'}</span>
                   </div>
 
+                  {item.evaluation && (
+                    <div className="comparison-verdict">
+                      <div className="comparison-verdict__score">
+                        <span>Scouting score</span>
+                        <strong>{item.evaluation.scoutingScore}/100</strong>
+                      </div>
+                      <div className="comparison-verdict__body">
+                        <p>{item.evaluation.executiveSummary}</p>
+                        <ul>
+                          <li>
+                            <strong>Signal:</strong> {item.evaluation.standoutSignal}
+                          </li>
+                          <li>
+                            <strong>Recommendation:</strong> {item.evaluation.recommendation}
+                          </li>
+                          <li>
+                            <strong>Focus:</strong> {item.evaluation.developmentFocus}
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="comparison-trend-card__rows">
                     {TREND_METRICS.map((metric) => {
                       const series = getTrendSeries(item, metric.key);

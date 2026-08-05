@@ -4,7 +4,20 @@ const Analysis = require('../models/Analysis');
 const { friendlyMongooseError } = require('../utils/mongooseErrors');
 const { pick } = require('../utils/pick');
 
-const PLAYER_FIELDS = ['name', 'team', 'position', 'jerseyNumber'];
+const PLAYER_FIELDS = [
+  'name',
+  'team',
+  'position',
+  'jerseyNumber',
+  'age',
+  'heightCm',
+  'weightKg',
+  'nationality',
+  'preferredFoot',
+  'contractStatus',
+  'marketValue',
+  'profileSummary',
+];
 
 exports.createPlayer = async (req, res) => {
   try {
@@ -21,7 +34,61 @@ exports.createPlayer = async (req, res) => {
 
 exports.getPlayers = async (req, res) => {
   try {
-    const players = await Player.find().populate('team');
+    const query = req.query.q?.trim();
+    const filters = {};
+    const searchClauses = [];
+
+    if (query) {
+      searchClauses.push(
+        { name: { $regex: query, $options: 'i' } },
+        { position: { $regex: query, $options: 'i' } },
+        { nationality: { $regex: query, $options: 'i' } },
+        { profileSummary: { $regex: query, $options: 'i' } }
+      );
+    }
+
+    if (req.query.position) {
+      filters.position = { $regex: req.query.position, $options: 'i' };
+    }
+
+    const clubQuery = req.query.club?.trim();
+    if (clubQuery) {
+      const clubClauses = [{ name: { $regex: clubQuery, $options: 'i' } }, { profileSummary: { $regex: clubQuery, $options: 'i' } }];
+      if (mongoose.Types.ObjectId.isValid(clubQuery)) {
+        clubClauses.push({ team: clubQuery });
+      }
+      searchClauses.push(...clubClauses);
+    }
+
+    if (req.query.country) {
+      filters.nationality = { $regex: req.query.country, $options: 'i' };
+    }
+
+    if (req.query.league) {
+      searchClauses.push({ profileSummary: { $regex: req.query.league, $options: 'i' } });
+    }
+
+    if (req.query.ageMin || req.query.ageMax) {
+      filters.age = {};
+      if (req.query.ageMin) filters.age.$gte = Number(req.query.ageMin);
+      if (req.query.ageMax) filters.age.$lte = Number(req.query.ageMax);
+    }
+    if (req.query.heightMin || req.query.heightMax) {
+      filters.heightCm = {};
+      if (req.query.heightMin) filters.heightCm.$gte = Number(req.query.heightMin);
+      if (req.query.heightMax) filters.heightCm.$lte = Number(req.query.heightMax);
+    }
+    if (req.query.weightMin || req.query.weightMax) {
+      filters.weightKg = {};
+      if (req.query.weightMin) filters.weightKg.$gte = Number(req.query.weightMin);
+      if (req.query.weightMax) filters.weightKg.$lte = Number(req.query.weightMax);
+    }
+
+    if (searchClauses.length) {
+      filters.$or = searchClauses;
+    }
+
+    const players = await Player.find(filters).populate('team').sort({ createdAt: -1 });
     res.json(players);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -42,6 +109,14 @@ exports.getPlayerOverview = async (req, res) => {
         name: player.name,
         position: player.position,
         jerseyNumber: player.jerseyNumber,
+        age: player.age,
+        heightCm: player.heightCm,
+        weightKg: player.weightKg,
+        nationality: player.nationality,
+        preferredFoot: player.preferredFoot,
+        contractStatus: player.contractStatus,
+        marketValue: player.marketValue,
+        profileSummary: player.profileSummary,
         team: player.team,
       },
       summary: aggregatePlayerSummary(String(player._id), analyses),
@@ -222,22 +297,34 @@ exports.comparePlayers = async (req, res) => {
         ? round2(speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length)
         : 0;
 
+      const totalActions = Object.values(actionCounts).reduce((a, b) => a + b, 0);
+      const averageDistancePerMatch = matchesPlayed ? round2(totalDistance / matchesPlayed) : 0;
+      const averageSprintsPerMatch = matchesPlayed ? round2(totalSprints / matchesPlayed) : 0;
+
       return {
         player: {
           _id: player._id,
           name: player.name,
           position: player.position,
           jerseyNumber: player.jerseyNumber,
+          age: player.age,
+          heightCm: player.heightCm,
+          weightKg: player.weightKg,
+          nationality: player.nationality,
+          preferredFoot: player.preferredFoot,
+          contractStatus: player.contractStatus,
+          marketValue: player.marketValue,
+          profileSummary: player.profileSummary,
           team: player.team,
         },
         matchesPlayed,
         totalDistanceCovered: round2(totalDistance),
-        averageDistancePerMatch: matchesPlayed ? round2(totalDistance / matchesPlayed) : 0,
+        averageDistancePerMatch,
         averageSpeed: avgSpeed,
         totalSprints,
-        averageSprintsPerMatch: matchesPlayed ? round2(totalSprints / matchesPlayed) : 0,
+        averageSprintsPerMatch,
         actions: actionCounts,
-        totalActions: Object.values(actionCounts).reduce((a, b) => a + b, 0),
+        totalActions,
         verifiedTracks,
         matches,
         trendSeries: {
@@ -248,7 +335,12 @@ exports.comparePlayers = async (req, res) => {
       };
     });
 
-    res.json(results);
+    const enrichedResults = results.map((result) => ({
+      ...result,
+      evaluation: buildComparisonEvaluation(result, results),
+    }));
+
+    res.json(enrichedResults);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: error.message });
@@ -279,6 +371,14 @@ exports.getPlayerProfile = async (req, res) => {
         name: player.name,
         position: player.position,
         jerseyNumber: player.jerseyNumber,
+        age: player.age,
+        heightCm: player.heightCm,
+        weightKg: player.weightKg,
+        nationality: player.nationality,
+        preferredFoot: player.preferredFoot,
+        contractStatus: player.contractStatus,
+        marketValue: player.marketValue,
+        profileSummary: player.profileSummary,
         team: player.team,
         createdAt: player.createdAt,
         updatedAt: player.updatedAt,
@@ -294,6 +394,60 @@ exports.getPlayerProfile = async (req, res) => {
 
 function round2(n) {
   return Math.round(n * 100) / 100;
+}
+
+function buildComparisonEvaluation(result, peers) {
+  const maxDistance = Math.max(...peers.map((peer) => peer.averageDistancePerMatch || 0), 1);
+  const maxActions = Math.max(...peers.map((peer) => peer.totalActions || 0), 1);
+  const maxVerified = Math.max(...peers.map((peer) => peer.verifiedTracks || 0), 1);
+  const maxSprints = Math.max(...peers.map((peer) => peer.averageSprintsPerMatch || 0), 1);
+
+  const distanceScore = Math.min(
+    100,
+    Math.round(((result.averageDistancePerMatch || 0) / maxDistance) * 100)
+  );
+  const actionScore = Math.min(100, Math.round(((result.totalActions || 0) / maxActions) * 100));
+  const reliabilityScore = Math.min(
+    100,
+    Math.round(((result.verifiedTracks || 0) / maxVerified) * 100)
+  );
+  const sprintScore = Math.min(
+    100,
+    Math.round(((result.averageSprintsPerMatch || 0) / maxSprints) * 100)
+  );
+
+  const scoutingScore = Math.round(
+    distanceScore * 0.35 + actionScore * 0.35 + reliabilityScore * 0.2 + sprintScore * 0.1
+  );
+
+  const standoutSignal =
+    result.totalActions >= maxActions * 0.8
+      ? 'High action volume'
+      : result.averageDistancePerMatch >= maxDistance * 0.8
+      ? 'High workload profile'
+      : result.verifiedTracks >= maxVerified * 0.8
+      ? 'Strong match fidelity'
+      : 'Balanced profile';
+
+  const developmentFocus =
+    result.verifiedTracks === 0
+      ? 'Add more verified clips to sharpen the scouting confidence.'
+      : result.totalActions < maxActions * 0.6
+      ? 'Increase end-product volume in the next review window.'
+      : 'Maintain current output and keep tracking the same match patterns.';
+
+  const executiveSummary =
+    result.matchesPlayed === 0
+      ? 'No analyzed match data yet; this view will become more valuable as clips are verified.'
+      : `${result.player.name} shows ${standoutSignal.toLowerCase()} and a ${scoutingScore >= 75 ? 'premium' : 'solid'} scouting score.`;
+
+  return {
+    scoutingScore,
+    standoutSignal,
+    developmentFocus,
+    executiveSummary,
+    recommendation: scoutingScore >= 80 ? 'Strong shortlist candidate' : scoutingScore >= 60 ? 'Promising profile' : 'Needs more data',
+  };
 }
 
 function aggregatePlayerSummary(id, analyses) {
