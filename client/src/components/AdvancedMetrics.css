@@ -1,0 +1,155 @@
+.advanced-metrics {
+  width: 100%;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.metric-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  transition: all 0.2s;
+}
+
+.metric-card:hover {
+  background: rgba(248, 250, 252, 0.9);
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.metric-icon {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+
+.metric-content {
+  display: grid;
+  gap: 2px;
+}
+
+.metric-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+}
+
+/* Detailed view */
+.metrics-detailed {
+  display: grid;
+  gap: 18px;
+}
+
+.metrics-section {
+  display: grid;
+  gap: 12px;
+}
+
+.metrics-section h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.metric-bar-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.metric-bar-group {
+  display: grid;
+  gap: 8px;
+}
+
+.metric-bar-group label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+}
+
+.metric-bar-wrapper {
+  position: relative;
+  height: 28px;
+  background: rgba(15, 23, 42, 0.04);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.metric-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: width 0.3s ease;
+  min-width: 30px;
+}
+
+.metric-bar.high {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.metric-bar.medium {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.metric-bar.low {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.metric-note {
+  font-size: 0.75rem;
+  color: var(--text-muted, #94a3b8);
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  .metric-card {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .metric-icon {
+    font-size: 1.5rem;
+  }
+
+  .metric-value {
+    font-size: 1rem;
+  }
+
+  .metric-bar-row {
+    grid-template-columns: 1fr;
+  }
+}

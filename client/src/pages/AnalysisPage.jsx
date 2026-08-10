@@ -4,6 +4,7 @@ import axios from 'axios';
 import PlayerVerification from '../components/PlayerVerification';
 import Heatmap from '../components/Heatmap';
 import EventMap from '../components/EventMap';
+import AdvancedMetrics from '../components/AdvancedMetrics';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import { apiUrl } from '../utils/api';
@@ -266,6 +267,21 @@ const AnalysisPage = () => {
           </div>
         </section>
       )}
+
+      <section className="surface-card analysis-panel">
+        <div className="card-title-row">
+          <div>
+            <h2 className="card-title">Advanced metrics</h2>
+            <p className="card-subtitle">Expected goals (xG), expected assists (xA), possession, and tactical intensity analysis.</p>
+          </div>
+        </div>
+        <AdvancedMetrics 
+          actions={analysis.actions}
+          playerData={analysis.playerData}
+          ballPossession={analysis.ballPossession}
+          showDetailed={true}
+        />
+      </section>
 
       <section className="surface-card analysis-panel">
         <div className="card-title-row">
