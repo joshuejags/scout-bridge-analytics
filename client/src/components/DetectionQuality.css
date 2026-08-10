@@ -1,0 +1,331 @@
+.detection-quality {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  padding: 0;
+}
+
+.detection-quality-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--color-surface-secondary, #f5f5f5);
+  border-radius: var(--radius-md, 8px);
+}
+
+.quality-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+}
+
+.quality-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #333);
+}
+
+.quality-score-badge,
+.quality-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  border-radius: var(--radius-md, 8px);
+  font-weight: 600;
+  color: white;
+  min-width: 100px;
+}
+
+.quality-badge {
+  flex-direction: row;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.quality-excellent,
+.quality-excellent .quality-badge {
+  background: linear-gradient(135deg, #4caf50 0%, #2e7d32 100%);
+}
+
+.quality-good,
+.quality-good .quality-badge {
+  background: linear-gradient(135deg, #8bc34a 0%, #558b2f 100%);
+}
+
+.quality-fair,
+.quality-fair .quality-badge {
+  background: linear-gradient(135deg, #ffc107 0%, #f57f17 100%);
+}
+
+.quality-poor,
+.quality-poor .quality-badge {
+  background: linear-gradient(135deg, #ff9800 0%, #e65100 100%);
+}
+
+.quality-veryPoor,
+.quality-veryPoor .quality-badge {
+  background: linear-gradient(135deg, #f44336 0%, #c62828 100%);
+}
+
+.score-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.score-label {
+  font-size: 0.85rem;
+  opacity: 0.95;
+}
+
+.quality-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.quality-score {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.quality-hint {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #666);
+  margin: 0;
+}
+
+/* Metrics Grid */
+.quality-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.metric-item {
+  display: flex;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--color-surface-card, #fff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: var(--radius-md, 8px);
+  transition: all 0.2s ease;
+}
+
+.metric-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-color: var(--color-primary, #667eea);
+}
+
+.metric-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.metric-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.metric-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-secondary, #666);
+}
+
+.metric-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-primary, #667eea);
+}
+
+.confidence-bar {
+  height: 6px;
+  background: var(--color-surface-secondary, #f5f5f5);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.confidence-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.confidence-fill.coverage-fill {
+  background: linear-gradient(90deg, #4caf50 0%, #2e7d32 100%);
+}
+
+.metric-context {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #666);
+  line-height: 1.4;
+}
+
+/* Quality Insights */
+.quality-insights {
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #f9fafc 100%);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: var(--radius-md, 8px);
+}
+
+.quality-insights h4 {
+  margin: 0 0 1rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #333);
+}
+
+.insights-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.insight {
+  padding: 0.75rem 1rem;
+  background: white;
+  border-left: 4px solid var(--color-border, #e0e0e0);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 0.9rem;
+  color: var(--color-text-secondary, #666);
+}
+
+.insight.positive {
+  border-left-color: #4caf50;
+  color: #2e7d32;
+}
+
+.insight.warning {
+  border-left-color: #ff9800;
+  color: #e65100;
+}
+
+/* Quality Factors */
+.quality-factors {
+  padding: 1.5rem;
+  background: var(--color-surface-card, #fff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: var(--radius-md, 8px);
+}
+
+.quality-factors h4 {
+  margin: 0 0 1rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #333);
+}
+
+.factors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1.5rem;
+}
+
+.factor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.factor-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary, #666);
+}
+
+.factor-bar {
+  height: 8px;
+  background: var(--color-surface-secondary, #f5f5f5);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.factor-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 4px;
+}
+
+.factor-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-primary, #667eea);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .detection-quality {
+    gap: 1rem;
+  }
+
+  .quality-metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .metric-item {
+    padding: 1rem;
+  }
+
+  .quality-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .quality-score-badge {
+    align-self: flex-end;
+  }
+
+  .factors-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .detection-quality {
+    gap: 0.75rem;
+  }
+
+  .metric-item {
+    flex-direction: column;
+    padding: 0.75rem;
+  }
+
+  .metric-icon {
+    font-size: 1.5rem;
+  }
+
+  .metric-value {
+    font-size: 1.5rem;
+  }
+
+  .quality-metrics-grid {
+    gap: 0.75rem;
+  }
+
+  .quality-insights,
+  .quality-factors {
+    padding: 1rem;
+  }
+
+  .quality-header {
+    gap: 0.5rem;
+  }
+
+  .quality-header h3 {
+    font-size: 0.95rem;
+  }
+}

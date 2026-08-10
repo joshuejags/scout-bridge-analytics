@@ -6,6 +6,7 @@ import Heatmap from '../components/Heatmap';
 import EventMap from '../components/EventMap';
 import AdvancedMetrics from '../components/AdvancedMetrics';
 import AIReportInsights from '../components/AIReportInsights';
+import DetectionQuality from '../components/DetectionQuality';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import { apiUrl } from '../utils/api';
@@ -281,6 +282,27 @@ const AnalysisPage = () => {
           playerData={analysis.playerData}
           ballPossession={analysis.ballPossession}
           showDetailed={true}
+        />
+      </section>
+
+      <section className="surface-card analysis-panel">
+        <DetectionQuality 
+          metrics={{
+            totalActionsDetected: analysis.actions?.length || 0,
+            averageActionConfidence: analysis.actions?.length > 0 
+              ? analysis.actions.reduce((sum, a) => sum + (a.confidence || 0), 0) / analysis.actions.length
+              : 0,
+            detectionCoverage: analysis.actions?.length > 0
+              ? analysis.actions.filter(a => (a.confidence || 0) > 0.6).length / analysis.actions.length
+              : 0,
+            qualityScore: analysis.actions?.length > 0
+              ? Math.round((analysis.actions.reduce((sum, a) => sum + (a.confidence || 0), 0) / analysis.actions.length) * 100)
+              : 0,
+            detectionDensity: analysis.playerData?.length > 0 && analysis.ballData?.trackingData
+              ? analysis.actions?.length / ((analysis.playerData?.length || 1) * (analysis.ballData?.trackingData?.length || 1))
+              : 0,
+          }}
+          actions={analysis.actions}
         />
       </section>
 
