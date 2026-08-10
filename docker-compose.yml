@@ -6,7 +6,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: password123
     ports:
-      - '27017:27017'
+      - '27018:27017'
     volumes:
       - mongodb_data:/data/db
 
@@ -24,7 +24,7 @@ services:
       # this placeholder only avoids a hard crash on `up` with no config.
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - MAX_FILE_SIZE=500000000
-      - CLIENT_URL=http://localhost:3000
+      - CLIENT_URL=http://localhost:3001
       # Set real SMTP_* values to send real password-reset/verification
       # emails; unset (the default here) logs them to this container's
       # console instead — see server/utils/email.js.
@@ -34,7 +34,7 @@ services:
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-}
     ports:
-      - '5000:5000'
+      - '5002:5000'
     depends_on:
       - mongodb
     volumes:
@@ -47,9 +47,9 @@ services:
       dockerfile: Dockerfile
     container_name: scout-bridge-client
     environment:
-      - REACT_APP_API_URL=http://localhost:5000/api
+      - REACT_APP_API_URL=http://localhost:5002/api
     ports:
-      - '3000:3000'
+      - '3001:3000'
     depends_on:
       - server
     volumes:

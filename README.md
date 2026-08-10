@@ -429,6 +429,21 @@ Two services (server, client) pointing at this repo with different **Root Direct
 3. **Client**: Root Directory `client`. Railway detects `client/railway.json`, which builds via `client/Dockerfile.railway` (production static build + `serve`, distinct from the dev-only `client/Dockerfile`). Set `REACT_APP_API_URL` as a **build variable** (CRA bakes it into the bundle at build time; deploy the server first to get its URL).
 4. Once the client has a public URL, set the server's `CLIENT_URL` to it and redeploy the server.
 
+### Share a running copy on the web
+
+If you want other people to view a local/staging environment right now, publish the two ports through a tunnel:
+
+1. Keep the stack running (`docker compose up -d`).
+2. Expose the frontend and backend with a tunnel tool such as Cloudflare Tunnel or ngrok.
+3. Point the frontend at the public backend URL by setting `REACT_APP_API_URL=https://your-public-api-url/api`.
+4. Point the backend at the public frontend URL by setting `CLIENT_URL=https://your-public-frontend-url`.
+
+For production sharing, prefer a hosted deployment:
+
+- Frontend: Vercel, Netlify, or Cloudflare Pages
+- Backend: Railway, Render, Fly.io, or a VPS
+- Database: MongoDB Atlas
+
 ## Troubleshooting
 
 **MongoDB connection refused**: confirm `mongod` is running and `MONGODB_URI` in `.env` is correct, or switch to Atlas.
