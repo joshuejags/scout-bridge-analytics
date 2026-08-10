@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import NavBar from './components/NavBar';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -11,6 +11,7 @@ import WorkspaceLayout from './components/WorkspaceLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UploadProvider } from './context/UploadContext';
 import LoadingSpinner from './components/LoadingSpinner';
+import { initializePWA } from './utils/pwaManager';
 import './App.css';
 
 // Route-level code splitting: each page ships as its own chunk, loaded on
@@ -36,6 +37,12 @@ const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const VerifyEmailPage = lazy(() => import('./pages/VerifyEmailPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+// Phase 5 new pages
+const SubscriptionPage = lazy(() => import('./pages/SubscriptionPage'));
+const NotificationCenterPage = lazy(() => import('./pages/NotificationCenterPage'));
+const OrganizationSettingsPage = lazy(() => import('./pages/OrganizationSettingsPage'));
+const BillingHistoryPage = lazy(() => import('./pages/BillingHistoryPage'));
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'));
 
 // The "/" route is public: a signed-out visitor sees the marketing
 // LandingPage (interactive sections, no login wall) while a signed-in
@@ -78,6 +85,11 @@ const AppChrome = ({ children }) => {
 };
 
 function App() {
+  // Initialize PWA on app load
+  useEffect(() => {
+    initializePWA();
+  }, []);
+
   return (
     <Router>
       <AuthProvider>
@@ -193,6 +205,50 @@ function App() {
                     element={
                       <ShellRoute>
                         <PlayerProfilePage />
+                      </ShellRoute>
+                    }
+                  />
+                  {/* Phase 5: Subscription & Billing Routes */}
+                  <Route
+                    path="/subscription"
+                    element={
+                      <ShellRoute>
+                        <SubscriptionPage />
+                      </ShellRoute>
+                    }
+                  />
+                  <Route
+                    path="/billing-history"
+                    element={
+                      <ShellRoute>
+                        <BillingHistoryPage />
+                      </ShellRoute>
+                    }
+                  />
+                  {/* Phase 5: Notifications Route */}
+                  <Route
+                    path="/notifications"
+                    element={
+                      <ShellRoute>
+                        <NotificationCenterPage />
+                      </ShellRoute>
+                    }
+                  />
+                  {/* Phase 5: Organization Settings Route */}
+                  <Route
+                    path="/organization-settings"
+                    element={
+                      <ShellRoute>
+                        <OrganizationSettingsPage />
+                      </ShellRoute>
+                    }
+                  />
+                  {/* Phase 5: Admin Dashboard Route */}
+                  <Route
+                    path="/admin/dashboard"
+                    element={
+                      <ShellRoute allowedRoles={['admin']}>
+                        <AdminDashboardPage />
                       </ShellRoute>
                     }
                   />

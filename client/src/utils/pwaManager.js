@@ -247,4 +247,30 @@ class PWAManager {
 
 // Export singleton instance
 const pwaManager = new PWAManager();
+export const initializePWA = async () => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  if (!('serviceWorker' in navigator)) {
+    return false;
+  }
+
+  try {
+    if (document.readyState === 'loading') {
+      await new Promise((resolve) => window.addEventListener('load', resolve, { once: true }));
+    }
+
+    await pwaManager.register();
+    pwaManager.watchOnlineStatus();
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize PWA:', error);
+    return false;
+  }
+};
+
+export const canUsePWA = () => typeof window !== 'undefined' && 'serviceWorker' in navigator;
+export const installPWA = (deferredPrompt) => pwaManager.installApp(deferredPrompt);
+
 export default pwaManager;

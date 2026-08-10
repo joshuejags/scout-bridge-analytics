@@ -63,6 +63,15 @@ const NavBar = () => {
             <NavLink to="/players" onClick={closeMenu}>
               Players
             </NavLink>
+            <NavLink to="/notifications" onClick={closeMenu}>
+              Alerts
+            </NavLink>
+            <NavLink to="/subscription" onClick={closeMenu}>
+              Billing
+            </NavLink>
+            <NavLink to="/organization-settings" onClick={closeMenu}>
+              Org
+            </NavLink>
             <button type="button" className="nav-search-btn" onClick={openCommandPalette}>
               Search
               <span className="nav-shortcut">Ctrl K</span>
