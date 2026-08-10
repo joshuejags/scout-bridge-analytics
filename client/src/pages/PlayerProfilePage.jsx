@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import axios from 'axios';
 import LoadingSpinner from '../components/LoadingSpinner';
+import PerformanceTrends from '../components/PerformanceTrends';
 import Toast from '../components/Toast';
 import { apiUrl } from '../utils/api';
 import './PlayerProfilePage.css';
@@ -125,6 +126,26 @@ const PlayerProfilePage = () => {
           </div>
         </section>
       </div>
+
+      {profile.recentMatches.length > 1 && (
+        <section className="surface-card player-profile-summary">
+          <div className="card-title-row">
+            <div>
+              <h2 className="card-title">Performance trends</h2>
+              <p className="card-subtitle">Distance covered and activity progression across recent matches.</p>
+            </div>
+          </div>
+          <PerformanceTrends
+            data={profile.recentMatches.map((match, idx) => ({
+              label: `M${idx + 1}`,
+              value: Math.round(match.distanceCovered / 1000) * 100,
+            }))}
+            title="Distance trend"
+            metric="distance"
+            unit="m"
+          />
+        </section>
+      )}
 
       <section className="surface-card player-profile-summary">
         <div className="card-title-row">
