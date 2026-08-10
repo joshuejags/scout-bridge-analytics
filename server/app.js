@@ -86,6 +86,9 @@ app.use('/api/players', requireAuth, require('./routes/playerRoutes'));
 app.use('/api/scouting', requireAuth, require('./routes/scoutingRoutes'));
 app.use('/api/reports', requireAuth, require('./routes/reportRoutes'));
 app.use('/api/filter-presets', requireAuth, require('./routes/filterPresetRoutes'));
+app.use('/api/organizations', require('./routes/organizationRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/subscription', require('./routes/subscriptionRoutes'));
 // Admin-only endpoints (requireAuth already applied by the mount above in
 // server.js; additionally requireRole('admin') is enforced per-route).
 app.use('/api/admin', requireAuth, require('./routes/adminRoutes'));

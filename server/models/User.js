@@ -27,6 +27,43 @@ const userSchema = new mongoose.Schema(
     verifyTokenExpires: { type: Date, select: false },
     resetTokenHash: { type: String, select: false },
     resetTokenExpires: { type: Date, select: false },
+
+    // Subscription reference
+    subscriptionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Subscription',
+    },
+
+    // Organizations the user belongs to
+    organizations: [
+      {
+        organizationId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Organization',
+        },
+        role: String,
+      },
+    ],
+
+    // Primary organization
+    primaryOrganizationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
+    },
+
+    // User preferences
+    preferences: {
+      emailNotifications: { type: Boolean, default: true },
+      inAppNotifications: { type: Boolean, default: true },
+      marketingEmails: { type: Boolean, default: false },
+      theme: { type: String, enum: ['light', 'dark'], default: 'light' },
+      timezone: { type: String, default: 'UTC' },
+    },
+
+    // Profile information
+    avatar: String, // S3 URL
+    bio: String,
+    phone: String,
   },
   { timestamps: true }
 );
