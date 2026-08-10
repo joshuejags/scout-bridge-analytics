@@ -428,6 +428,7 @@ Two services (server, client) pointing at this repo with different **Root Direct
 2. **Server**: Root Directory `server`. Railway detects `server/Dockerfile` (health check: `/api/health`). Add a **Volume** at `/app/uploads` so uploads survive a redeploy (or use `STORAGE_BACKEND=s3` instead; see Environment Variables). Set `NODE_ENV`, `MONGODB_URI`, `JWT_SECRET`, `CLIENT_URL`, and `ANALYSIS_WORKER_POOL_SIZE=1` (smaller Railway plans don't have headroom for 2+ concurrent torch/YOLO/EasyOCR workers).
 3. **Client**: Root Directory `client`. Railway detects `client/railway.json`, which builds via `client/Dockerfile.railway` (production static build + `serve`, distinct from the dev-only `client/Dockerfile`). Set `REACT_APP_API_URL` as a **build variable** (CRA bakes it into the bundle at build time; deploy the server first to get its URL).
 4. Once the client has a public URL, set the server's `CLIENT_URL` to it and redeploy the server.
+5. If you do not have a custom domain yet, use Railway's generated public URLs for both services (for example, the `*.up.railway.app` URL assigned to the server and client services). The app works fine on those Railway subdomains.
 
 ### Share a running copy on the web
 
