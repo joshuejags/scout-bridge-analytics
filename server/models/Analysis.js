@@ -98,6 +98,20 @@ const AnalysisSchema = new mongoose.Schema(
     // Indexed: looked up via Analysis.findOne({ video }) every time a
     // report page loads (see analysisController.getAnalysisByVideo).
     video: { type: mongoose.Schema.Types.ObjectId, ref: 'Video', required: true, index: true },
+    // Track the AI model version used for this analysis for reproducibility
+    // and to enable model comparison across analyses
+    modelVersion: {
+      type: String,
+      default: 'yolov8n-v0.1.0',
+      index: true,
+    },
+    // Detection configuration and model metadata for audit trail
+    detectionConfig: {
+      confidenceThreshold: { type: Number, default: 0.5 },
+      iouThreshold: { type: Number, default: 0.45 },
+      modelWeightsUrl: String,
+      modelTimestamp: Date,
+    },
     playerData: { type: [PlayerDataSchema], default: [] },
     ballData: {
       trackingData: { type: [BallTrackingSchema], default: [] },

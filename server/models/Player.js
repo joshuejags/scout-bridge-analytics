@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const playerSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
+    name: { type: String, required: true, index: true },
     // Indexed: queried via Player.find({ team: { $in: ... } }) every time
     // an analysis run persists results (see analysisController.js).
     team: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', index: true },
