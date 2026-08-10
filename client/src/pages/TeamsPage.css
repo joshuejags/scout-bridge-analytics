@@ -53,8 +53,19 @@
 .team-card {
   padding: 18px;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 14px;
+}
+
+.team-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.team-card-actions .button {
+  flex: 1;
+  min-width: 120px;
 }
 
 .team-card strong {

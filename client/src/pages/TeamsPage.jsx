@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import Toast from '../components/Toast';
 import SearchFilter from '../components/SearchFilter';
@@ -159,9 +160,14 @@ const TeamsPage = () => {
                   <strong>{team.name}</strong>
                   <p>{team.description || 'No description'}</p>
                 </div>
-                <button type="button" className="button button-danger" onClick={() => handleDelete(team._id)}>
-                  Delete
-                </button>
+                <div className="team-card-actions">
+                  <Link to={`/teams/${team._id}/analytics`} className="button button-secondary">
+                    View analytics
+                  </Link>
+                  <button type="button" className="button button-danger" onClick={() => handleDelete(team._id)}>
+                    Delete
+                  </button>
+                </div>
               </article>
             ))}
           </div>

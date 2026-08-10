@@ -20,6 +20,7 @@ const Home = lazy(() => import('./pages/Home'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const AnalysisPage = lazy(() => import('./pages/AnalysisPage'));
 const TeamsPage = lazy(() => import('./pages/TeamsPage'));
+const TeamAnalyticsPage = lazy(() => import('./pages/TeamAnalyticsPage'));
 const PlayersPage = lazy(() => import('./pages/PlayersPage'));
 const PlayerComparisonPage = lazy(() => import('./pages/PlayerComparisonPage'));
 const PlayerProfilePage = lazy(() => import('./pages/PlayerProfilePage'));
@@ -160,6 +161,14 @@ function App() {
                     element={
                       <ShellRoute>
                         <TeamsPage />
+                      </ShellRoute>
+                    }
+                  />
+                  <Route
+                    path="/teams/:teamId/analytics"
+                    element={
+                      <ShellRoute>
+                        <TeamAnalyticsPage />
                       </ShellRoute>
                     }
                   />
