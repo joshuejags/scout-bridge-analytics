@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { apiUrl } from '../utils/api';
@@ -20,11 +20,9 @@ const NotificationCenterPage = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const authHeaders = {
-    Authorization: `Bearer ${token}`,
-  };
+  const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -39,7 +37,7 @@ const NotificationCenterPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authHeaders]);
 
   useEffect(() => {
     if (!token) {
@@ -47,7 +45,7 @@ const NotificationCenterPage = () => {
       return;
     }
     loadData();
-  }, [token]);
+  }, [loadData, token]);
 
   const markAsRead = async (notificationId) => {
     try {

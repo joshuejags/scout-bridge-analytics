@@ -38,7 +38,7 @@ const BillingHistoryPage = () => {
     } else {
       setLoading(false);
     }
-  }, [token]);
+  }, [authHeaders, token]);
 
   if (loading) {
     return <LoadingSpinner fullScreen message="Loading billing history..." />;

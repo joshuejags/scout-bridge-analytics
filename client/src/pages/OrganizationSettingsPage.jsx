@@ -40,7 +40,7 @@ const OrganizationSettingsPage = () => {
       return;
     }
     loadOrganizations();
-  }, [token]);
+  }, [authHeaders, token]);
 
   const selectOrganization = async (organization) => {
     setSelectedOrganization(organization);

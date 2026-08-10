@@ -1,42 +1,47 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { apiUrl } from '../utils/api';
 import './SubscriptionPage.css';
 
 const SubscriptionPage = () => {
-  const { user } = useAuth();
+  const { token } = useAuth();
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [upgrading, setUpgrading] = useState(false);
 
   useEffect(() => {
-    fetchSubscription();
-  }, []);
+    const fetchSubscription = async () => {
+      try {
+        const response = await fetch(apiUrl('/subscription'), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) throw new Error('Failed to fetch subscription');
+        const data = await response.json();
+        setSubscription(data.subscription || data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const fetchSubscription = async () => {
-    try {
-      const response = await fetch('/api/subscription', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-      if (!response.ok) throw new Error('Failed to fetch subscription');
-      const data = await response.json();
-      setSubscription(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
+    if (token) {
+      fetchSubscription();
+    } else {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   const handleUpgrade = async (plan) => {
     setUpgrading(true);
     try {
-      const response = await fetch('/api/subscription/upgrade', {
+      const response = await fetch(apiUrl('/subscription/upgrade'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ plan }),
       });
@@ -54,10 +59,10 @@ const SubscriptionPage = () => {
 
   const handleBillingPortal = async () => {
     try {
-      const response = await fetch('/api/subscription/billing-portal', {
+      const response = await fetch(apiUrl('/subscription/billing-portal'), {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${token}`,
         },
       });
       if (!response.ok) throw new Error('Failed to open billing portal');
@@ -177,9 +182,7 @@ const SubscriptionPage = () => {
           {plans.map((plan) => (
             <div
               key={plan.name}
-              className={`plan-card ${plan.recommended ? 'recommended' : ''} ${
-                plan.current ? 'current' : ''
-              }`}
+              className={`plan-card ${plan.recommended ? 'recommended' : ''} ${plan.current ? 'current' : ''}`}
             >
               {plan.recommended && <div className="recommended-badge">Recommended</div>}
               {plan.current && <div className="current-badge">Current Plan</div>}
@@ -193,12 +196,7 @@ const SubscriptionPage = () => {
               <ul className="features-list">
                 {plan.features.map((feature, idx) => (
                   <li key={idx}>
-                    <svg
-                      className="check-icon"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                    >
+                    <svg className="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                       <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
                     {feature}
@@ -207,11 +205,7 @@ const SubscriptionPage = () => {
               </ul>
 
               {!plan.current && (
-                <button
-                  className="upgrade-btn"
-                  onClick={() => handleUpgrade(plan.name)}
-                  disabled={upgrading}
-                >
+                <button className="upgrade-btn" onClick={() => handleUpgrade(plan.name)} disabled={upgrading}>
                   {upgrading ? 'Processing...' : 'Upgrade to ' + plan.name}
                 </button>
               )}
@@ -229,24 +223,12 @@ const SubscriptionPage = () => {
               <div className="usage-bar">
                 <div
                   className="usage-fill"
-                  style={{
-                    width: `${(subscription.usageMetrics?.videosUploaded || 0) / 
-                      (subscription.plan === 'Free' ? 5 : 
-                       subscription.plan === 'Scout Pro' ? 100 : 
-                       subscription.plan === 'Club Pro' ? 500 : 99999) * 100}%`,
-                  }}
+                  style={{ width: `${(subscription.usageMetrics?.videosUploaded || 0) / (subscription.plan === 'Free' ? 5 : subscription.plan === 'Scout Pro' ? 100 : subscription.plan === 'Club Pro' ? 500 : 99999) * 100}%` }}
                 ></div>
               </div>
               <p className="usage-text">
                 {subscription.usageMetrics?.videosUploaded || 0} of{' '}
-                {subscription.plan === 'Free'
-                  ? '5'
-                  : subscription.plan === 'Scout Pro'
-                  ? '100'
-                  : subscription.plan === 'Club Pro'
-                  ? '500'
-                  : 'unlimited'}{' '}
-                videos
+                {subscription.plan === 'Free' ? '5' : subscription.plan === 'Scout Pro' ? '100' : subscription.plan === 'Club Pro' ? '500' : 'unlimited'} videos
               </p>
             </div>
 
@@ -255,24 +237,12 @@ const SubscriptionPage = () => {
               <div className="usage-bar">
                 <div
                   className="usage-fill"
-                  style={{
-                    width: `${(subscription.usageMetrics?.storageUsed || 0) / 
-                      (subscription.plan === 'Free' ? 10 : 
-                       subscription.plan === 'Scout Pro' ? 500 : 
-                       subscription.plan === 'Club Pro' ? 2000 : 99999) * 100}%`,
-                  }}
+                  style={{ width: `${(subscription.usageMetrics?.storageUsed || 0) / (subscription.plan === 'Free' ? 10 : subscription.plan === 'Scout Pro' ? 500 : subscription.plan === 'Club Pro' ? 2000 : 99999) * 100}%` }}
                 ></div>
               </div>
               <p className="usage-text">
-                {(subscription.usageMetrics?.storageUsed || 0).toFixed(2)} of{' '}
-                {subscription.plan === 'Free'
-                  ? '10'
-                  : subscription.plan === 'Scout Pro'
-                  ? '500'
-                  : subscription.plan === 'Club Pro'
-                  ? '2000'
-                  : 'unlimited'}{' '}
-                GB
+                {subscription.usageMetrics?.storageUsed || 0} of{' '}
+                {subscription.plan === 'Free' ? '10' : subscription.plan === 'Scout Pro' ? '500' : subscription.plan === 'Club Pro' ? '2000' : 'unlimited'} GB
               </p>
             </div>
           </div>
