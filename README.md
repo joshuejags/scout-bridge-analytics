@@ -424,6 +424,8 @@ Brings up MongoDB, the Express server, and the CRA dev server. The server image 
 
 Two services (server, client) pointing at this repo with different **Root Directory** values, plus a MongoDB database. `server/railway.json` / `client/railway.json` are already committed, so Railway picks up build config automatically once each service's root directory is set.
 
+For the current single-service Railway deployment path, the backend serves the built frontend from the repo root `Dockerfile`, so only one Railway app plus MongoDB is needed.
+
 1. **Database**: add Railway's MongoDB plugin, or point at an external MongoDB Atlas cluster.
 2. **Server**: Root Directory `server`. Railway detects `server/Dockerfile` (health check: `/api/health`). Add a **Volume** at `/app/uploads` so uploads survive a redeploy (or use `STORAGE_BACKEND=s3` instead; see Environment Variables). Set `NODE_ENV`, `MONGODB_URI`, `JWT_SECRET`, `CLIENT_URL`, and `ANALYSIS_WORKER_POOL_SIZE=1` (smaller Railway plans don't have headroom for 2+ concurrent torch/YOLO/EasyOCR workers).
 3. **Client**: Root Directory `client`. Railway detects `client/railway.json`, which builds via `client/Dockerfile.railway` (production static build + `serve`, distinct from the dev-only `client/Dockerfile`). Set `REACT_APP_API_URL` as a **build variable** (CRA bakes it into the bundle at build time; deploy the server first to get its URL).

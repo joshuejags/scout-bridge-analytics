@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const mongoose = require('mongoose');
+const fs = require('fs');
 const path = require('path');
 const { requireAuth } = require('./middleware/auth');
 const authorizeUploadAccess = require('./middleware/uploadAccess');
@@ -33,6 +34,9 @@ app.use(express.json());
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
 
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || 'uploads');
+const clientBuildDir = path.resolve(__dirname, '../client/build');
+const clientIndexFile = path.join(clientBuildDir, 'index.html');
+const hasClientBuild = fs.existsSync(clientIndexFile);
 
 // A video stored on S3 (see utils/storage.js) has nothing for
 // express.static to serve locally — proxy it through instead, after the
@@ -95,6 +99,16 @@ app.use('/api/monitoring', requireAuth, require('./routes/monitoringRoutes'));
 // Admin-only endpoints (requireAuth already applied by the mount above in
 // server.js; additionally requireRole('admin') is enforced per-route).
 app.use('/api/admin', requireAuth, require('./routes/adminRoutes'));
+
+if (hasClientBuild) {
+  app.use(express.static(clientBuildDir));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+      return next();
+    }
+    return res.sendFile(clientIndexFile);
+  });
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
