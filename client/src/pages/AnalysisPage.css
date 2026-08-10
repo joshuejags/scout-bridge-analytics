@@ -210,6 +210,10 @@
   padding: 22px;
 }
 
+.event-map-card {
+  padding: 22px;
+}
+
 .player-stats-table {
   min-width: 980px;
 }

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import axios from 'axios';
 import PlayerVerification from '../components/PlayerVerification';
 import Heatmap from '../components/Heatmap';
+import EventMap from '../components/EventMap';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import { apiUrl } from '../utils/api';
@@ -404,6 +405,16 @@ const AnalysisPage = () => {
           </div>
         </div>
         <Heatmap grid={analysis.heatmapData.grid} sport={analysis.video?.sport} />
+      </section>
+
+      <section className="surface-card event-map-card analysis-panel">
+        <div className="card-title-row">
+          <div>
+            <h2 className="card-title">Event map</h2>
+            <p className="card-subtitle">Shot, pass, and tackle locations on the pitch.</p>
+          </div>
+        </div>
+        <EventMap actions={analysis.actions} sport={analysis.video?.sport} />
       </section>
 
       {analysis.tacticalData?.teams?.length > 0 && (
