@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PWA Registration & Management
  * Handles service worker registration, update checking, and PWA features
  */
@@ -123,12 +123,11 @@ class PWAManager {
 
     try {
       const subscription = await this.registration.pushManager.getSubscription();
-      
+
       if (subscription) {
         return subscription;
       }
 
-      // Request new subscription
       const vapidPublicKey = process.env.REACT_APP_VAPID_PUBLIC_KEY;
       if (!vapidPublicKey) {
         console.error('VAPID public key not configured');
@@ -152,7 +151,7 @@ class PWAManager {
    */
   urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
 
     const rawData = window.atob(base64);
     const outputArray = new Uint8Array(rawData.length);
@@ -202,8 +201,8 @@ class PWAManager {
    */
   isRunningAsPWA() {
     return window.matchMedia('(display-mode: standalone)').matches ||
-           window.navigator.standalone === true ||
-           document.referrer.includes('android-app://');
+      window.navigator.standalone === true ||
+      document.referrer.includes('android-app://');
   }
 
   /**
@@ -245,7 +244,6 @@ class PWAManager {
   }
 }
 
-// Export singleton instance
 const pwaManager = new PWAManager();
 export const initializePWA = async () => {
   if (typeof window === 'undefined') {

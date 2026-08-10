@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -13,6 +13,7 @@ const AdminPortalPage = () => {
   const [summary, setSummary] = useState(null);
   const [users, setUsers] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [monitoring, setMonitoring] = useState({ summary: null, alerts: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
@@ -23,14 +24,24 @@ const AdminPortalPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const [summaryRes, usersRes, jobsRes] = await Promise.all([
+      const [summaryRes, usersRes, jobsRes, organizationsRes] = await Promise.all([
         axios.get(apiUrl('/admin/summary')),
         axios.get(apiUrl('/auth/users')),
         axios.get(apiUrl('/admin/jobs')),
+        axios.get(apiUrl('/organizations/my')),
       ]);
       setSummary(summaryRes.data);
       setUsers(usersRes.data);
       setJobs(jobsRes.data.items || []);
+
+      const orgs = organizationsRes.data.organizations || [];
+      if (orgs[0]?._id) {
+        const [auditSummaryRes, alertsRes] = await Promise.all([
+          axios.get(apiUrl(`/audit/organizations/${orgs[0]._id}/audit-summary?days=30`)),
+          axios.get(apiUrl(`/audit/organizations/${orgs[0]._id}/security-alerts`)),
+        ]);
+        setMonitoring({ summary: auditSummaryRes.data, alerts: alertsRes.data.alerts || [] });
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Unable to load the admin portal.');
     } finally {
@@ -126,6 +137,45 @@ const AdminPortalPage = () => {
               <p className="kpi-card__meta">Processing items that need moderation</p>
             </div>
           </div>
+
+          <section className="surface-card admin-card monitoring-card">
+            <div className="card-title-row">
+              <div>
+                <h2 className="card-title">Platform operations overview</h2>
+                <p className="card-subtitle">Monitor governance signals and security events without leaving the admin workspace.</p>
+              </div>
+            </div>
+            <div className="monitoring-grid">
+              <div className="kpi-card">
+                <p className="kpi-card__label">Audit events</p>
+                <p className="kpi-card__value">{monitoring.summary?.totalEvents ?? '—'}</p>
+                <p className="kpi-card__meta">Last 30 days</p>
+              </div>
+              <div className="kpi-card">
+                <p className="kpi-card__label">Security alerts</p>
+                <p className="kpi-card__value">{monitoring.alerts.length}</p>
+                <p className="kpi-card__meta">High-priority activity</p>
+              </div>
+              <div className="kpi-card">
+                <p className="kpi-card__label">Critical events</p>
+                <p className="kpi-card__value">{monitoring.summary?.criticalEvents ?? '—'}</p>
+                <p className="kpi-card__meta">Needs investigation</p>
+              </div>
+            </div>
+
+            {monitoring.alerts.length > 0 ? (
+              <div className="alert-list">
+                {monitoring.alerts.slice(0, 5).map((alert, index) => (
+                  <div key={`${alert.action}-${index}`} className="alert-item">
+                    <strong>{alert.action}</strong>
+                    <p>{alert.details?.details || alert.details || 'Security event detected'}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state">No security alerts in the last 7 days.</div>
+            )}
+          </section>
 
           <div className="admin-layout">
             <section className="surface-card admin-card">
