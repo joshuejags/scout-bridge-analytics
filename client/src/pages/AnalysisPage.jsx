@@ -5,6 +5,7 @@ import PlayerVerification from '../components/PlayerVerification';
 import Heatmap from '../components/Heatmap';
 import EventMap from '../components/EventMap';
 import AdvancedMetrics from '../components/AdvancedMetrics';
+import AIReportInsights from '../components/AIReportInsights';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
 import { apiUrl } from '../utils/api';
@@ -281,6 +282,16 @@ const AnalysisPage = () => {
           ballPossession={analysis.ballPossession}
           showDetailed={true}
         />
+      </section>
+
+      <section className="surface-card analysis-panel">
+        <div className="card-title-row">
+          <div>
+            <h2 className="card-title">AI-Assisted Scout Report</h2>
+            <p className="card-subtitle">Automated performance analysis with AI-generated insights, strengths, weaknesses, and development recommendations.</p>
+          </div>
+        </div>
+        <AIReportInsights analysis={analysis} />
       </section>
 
       <section className="surface-card analysis-panel">
