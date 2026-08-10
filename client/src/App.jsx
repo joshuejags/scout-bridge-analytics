@@ -11,6 +11,7 @@ import WorkspaceLayout from './components/WorkspaceLayout';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UploadProvider } from './context/UploadContext';
 import LoadingSpinner from './components/LoadingSpinner';
+import PwaStatusBanner from './components/PwaStatusBanner';
 import { initializePWA } from './utils/pwaManager';
 import './App.css';
 
@@ -76,6 +77,7 @@ const AppChrome = ({ children }) => {
   return (
     <div className="App">
       {(!isAuthenticated || loading) && <NavBar />}
+      <PwaStatusBanner />
       <EmailVerificationBanner />
       <UploadModal />
       <CommandPalette />

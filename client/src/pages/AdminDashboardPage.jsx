@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import './AdminDashboardPage.css';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const AdminDashboardPage = () => {
+  const { token } = useAuth();
   const [health, setHealth] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [metrics, setMetrics] = useState(null);
@@ -10,25 +12,19 @@ const AdminDashboardPage = () => {
   const [error, setError] = useState(null);
   const [selectedMetric, setSelectedMetric] = useState('api_latency');
 
-  useEffect(() => {
-    fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       const [healthRes, alertsRes, metricsRes] = await Promise.all([
         fetch('/api/monitoring/health', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          headers: { Authorization: `Bearer ${token}` },
         }),
         fetch('/api/monitoring/alerts', {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          headers: { Authorization: `Bearer ${token}` },
         }),
         fetch(
           `/api/monitoring/metrics?metric=${selectedMetric}&startDate=${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()}&endDate=${new Date().toISOString()}`,
           {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+            headers: { Authorization: `Bearer ${token}` },
           }
         ),
       ]);
@@ -41,7 +37,13 @@ const AdminDashboardPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedMetric, token]);
+
+  useEffect(() => {
+    fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchDashboardData]);
 
   const getHealthColor = (status) => {
     const colors = {
@@ -155,7 +157,7 @@ const AdminDashboardPage = () => {
                         // Call API to acknowledge
                         fetch(`/api/monitoring/alerts/${alert._id}/acknowledge`, {
                           method: 'PATCH',
-                          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                          headers: { Authorization: `Bearer ${token}` },
                         }).then(() => fetchDashboardData());
                       }}
                     >
@@ -169,7 +171,7 @@ const AdminDashboardPage = () => {
                         // Call API to resolve
                         fetch(`/api/monitoring/alerts/${alert._id}/resolve`, {
                           method: 'PATCH',
-                          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                          headers: { Authorization: `Bearer ${token}` },
                         }).then(() => fetchDashboardData());
                       }}
                     >

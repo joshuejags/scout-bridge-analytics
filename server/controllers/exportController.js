@@ -1,6 +1,6 @@
 const ExportService = require('../services/ExportService');
 const ReportExport = require('../models/ReportExport');
-const Report = require('../models/Report');
+const SavedReport = require('../models/SavedReport');
 const { validateObjectId, validatePagination } = require('../utils/validators');
 
 exports.createExport = async (req, res) => {
@@ -55,7 +55,7 @@ exports.generateExport = async (req, res) => {
 
     // Fetch data based on export type
     if (exportDoc.reportId) {
-      const report = await Report.findById(exportDoc.reportId);
+      const report = await SavedReport.findById(exportDoc.reportId);
       data = report ? report.toObject() : {};
     }
 

@@ -1,11 +1,11 @@
 const express = require('express');
-const { authenticate } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 const notificationController = require('../controllers/notificationController');
 
 const router = express.Router();
 
 // All notification routes require authentication
-router.use(authenticate);
+router.use(requireAuth);
 
 /**
  * GET /api/notifications - Get all notifications

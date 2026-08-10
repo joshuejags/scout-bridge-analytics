@@ -3,7 +3,7 @@ const PDFDocument = require('pdfkit');
 const csv = require('csv-stringify');
 const fs = require('fs');
 const path = require('path');
-const Report = require('../models/Report');
+const SavedReport = require('../models/SavedReport');
 const ReportExport = require('../models/ReportExport');
 const AuditService = require('./AuditService');
 

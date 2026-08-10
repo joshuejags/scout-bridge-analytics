@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { apiUrl } from '../utils/api';
@@ -12,7 +12,7 @@ const BillingHistoryPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const authHeaders = { Authorization: `Bearer ${token}` };
+  const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
   useEffect(() => {
     const loadBilling = async () => {

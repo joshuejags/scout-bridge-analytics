@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useUpload } from '../context/UploadContext';
 import { roleLabels, workspaceNavigation } from '../config/workspace';
+import MobileBottomNav from './MobileBottomNav';
 import './WorkspaceLayout.css';
 
 const breadcrumbLabels = {
@@ -138,6 +139,7 @@ const WorkspaceLayout = ({ children }) => {
         </header>
 
         <div className="workspace-content">{children}</div>
+        <MobileBottomNav />
       </div>
     </div>
   );

@@ -205,7 +205,7 @@ const generateRecommendationScore = (stats, metrics, actions) => {
 export const generateAIReport = (analysis) => {
   if (!analysis) return null;
 
-  const { playerData = [], actions = [], ballPossession = [], video = {} } = analysis;
+  const { playerData = [], actions = [], video = {} } = analysis;
   
   // Get team-specific player data
   const teamPlayers = playerData.filter(p => p);

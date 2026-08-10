@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PWA Registration & Management
  * Handles service worker registration, update checking, and PWA features
  */
@@ -13,7 +13,7 @@ class PWAManager {
    * Register service worker
    */
   async register() {
-    if (!('serviceWorker' in navigator)) {
+    if (!navigator.serviceWorker || typeof navigator.serviceWorker.register !== 'function') {
       console.log('Service Workers not supported');
       return false;
     }
@@ -250,7 +250,7 @@ export const initializePWA = async () => {
     return false;
   }
 
-  if (!('serviceWorker' in navigator)) {
+  if (!navigator.serviceWorker || typeof navigator.serviceWorker.register !== 'function') {
     return false;
   }
 
@@ -268,7 +268,7 @@ export const initializePWA = async () => {
   }
 };
 
-export const canUsePWA = () => typeof window !== 'undefined' && 'serviceWorker' in navigator;
+export const canUsePWA = () => typeof window !== 'undefined' && !!navigator.serviceWorker && typeof navigator.serviceWorker.register === 'function';
 export const installPWA = (deferredPrompt) => pwaManager.installApp(deferredPrompt);
 
 export default pwaManager;

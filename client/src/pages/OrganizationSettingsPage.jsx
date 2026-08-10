@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { apiUrl } from '../utils/api';
@@ -17,30 +17,32 @@ const OrganizationSettingsPage = () => {
 
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
 
-  const loadOrganizations = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await axios.get(apiUrl('/organizations/my'), { headers: authHeaders });
-      const orgs = response.data.organizations || [];
-      setOrganizations(orgs);
-      if (!selectedOrganization && orgs[0]) {
-        setSelectedOrganization(orgs[0]);
-      }
-    } catch (err) {
-      setError(err.response?.data?.error || 'Unable to load organizations.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (!token) {
       setLoading(false);
       return;
     }
+
+    const loadOrganizations = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const response = await axios.get(apiUrl('/organizations/my'), { headers: authHeaders });
+        const orgs = response.data.organizations || [];
+        setOrganizations(orgs);
+        if (!selectedOrganization && orgs[0]) {
+          setSelectedOrganization(orgs[0]);
+        }
+      } catch (err) {
+        setError(err.response?.data?.error || 'Unable to load organizations.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadOrganizations();
-  }, [authHeaders, token]);
+  }, [authHeaders, selectedOrganization, token]);
+
 
   const selectOrganization = async (organization) => {
     setSelectedOrganization(organization);

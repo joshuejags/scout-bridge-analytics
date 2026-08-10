@@ -225,4 +225,8 @@
   .workspace-topbar__hint {
     display: none;
   }
+
+  .workspace-content {
+    padding-bottom: 84px;
+  }
 }

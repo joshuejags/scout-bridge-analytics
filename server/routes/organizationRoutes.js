@@ -1,11 +1,11 @@
 const express = require('express');
-const { authenticate } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 const organizationController = require('../controllers/organizationController');
 
 const router = express.Router();
 
 // All organization routes require authentication
-router.use(authenticate);
+router.use(requireAuth);
 
 /**
  * POST /api/organizations - Create organization
