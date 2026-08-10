@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import Toast from './Toast';
 import { uploadFileInChunks } from '../utils/chunkedUpload';
+import { apiUrl } from '../utils/api';
 import './VideoUpload.css';
 
 const SPORTS = [
@@ -30,8 +31,8 @@ const VideoUpload = ({ onUploadSuccess }) => {
     const fetchMeta = async () => {
       try {
         const [teamRes, playerRes] = await Promise.all([
-          axios.get(`${process.env.REACT_APP_API_URL}/teams`),
-          axios.get(`${process.env.REACT_APP_API_URL}/players`),
+          axios.get(apiUrl('/teams')),
+          axios.get(apiUrl('/players')),
         ]);
         setTeams(teamRes.data);
         setPlayers(playerRes.data);
@@ -102,7 +103,7 @@ const VideoUpload = ({ onUploadSuccess }) => {
         // downloads the file in the background; see
         // videoController.importVideoFromUrl. VideoList picks up progress
         // from there over the video:import:* socket events.
-        const response = await axios.post(`${process.env.REACT_APP_API_URL}/videos/import-url`, {
+        const response = await axios.post(apiUrl('/videos/import-url'), {
           url: videoUrl.trim(),
           sport,
           team: selectedTeam || undefined,
@@ -122,8 +123,13 @@ const VideoUpload = ({ onUploadSuccess }) => {
   };
 
   return (
-    <div className="video-upload">
-      <h2>Upload Match Highlight</h2>
+    <div className="video-upload surface-card">
+      <div className="card-title-row">
+        <div>
+          <h2 className="card-title">Upload match highlight</h2>
+          <p className="card-subtitle">Add a video file or import a supported link for analysis.</p>
+        </div>
+      </div>
       <form onSubmit={handleUpload}>
         <div className="form-row">
           <label htmlFor="sport">Sport</label>
@@ -251,6 +257,11 @@ const VideoUpload = ({ onUploadSuccess }) => {
             ? 'Upload Video'
             : 'Import Video'}
         </button>
+        {uploading && mode === 'file' && (
+          <div className="upload-progress" aria-label="Upload progress">
+            <span style={{ width: `${progress}%` }} />
+          </div>
+        )}
       </form>
       {message && <Toast type="success" message={message} onClose={() => setMessage(null)} />}
       {error && <Toast type="error" message={error} onClose={() => setError(null)} />}

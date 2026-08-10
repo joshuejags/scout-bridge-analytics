@@ -48,7 +48,7 @@ describe('Home navigation', () => {
 
     render(<App />);
 
-    const homeLink = await screen.findByRole('link', { name: 'Home' });
+    const [homeLink] = await screen.findAllByRole('link', { name: 'Overview' });
     expect(homeLink).toHaveAttribute('href', '/');
 
     await userEvent.click(homeLink);
@@ -61,35 +61,45 @@ describe('Home navigation', () => {
     render(<App />);
 
     expect(await screen.findByRole('link', { name: /get started free/i })).toBeInTheDocument();
-    expect(screen.queryByText(/here's what's happening with your match analysis/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/scout workspace/i)).not.toBeInTheDocument();
   });
 });
 
-describe('Upload access', () => {
+describe('Role-aware shell', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     window.localStorage.clear();
   });
 
-  // Upload used to only exist as a toggle panel on Home - nowhere else in
-  // the app could add a video. The NavBar's "+ Upload Video" button (see
-  // UploadContext/UploadModal) is meant to fix that by being reachable
-  // from any authenticated page, not just Home.
-  it('opens the upload form from the nav bar while on a page that has no upload UI of its own', async () => {
+  it('shows the admin portal in navigation and loads the admin page for admin users', async () => {
     window.localStorage.setItem('sba_token', 'a-valid-token');
-    window.history.pushState({}, '', '/teams');
+    window.history.pushState({}, '', '/admin');
     axios.get.mockImplementation((url) => {
       if (url.includes('/auth/me')) {
-        return Promise.resolve({ data: { name: 'Ada Scout', email: 'ada@example.com', role: 'scout' } });
+        return Promise.resolve({ data: { name: 'Ada Admin', email: 'ada@example.com', role: 'admin' } });
+      }
+      if (url.includes('/admin/summary')) {
+        return Promise.resolve({
+          data: {
+            users: { total: 3, pendingVerification: 1, byRole: { admin: 1, scout: 1, team: 1, player: 0 }, recent: [] },
+            content: { teams: 2, players: 4, videos: 5 },
+            jobs: { analyzed: 2, processing: 1, failed: 1, queued: 1 },
+            recentVideos: [],
+          },
+        });
+      }
+      if (url.includes('/auth/users')) {
+        return Promise.resolve({ data: [{ _id: 'u1', name: 'Ada Admin', email: 'ada@example.com', role: 'admin', emailVerified: true }] });
+      }
+      if (url.includes('/admin/jobs')) {
+        return Promise.resolve({ data: { items: [] } });
       }
       return Promise.resolve({ data: [] });
     });
 
     render(<App />);
 
-    const uploadButton = await screen.findByRole('button', { name: '+ Upload Video' });
-    await userEvent.click(uploadButton);
-
-    expect(await screen.findByLabelText('Highlight File')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Admin portal' })).toBeInTheDocument();
+    expect(await screen.findByText(/operate the platform like a premium scouting saas/i)).toBeInTheDocument();
   });
 });

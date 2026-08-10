@@ -25,6 +25,7 @@ describe('Heatmap', () => {
     const canvas = screen.getByRole('img', { name: /player position density heatmap/i });
     expect(canvas.tagName).toBe('CANVAS');
     expect(screen.queryByText(/no player positions were recorded/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/peak density/i)).toBeInTheDocument();
   });
 
   it('flags an all-zero grid as having no recorded positions', () => {

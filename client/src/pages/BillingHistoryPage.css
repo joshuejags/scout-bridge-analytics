@@ -1,0 +1,52 @@
+.billing-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.plan-summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.invoice-list {
+  display: grid;
+  gap: 10px;
+}
+
+.invoice-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(214, 222, 233, 0.85);
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.invoice-item__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .billing-grid,
+  .plan-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .invoice-item__meta {
+    align-items: flex-start;
+  }
+}

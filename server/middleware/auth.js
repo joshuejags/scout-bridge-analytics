@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { getJwtSecret } = require('../utils/jwt');
 
 /**
  * Requires a valid Bearer JWT. Attaches the authenticated user (without
@@ -14,7 +15,7 @@ const requireAuth = async (req, res, next) => {
   }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, getJwtSecret());
     const user = await User.findById(payload.id);
     if (!user) {
       return res.status(401).json({ error: 'User no longer exists' });

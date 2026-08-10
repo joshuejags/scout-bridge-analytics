@@ -1,12 +1,13 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { sendMail } = require('../utils/email');
+const { getJwtSecret } = require('../utils/jwt');
 
 const TOKEN_EXPIRY = '7d';
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 
 const signToken = (user) =>
-  jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+  jwt.sign({ id: user._id, role: user.role }, getJwtSecret(), {
     expiresIn: TOKEN_EXPIRY,
   });
 

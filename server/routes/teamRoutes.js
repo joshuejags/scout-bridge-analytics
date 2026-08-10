@@ -11,6 +11,7 @@ const nameBody = body('name').trim().notEmpty().withMessage('Team name is requir
 
 router.post('/', [nameBody], validate, teamController.createTeam);
 router.get('/', teamController.getTeams);
+router.get('/overview', teamController.getTeamOverview);
 router.get('/:id', [idParam], validate, teamController.getTeamById);
 router.put(
   '/:id',

@@ -1,0 +1,223 @@
+.scout-portal {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.scout-portal__kpis {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.scout-portal__kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: rgba(88, 145, 255, 0.12);
+  color: var(--accent, #5891ff);
+}
+
+.scout-portal__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(320px, 0.95fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.scout-portal__main,
+.scout-portal__side {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.scout-portal__form-grid,
+.scout-portal__editor-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.scout-portal__form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scout-portal__field--wide,
+.scout-portal__form-actions {
+  grid-column: 1 / -1;
+}
+
+.scout-portal__form-grid label,
+.scout-portal__editor-form label {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--text-secondary, #93a1bf);
+  font-size: 0.92rem;
+}
+
+.scout-portal__form-grid input,
+.scout-portal__form-grid select,
+.scout-portal__form-grid textarea,
+.scout-portal__editor-form input,
+.scout-portal__editor-form select,
+.scout-portal__editor-form textarea {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  background: rgba(9, 14, 24, 0.65);
+  color: var(--text-primary, #f8fafc);
+  padding: 0.85rem 1rem;
+  font: inherit;
+}
+
+.scout-portal__pipeline {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(180px, 1fr));
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.scout-stage-column {
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.scout-stage-column__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-secondary, #93a1bf);
+}
+
+.scout-stage-column__body {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.scout-target-card,
+.scout-priority-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 18px;
+  background: rgba(9, 14, 24, 0.72);
+  color: inherit;
+  padding: 1rem;
+  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.scout-target-card:hover,
+.scout-priority-item:hover,
+.scout-target-card.active,
+.scout-priority-item.active {
+  border-color: rgba(88, 145, 255, 0.45);
+  background: rgba(19, 29, 47, 0.9);
+  transform: translateY(-1px);
+}
+
+.scout-target-card {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.scout-target-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scout-target-card__score {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.scout-target-card strong,
+.scout-priority-item strong,
+.scout-portal__editor-summary strong {
+  color: var(--text-primary, #f8fafc);
+}
+
+.scout-target-card span,
+.scout-target-card p,
+.scout-priority-item span,
+.scout-portal__editor-summary span {
+  color: var(--text-secondary, #93a1bf);
+  margin: 0;
+}
+
+.scout-priority-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.scout-priority-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.scout-portal__editor-summary {
+  display: grid;
+  gap: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.scout-portal__editor-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.scout-stage-column__empty {
+  min-height: 7rem;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.scout-portal__filters {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(140px, 1fr)) auto;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.scout-portal__filters label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--text-secondary, #93a1bf);
+  font-size: 0.9rem;
+}
+
+.scout-portal__filters input,
+.scout-portal__filters select {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  background: rgba(9, 14, 24, 0.65);
+  color: var(--text-primary, #f8fafc);
+  padding: 0.75rem 0.9rem;
+  font: inherit;
+}
+
+@media (max-width: 1180px) {
+  .scout-portal__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .scout-portal__form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scout-portal__filters {
+    grid-template-columns: 1fr;
+  }
+}

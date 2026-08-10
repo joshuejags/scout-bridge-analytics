@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { apiUrl } from '../utils/api';
 import './AnalysisControls.css';
 
 const AnalysisControls = ({ videoId, onAnalysisComplete }) => {
@@ -12,7 +13,7 @@ const AnalysisControls = ({ videoId, onAnalysisComplete }) => {
     setError(null);
 
     try {
-      const response = await axios.post(`${process.env.REACT_APP_API_URL}/analysis/${videoId}/process`);
+      const response = await axios.post(apiUrl(`/analysis/${videoId}/process`));
       setAnalysis(response.data);
       if (onAnalysisComplete) onAnalysisComplete(response.data);
     } catch (err) {

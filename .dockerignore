@@ -1,0 +1,14 @@
+.git
+node_modules
+client/node_modules
+server/node_modules
+**/node_modules
+**/coverage
+**/.cache
+**/*.log
+.env
+server/.env
+client/.env
+docker-compose.yml
+README.md
+DEPLOYMENT_GUIDE.md

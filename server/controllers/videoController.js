@@ -206,6 +206,69 @@ exports.completeChunkedUpload = async (req, res) => {
   }
 };
 
+exports.presignMultipartInit = async (req, res) => {
+  try {
+    const { filename, partCount, contentType } = req.body;
+    const count = Number(partCount);
+    if (!Number.isInteger(count) || count < 1) {
+      return res.status(400).json({ error: 'partCount must be a positive integer' });
+    }
+
+    const safeName = path.basename(String(filename || '').trim());
+    if (!safeName) {
+      return res.status(400).json({ error: 'filename is required' });
+    }
+    if (!storage.isCloudBackend()) {
+      return res.status(400).json({ error: 'Presigned multipart uploads require STORAGE_BACKEND=s3' });
+    }
+
+    const key = `${Date.now()}-${safeName}`;
+    const result = await storage.createMultipartPresignedUrls(key, count, contentType);
+    res.status(201).json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.completePresignedMultipartUpload = async (req, res) => {
+  try {
+    const { filename, uploadId, fileSize, parts } = req.body;
+    if (!storage.isCloudBackend()) {
+      return res.status(400).json({ error: 'Presigned multipart uploads require STORAGE_BACKEND=s3' });
+    }
+
+    const safeName = path.basename(String(filename || '').trim());
+    if (!safeName) {
+      return res.status(400).json({ error: 'filename is required' });
+    }
+
+    await storage.completeMultipartUpload(filename, uploadId, parts);
+
+    const video = new Video({
+      filename,
+      originalName: safeName,
+      fileSize: Number(fileSize),
+      filePath: filename,
+      storageBackend: 's3',
+      uploadedBy: req.user.email,
+      user: req.user._id,
+      status: 'uploaded',
+      team: req.body.team || null,
+      opponentTeam: req.body.opponentTeam || null,
+      players: Array.isArray(req.body.players)
+        ? req.body.players
+        : req.body.players
+        ? [req.body.players]
+        : [],
+      sport: req.body.sport || 'soccer',
+    });
+    await video.save();
+    res.status(201).json(video);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Import a video from a URL (YouTube, Instagram, TikTok, Facebook,
 // X/Twitter, Vimeo) instead of a direct file upload. The Video document is
 // created and returned immediately with status 'importing' - the actual

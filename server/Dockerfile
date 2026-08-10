@@ -16,7 +16,7 @@ WORKDIR /app
 
 # Node dependencies
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 
 # Python dependencies, in their own venv so they don't fight the system
 # Python's package manager. This layer is cached separately from the Node

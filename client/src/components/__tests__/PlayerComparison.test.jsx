@@ -17,6 +17,13 @@ const sampleData = [
     actions: { pass: 1, shot: 1, tackle: 0, interception: 0 },
     totalActions: 2,
     verifiedTracks: 2,
+    evaluation: {
+      scoutingScore: 88,
+      standoutSignal: 'High action volume',
+      developmentFocus: 'Maintain current output and keep tracking the same match patterns.',
+      executiveSummary: 'Sam Striker shows high action volume and a premium scouting score.',
+      recommendation: 'Strong shortlist candidate',
+    },
   },
   {
     player: { _id: 'p2', name: 'Danny Defender', jerseyNumber: 4, team: { name: 'Away FC' } },
@@ -42,8 +49,8 @@ describe('PlayerComparison', () => {
 
     render(<PlayerComparison playerIds={['p1', 'p2']} onClose={jest.fn()} />);
 
-    await waitFor(() => expect(screen.getByText('Sam Striker')).toBeInTheDocument());
-    expect(screen.getByText('Danny Defender')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText('Sam Striker').length).toBeGreaterThan(0));
+    expect(screen.getAllByText('Danny Defender').length).toBeGreaterThan(0);
     expect(axios.get).toHaveBeenCalledWith(
       expect.stringContaining('/players/compare'),
       expect.objectContaining({ params: { ids: 'p1,p2' } })
@@ -54,6 +61,10 @@ describe('PlayerComparison', () => {
     const distanceRow = rows.find((r) => r.textContent.includes('Total distance'));
     expect(distanceRow.textContent).toContain('3000');
     expect(distanceRow.textContent).toContain('1500');
+
+    expect(screen.getByText(/decision-ready reading/i)).toBeInTheDocument();
+    expect(screen.getByText(/sam striker leads the comparison/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/scouting score/i).length).toBeGreaterThan(0);
   });
 
   it('shows an error message when the request fails', async () => {
@@ -69,7 +80,7 @@ describe('PlayerComparison', () => {
     const onClose = jest.fn();
     render(<PlayerComparison playerIds={['p1', 'p2']} onClose={onClose} />);
 
-    await waitFor(() => expect(screen.getByText('Sam Striker')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getAllByText('Sam Striker').length).toBeGreaterThan(0));
     screen.getByLabelText(/close comparison/i).click();
     expect(onClose).toHaveBeenCalled();
   });

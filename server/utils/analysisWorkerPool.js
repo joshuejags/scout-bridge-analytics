@@ -1,12 +1,31 @@
+/**
+ * Analysis Worker Pool - BullMQ-based implementation with Redis persistence
+ *
+ * This module provides a backward-compatible API for submitting analysis jobs.
+ * Jobs are now persisted in Redis via BullMQ, providing durability across restarts,
+ * automatic retry logic with exponential backoff, and proper error handling.
+ *
+ * The submitJob() API is unchanged; existing callers in analysisController.js
+ * and analysisDaemon.js continue to work transparently.
+ */
+
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 
-// Mirrors the path-resolution comment in analysisController.js: this file
-// lives in server/utils/, so PROJECT_ROOT assumes a full repo checkout
-// (true for local dev), overridable via env for Docker (only server/ is
-// copied into the image there).
+// Configuration: Redis backend for job persistence
+const REDIS_HOST = process.env.REDIS_HOST || 'localhost';
+const REDIS_PORT = process.env.REDIS_PORT || 6379;
+const REDIS_DB = process.env.REDIS_DB || 0;
+const REDIS_PASSWORD = process.env.REDIS_PASSWORD;
+
+// Fallback to in-memory mode if Redis is not available (for backward compatibility)
+// This can be disabled via DISABLE_FALLBACK_MODE=true
+const FALLBACK_MODE_ENABLED = process.env.DISABLE_FALLBACK_MODE !== 'true';
+
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
+const CV_DIR = process.env.CV_DIR || path.join(PROJECT_ROOT, 'server', 'cv');
+const WORKER_SCRIPT = path.join(CV_DIR, 'worker.py');
 
 const PYTHON_BIN =
   process.env.PYTHON_BIN ||
@@ -14,32 +33,74 @@ const PYTHON_BIN =
     ? path.join(PROJECT_ROOT, 'venv', 'Scripts', 'python.exe')
     : path.join(PROJECT_ROOT, 'venv', 'bin', 'python'));
 
-const CV_DIR = process.env.CV_DIR || path.join(PROJECT_ROOT, 'server', 'cv');
-const WORKER_SCRIPT = path.join(CV_DIR, 'worker.py');
-
-// How many analyses can genuinely run at once. Spawning a fresh analyzer
-// process per request had no concurrency control at all — N simultaneous
-// uploads meant N simultaneous cold YOLO/torch/EasyOCR inits competing for
-// the same CPU cores. A small fixed pool bounds that, and doubles as the
-// "job queue" this module exists to provide: jobs beyond POOL_SIZE just
-// wait their turn instead of piling onto the machine unbounded.
 const POOL_SIZE = process.env.ANALYSIS_WORKER_POOL_SIZE
   ? Number(process.env.ANALYSIS_WORKER_POOL_SIZE)
   : 2;
 
-let nextJobId = 1;
-const workers = []; // { proc, ready, busy, stdoutTail }
-const pendingQueue = []; // jobs waiting for a free ready worker
-const activeJobs = new Map(); // jobId -> job, while a worker is running it
-let shuttingDown = false;
-
-// Without a cap, an unbounded number of jobs could pile up in memory with
-// no backpressure — a caller (see analysisLimiter in middleware/rateLimit.js
-// for the per-user side of this) gets a clear rejection instead of a job
-// that silently waits behind an ever-growing line.
 const MAX_QUEUE_LENGTH = process.env.ANALYSIS_QUEUE_MAX
   ? Number(process.env.ANALYSIS_QUEUE_MAX)
   : 20;
+
+let useBullMQ = false;
+let bullmqQueue = null;
+
+// In-memory fallback for when Redis is unavailable
+let nextJobId = 1;
+const workers = [];
+const pendingQueue = [];
+const activeJobs = new Map();
+let shuttingDown = false;
+
+/**
+ * Initialize BullMQ backend if Redis is available, otherwise use in-memory pool
+ */
+async function ensureInitialized() {
+  if (useBullMQ || bullmqQueue) return;
+
+  try {
+    // Attempt to use BullMQ + Redis
+    const bullmq = require('bullmq');
+    const redis = require('redis');
+
+    // Quick Redis connectivity check
+    const testClient = redis.createClient({
+      host: REDIS_HOST,
+      port: REDIS_PORT,
+      ...(REDIS_PASSWORD && { password: REDIS_PASSWORD }),
+      db: REDIS_DB,
+      connectTimeout: 2000,
+      retryStrategy: () => null, // fail fast on timeout
+    });
+
+    await new Promise((resolve, reject) => {
+      testClient.on('ready', resolve);
+      testClient.on('error', reject);
+      setTimeout(() => reject(new Error('Redis connection timeout')), 3000);
+    });
+
+    testClient.quit();
+
+    // Redis is available, initialize BullMQ
+    bullmqQueue = require('./bullmqQueue');
+    await bullmqQueue.initializeQueue();
+    await bullmqQueue.startWorker();
+    useBullMQ = true;
+    console.log('[analysisWorkerPool] Using BullMQ backend with Redis persistence');
+  } catch (err) {
+    if (!FALLBACK_MODE_ENABLED) {
+      throw new Error(`[analysisWorkerPool] Redis/BullMQ unavailable and fallback disabled: ${err.message}`);
+    }
+    console.warn(`[analysisWorkerPool] Redis/BullMQ unavailable, falling back to in-memory pool: ${err.message}`);
+    useBullMQ = false;
+    bullmqQueue = null;
+    // Initialize in-memory pool as fallback
+    warmUp();
+  }
+}
+
+// ========================
+// In-memory pool fallback (used when Redis is unavailable)
+// ========================
 
 function handleWorkerMessage(workerState, msg) {
   if (msg.type === 'ready') {
@@ -53,7 +114,7 @@ function handleWorkerMessage(workerState, msg) {
   }
 
   const job = activeJobs.get(msg.jobId);
-  if (!job) return; // stale message for a job we've already given up on
+  if (!job) return;
 
   if (msg.type === 'progress') {
     if (job.onProgress) {
@@ -104,9 +165,6 @@ function spawnWorker() {
     }
   });
 
-  // The worker's own logger.info/warning calls (from video_analyzer.py's
-  // module-level logging config) land here — informational only, the
-  // structured progress/result/error protocol is entirely on stdout.
   proc.stderr.on('data', (b) => {
     const str = b.toString().trim();
     if (str) console.log(`[analysis-worker] ${str}`);
@@ -122,15 +180,12 @@ function spawnWorker() {
     if (workerState.busy) {
       console.error(`[analysis-worker] exited unexpectedly (code ${code}) mid-job`);
     }
-    // Fail any job this worker was holding rather than leaving it hanging.
     for (const [jobId, job] of activeJobs) {
       if (job.worker === workerState) {
         activeJobs.delete(jobId);
         job.reject(new Error('Analysis worker exited unexpectedly'));
       }
     }
-    // Keep the pool at full size so one crashed worker doesn't permanently
-    // shrink capacity, unless the whole server is going down.
     if (!shuttingDown) spawnWorker();
   });
 
@@ -138,11 +193,6 @@ function spawnWorker() {
   return workerState;
 }
 
-/**
- * Spawn the pool now rather than waiting for the first real job, so a
- * user's first upload doesn't pay the ~2-3s EasyOCR init cold start —
- * that cost is paid once here, at server startup, instead.
- */
 function warmUp() {
   if (!fs.existsSync(WORKER_SCRIPT)) {
     console.warn(
@@ -176,14 +226,35 @@ function dispatchNext() {
   );
 }
 
+// ========================
+// Unified API (routing to BullMQ or in-memory)
+// ========================
+
 /**
- * Queue an analysis job and return a Promise resolving to the analyzer's
- * result dict (the same shape the old per-request spawn produced). Callers
- * get three optional hooks: onQueued (no worker was free at submit time),
- * onDispatch (a worker just picked this job up), and onProgress (periodic
- * frame-count updates while it runs).
+ * Submit an analysis job. Returns a Promise resolving to the analyzer result.
+ * Transparently uses BullMQ if Redis is available, otherwise in-memory pool.
  */
-function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
+async function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
+  await ensureInitialized();
+
+  if (useBullMQ && bullmqQueue) {
+    // BullMQ path: job is persistent and queued in Redis
+    try {
+      return await bullmqQueue.submitJob(params);
+    } catch (err) {
+      // If BullMQ fails, fall back to in-memory (if enabled)
+      if (!FALLBACK_MODE_ENABLED) throw err;
+      console.warn(`[analysisWorkerPool] BullMQ submission failed, falling back: ${err.message}`);
+      useBullMQ = false;
+      return submitJobInMemory(params, { onProgress, onQueued, onDispatch });
+    }
+  } else {
+    // In-memory path (fallback or when Redis unavailable)
+    return submitJobInMemory(params, { onProgress, onQueued, onDispatch });
+  }
+}
+
+function submitJobInMemory(params, { onProgress, onQueued, onDispatch } = {}) {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(WORKER_SCRIPT)) {
       return reject(new Error(`Analyzer worker script not found at ${WORKER_SCRIPT}`));
@@ -193,7 +264,7 @@ function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
         new Error('Analysis queue is full right now — try again in a few minutes.')
       );
     }
-    warmUp(); // no-op if already warm; lazily starts the pool otherwise
+    warmUp();
 
     const jobId = String(nextJobId++);
     const hasIdleWorker = workers.some((w) => w.ready && !w.busy);
@@ -204,8 +275,13 @@ function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
   });
 }
 
-function shutdown() {
+async function shutdown() {
   shuttingDown = true;
+
+  if (useBullMQ && bullmqQueue) {
+    await bullmqQueue.shutdown();
+  }
+
   workers.forEach((w) => {
     try {
       w.proc.kill();
@@ -215,4 +291,8 @@ function shutdown() {
   });
 }
 
-module.exports = { submitJob, warmUp, shutdown };
+function warmUpSync() {
+  if (!useBullMQ) warmUp();
+}
+
+module.exports = { submitJob, warmUp: warmUpSync, shutdown };

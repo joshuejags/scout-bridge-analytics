@@ -24,36 +24,36 @@ describe('LandingPage', () => {
   it('shows the first feature detail by default and switches on tab click', async () => {
     renderPage();
 
-    expect(screen.getByText(/every player on the pitch is detected/i)).toBeInTheDocument();
+    expect(screen.getByText(/every player is detected, tracked/i)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /jersey recognition/i }));
 
     expect(
       screen.getByText(/jersey numbers are read automatically/i)
     ).toBeInTheDocument();
-    expect(screen.queryByText(/every player on the pitch is detected/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/every player is detected, tracked/i)).not.toBeInTheDocument();
   });
 
   it('expands and collapses "how it works" steps on click', async () => {
     renderPage();
 
     // First step starts open by default (openStep initialized to 0).
-    expect(screen.getByText(/paste a link from youtube/i)).toBeInTheDocument();
+    expect(screen.getByText(/supported video links from youtube and social platforms/i)).toBeInTheDocument();
 
-    const secondStepButton = screen.getByRole('button', { name: /let it analyze/i });
+    const secondStepButton = screen.getByRole('button', { name: /analyze in the background/i });
     await userEvent.click(secondStepButton);
-    expect(screen.getByText(/analyzed in the background/i)).toBeInTheDocument();
-    expect(screen.queryByText(/paste a link from youtube/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/computer vision jobs run automatically/i)).toBeInTheDocument();
+    expect(screen.queryByText(/supported video links from youtube and social platforms/i)).not.toBeInTheDocument();
 
     // Clicking the open step again collapses it.
     await userEvent.click(secondStepButton);
-    expect(screen.queryByText(/analyzed in the background/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/computer vision jobs run automatically/i)).not.toBeInTheDocument();
   });
 
   it('labels the sample report as sample data, not real results', () => {
     renderPage();
-    expect(screen.getByText(/sample data/i)).toBeInTheDocument();
-    expect(screen.getByText(/sign in to analyze your own footage/i)).toBeInTheDocument();
+    expect(screen.getByText(/verified sample data/i)).toBeInTheDocument();
+    expect(screen.getByText(/same seeded match data/i)).toBeInTheDocument();
   });
 
   it('has a final call-to-action linking to registration', () => {
@@ -75,7 +75,7 @@ describe('LandingPage', () => {
 
   it('credits the real dataset source', () => {
     renderPage();
-    const link = screen.getByRole('link', { name: /metrica sports/i });
+    const link = screen.getByRole('link', { name: /metrica sports.*sample-data repository/i });
     expect(link).toHaveAttribute('href', 'https://github.com/metrica-sports/sample-data');
   });
 });

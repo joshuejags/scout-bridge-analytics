@@ -44,7 +44,17 @@ const VideoStatusChart = ({ videos }) => {
       data={data}
       options={{
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'right' } },
+        cutout: '68%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              usePointStyle: true,
+              boxWidth: 10,
+              padding: 16,
+            },
+          },
+        },
       }}
     />
   );
