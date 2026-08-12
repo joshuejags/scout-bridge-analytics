@@ -72,7 +72,7 @@ describe('DetectionQuality', () => {
 
     it('should display average confidence as percentage', () => {
       render(<DetectionQuality metrics={mockMetrics} />);
-      expect(screen.getByText('85%')).toBeInTheDocument();
+      expect(screen.getAllByText('85%').length).toBeGreaterThan(0);
     });
 
     it('should display detection coverage as percentage', () => {

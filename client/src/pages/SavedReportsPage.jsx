@@ -31,6 +31,12 @@ const DEFAULT_REPORT_FORM = {
   mentalEvaluation: '',
 };
 
+const normalizeVideos = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.videos)) return payload.videos;
+  return [];
+};
+
 const SavedReportsPage = () => {
   const [reports, setReports] = useState([]);
   const [videos, setVideos] = useState([]);
@@ -52,7 +58,7 @@ const SavedReportsPage = () => {
           axios.get(apiUrl('/videos')),
         ]);
         setReports(reportResponse.data);
-        setVideos(videoResponse.data || []);
+        setVideos(normalizeVideos(videoResponse.data));
       } catch (err) {
         console.error('Error loading saved reports:', err);
         setError(err.response?.data?.error || 'Unable to load saved reports.');

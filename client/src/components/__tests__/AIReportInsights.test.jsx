@@ -43,7 +43,7 @@ describe('AIReportInsights', () => {
 
     it('should render report summary', () => {
       render(<AIReportInsights analysis={mockAnalysis} />);
-      expect(screen.getByText(/Executive Summary/i)).toBeInTheDocument();
+      expect(screen.getByText(/^Summary$/i)).toBeInTheDocument();
     });
 
     it('should render metrics section with values', () => {
@@ -77,21 +77,6 @@ describe('AIReportInsights', () => {
   });
 
   describe('Export Functionality', () => {
-    beforeEach(() => {
-      // Mock document methods for file download
-      global.URL.createObjectURL = jest.fn();
-      global.document.createElement = jest.fn((...args) => {
-        if (args[0] === 'a') {
-          return {
-            setAttribute: jest.fn(),
-            style: {},
-            click: jest.fn(),
-          };
-        }
-        return document.createElement(...args);
-      });
-    });
-
     it('should show export buttons when showExport is true', () => {
       render(<AIReportInsights analysis={mockAnalysis} showExport={true} />);
       expect(screen.getByText(/Export as Markdown/i)).toBeInTheDocument();

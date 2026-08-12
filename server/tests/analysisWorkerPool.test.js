@@ -15,6 +15,16 @@ const emitLine = (proc, obj) => {
   proc.stdout.emit('data', Buffer.from(JSON.stringify(obj) + '\n'));
 };
 
+const waitFor = async (predicate, timeoutMs = 1000) => {
+  const startedAt = Date.now();
+  while (!predicate()) {
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new Error('Timed out waiting for test condition');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+};
+
 describe('analysisWorkerPool', () => {
   let spawn;
   let spawnedProcs;
@@ -42,6 +52,7 @@ describe('analysisWorkerPool', () => {
   it('resolves a submitted job with the worker\'s result message', async () => {
     const jobPromise = pool.submitJob({ videoPath: '/tmp/a.mp4' });
 
+    await waitFor(() => spawnedProcs.length === 1);
     expect(spawnedProcs).toHaveLength(1);
     emitLine(spawnedProcs[0], { type: 'ready' });
     emitLine(spawnedProcs[0], { jobId: '1', type: 'result', data: { summary: { totalPlayers: 3 } } });
@@ -52,6 +63,7 @@ describe('analysisWorkerPool', () => {
 
   it('rejects a submitted job with the worker\'s error message', async () => {
     const jobPromise = pool.submitJob({ videoPath: '/tmp/a.mp4' });
+    await waitFor(() => spawnedProcs.length === 1);
     emitLine(spawnedProcs[0], { type: 'ready' });
     emitLine(spawnedProcs[0], { jobId: '1', type: 'error', message: 'boom' });
 
@@ -61,6 +73,7 @@ describe('analysisWorkerPool', () => {
   it('calls onProgress for progress messages carrying the right job', async () => {
     const onProgress = jest.fn();
     const jobPromise = pool.submitJob({ videoPath: '/tmp/a.mp4' }, { onProgress });
+    await waitFor(() => spawnedProcs.length === 1);
     emitLine(spawnedProcs[0], { type: 'ready' });
     emitLine(spawnedProcs[0], { jobId: '1', type: 'progress', frame: 30, total: 100 });
     emitLine(spawnedProcs[0], { jobId: '1', type: 'result', data: {} });
@@ -71,6 +84,7 @@ describe('analysisWorkerPool', () => {
 
   it('queues a second job when the single pooled worker is busy, and calls onQueued', async () => {
     const job1 = pool.submitJob({ videoPath: '/tmp/a.mp4' });
+    await waitFor(() => spawnedProcs.length === 1);
     emitLine(spawnedProcs[0], { type: 'ready' });
 
     const onQueued = jest.fn();
@@ -78,6 +92,7 @@ describe('analysisWorkerPool', () => {
 
     // Only one worker was spawned (pool size 1); job2 has nowhere to go yet.
     expect(spawnedProcs).toHaveLength(1);
+    await waitFor(() => onQueued.mock.calls.length > 0);
     expect(onQueued).toHaveBeenCalled();
     // The still-busy worker's stdin should only have been written to once so far.
     expect(spawnedProcs[0].stdin.write).toHaveBeenCalledTimes(1);
@@ -93,6 +108,7 @@ describe('analysisWorkerPool', () => {
 
   it('rejects the in-flight job and respawns a replacement when a worker exits unexpectedly', async () => {
     const jobPromise = pool.submitJob({ videoPath: '/tmp/a.mp4' });
+    await waitFor(() => spawnedProcs.length === 1);
     emitLine(spawnedProcs[0], { type: 'ready' });
 
     spawnedProcs[0].emit('exit', 1);

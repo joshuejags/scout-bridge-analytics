@@ -73,11 +73,21 @@ describe('MobileVideoPlayer', () => {
       const onPause = jest.fn();
       const { container } = render(<MobileVideoPlayer src={mockVideoSrc} onPause={onPause} />);
       const video = container.querySelector('video');
+      const controlsPlayButton = container.querySelector('.controls .control-button');
       
-      // Simulate playing then pausing
-      fireEvent.play(video);
+      fireEvent.click(container.querySelector('.play-button'));
       await waitFor(() => {
         expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalled();
+      });
+
+      Object.defineProperty(video, 'paused', {
+        configurable: true,
+        get: () => false,
+      });
+      fireEvent.click(controlsPlayButton);
+
+      await waitFor(() => {
+        expect(onPause).toHaveBeenCalled();
       });
     });
   });

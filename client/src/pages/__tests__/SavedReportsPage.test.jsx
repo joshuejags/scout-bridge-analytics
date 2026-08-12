@@ -22,28 +22,33 @@ afterAll(() => {
 });
 
 describe('SavedReportsPage', () => {
+  const reportsResponse = [
+    {
+      _id: 'r1',
+      title: 'Weekend report',
+      summary: 'High-energy winger profile.',
+      tags: ['priority', 'winger'],
+      template: 'recruitment-decision',
+      insightSnapshot: {
+        recommendation: { label: 'Priority live view', score: 82 },
+        confidence: { label: 'High confidence', score: 74 },
+        metrics: { totalActions: 4 },
+        recruitmentSignals: ['2 shots flagged final-third involvement worth a second pass.'],
+        tacticalSignals: ['Blue held 40.0m width with 11.0m compactness across 2 lines (4-3).'],
+        eventBreakdown: [{ type: 'shot', count: 2 }],
+      },
+      updatedAt: '2026-08-05T12:00:00.000Z',
+      video: { _id: 'v1', originalName: 'weekend.mp4', sport: 'soccer', status: 'analyzed' },
+    },
+  ];
+
   beforeEach(() => {
     jest.clearAllMocks();
-    axios.get.mockResolvedValue({
-      data: [
-        {
-          _id: 'r1',
-          title: 'Weekend report',
-          summary: 'High-energy winger profile.',
-          tags: ['priority', 'winger'],
-          template: 'recruitment-decision',
-          insightSnapshot: {
-            recommendation: { label: 'Priority live view', score: 82 },
-            confidence: { label: 'High confidence', score: 74 },
-            metrics: { totalActions: 4 },
-            recruitmentSignals: ['2 shots flagged final-third involvement worth a second pass.'],
-            tacticalSignals: ['Blue held 40.0m width with 11.0m compactness across 2 lines (4-3).'],
-            eventBreakdown: [{ type: 'shot', count: 2 }],
-          },
-          updatedAt: '2026-08-05T12:00:00.000Z',
-          video: { _id: 'v1', originalName: 'weekend.mp4', sport: 'soccer', status: 'analyzed' },
-        },
-      ],
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/reports/saved')) return Promise.resolve({ data: reportsResponse });
+      if (url.includes('/videos')) return Promise.resolve({ data: [{ _id: 'v1', originalName: 'weekend.mp4' }] });
+      if (url.includes('/filter-presets')) return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
     });
   });
 
@@ -61,29 +66,13 @@ describe('SavedReportsPage', () => {
   });
 
   it('filters by template and exports markdown', async () => {
-    axios.get
-      .mockResolvedValueOnce({
-        data: [
-          {
-            _id: 'r1',
-            title: 'Weekend report',
-            summary: 'High-energy winger profile.',
-            tags: ['priority', 'winger'],
-            template: 'recruitment-decision',
-            insightSnapshot: {
-              recommendation: { label: 'Priority live view', score: 82 },
-              confidence: { label: 'High confidence', score: 74 },
-              metrics: { totalActions: 4 },
-              recruitmentSignals: ['2 shots flagged final-third involvement worth a second pass.'],
-              tacticalSignals: ['Blue held 40.0m width with 11.0m compactness across 2 lines (4-3).'],
-              eventBreakdown: [{ type: 'shot', count: 2 }],
-            },
-            updatedAt: '2026-08-05T12:00:00.000Z',
-            video: { _id: 'v1', originalName: 'weekend.mp4', sport: 'soccer', status: 'analyzed' },
-          },
-        ],
-      })
-      .mockResolvedValueOnce({ data: new Blob(['# report']) });
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/reports/saved/r1/export')) return Promise.resolve({ data: new Blob(['# report']) });
+      if (url.includes('/reports/saved')) return Promise.resolve({ data: reportsResponse });
+      if (url.includes('/videos')) return Promise.resolve({ data: [{ _id: 'v1', originalName: 'weekend.mp4' }] });
+      if (url.includes('/filter-presets')) return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
     axios.patch.mockResolvedValue({
       data: {
         _id: 'r1',

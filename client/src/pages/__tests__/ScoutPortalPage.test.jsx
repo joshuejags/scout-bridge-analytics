@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import axios from 'axios';
@@ -14,18 +14,21 @@ const boardResponse = {
     activeDecisions: 0,
     dueThisWeek: 0,
     byStage: {
-      discovery: 0,
-      watchlist: 1,
-      shortlist: 0,
-      live: 0,
-      decision: 0,
+      discovered: 1,
+      'under-review': 0,
+      shortlisted: 0,
+      scouted: 0,
+      recommended: 0,
+      trial: 0,
+      signed: 0,
+      rejected: 0,
     },
   },
-  stages: ['discovery', 'watchlist', 'shortlist', 'live', 'decision'],
+  stages: ['discovered', 'under-review', 'shortlisted', 'scouted', 'recommended', 'trial', 'signed', 'rejected'],
   targets: [
     {
       _id: 'target-1',
-      stage: 'watchlist',
+      stage: 'discovered',
       priority: 'high',
       fitScore: 82,
       note: 'Explosive outlet option on the weak side.',
@@ -52,11 +55,15 @@ const boardResponse = {
 describe('ScoutPortalPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    axios.get.mockResolvedValue({ data: boardResponse });
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/scouting/board')) return Promise.resolve({ data: boardResponse });
+      if (url.includes('/filter-presets')) return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
     axios.patch.mockResolvedValue({
       data: {
         ...boardResponse.targets[0],
-        stage: 'shortlist',
+        stage: 'shortlisted',
         priority: 'medium',
         fitScore: 84,
       },
@@ -74,17 +81,18 @@ describe('ScoutPortalPage', () => {
     expect(screen.getAllByText('Tobi Winger').length).toBeGreaterThan(0);
     expect(screen.getByText('Tracked prospects')).toBeInTheDocument();
 
-    await userEvent.selectOptions(screen.getAllByLabelText('Stage')[1], 'shortlist');
-    await userEvent.selectOptions(screen.getAllByLabelText('Priority')[1], 'medium');
-    await userEvent.clear(screen.getAllByLabelText('Fit score')[1]);
-    await userEvent.type(screen.getAllByLabelText('Fit score')[1], '84');
-    await userEvent.click(screen.getByRole('button', { name: 'Save target' }));
+    const editorSection = screen.getByRole('heading', { name: 'Target editor' }).closest('section');
+    await userEvent.selectOptions(within(editorSection).getByLabelText('Stage'), 'shortlisted');
+    await userEvent.selectOptions(within(editorSection).getByLabelText('Priority'), 'medium');
+    await userEvent.clear(within(editorSection).getByLabelText('Fit score'));
+    await userEvent.type(within(editorSection).getByLabelText('Fit score'), '84');
+    await userEvent.click(within(editorSection).getByRole('button', { name: 'Save target' }));
 
     await waitFor(() =>
       expect(axios.patch).toHaveBeenCalledWith(
         expect.stringContaining('/scouting/targets/target-1'),
         expect.objectContaining({
-          stage: 'shortlist',
+          stage: 'shortlisted',
           priority: 'medium',
           fitScore: 84,
         })

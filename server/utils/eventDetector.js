@@ -11,7 +11,7 @@
  * @param {Array} recentFrames - Last N frames for trend analysis
  * @returns {Object} { confidence, details, reasoning }
  */
-export const detectShot = (playerData, ballData, recentFrames = []) => {
+const detectShot = (playerData, ballData, recentFrames = []) => {
   let confidence = 0;
   const details = {
     distanceFromGoal: 0,
@@ -84,7 +84,7 @@ export const detectShot = (playerData, ballData, recentFrames = []) => {
  * @param {Array} recentFrames - Last N frames for trend analysis
  * @returns {Object} { confidence, details, reasoning }
  */
-export const detectPass = (playerData, ballData, teamPlayers = [], recentFrames = []) => {
+const detectPass = (playerData, ballData, teamPlayers = [], recentFrames = []) => {
   let confidence = 0;
   const details = {
     ballVelocityFactor: 0,
@@ -149,7 +149,7 @@ export const detectPass = (playerData, ballData, teamPlayers = [], recentFrames 
  * @param {Array} recentFrames - Last N frames for trend analysis
  * @returns {Object} { confidence, details, reasoning }
  */
-export const detectTackle = (playerData, opponentData, ballData, recentFrames = []) => {
+const detectTackle = (playerData, opponentData, ballData, recentFrames = []) => {
   let confidence = 0;
   const details = {
     proximityFactor: 0,
@@ -221,7 +221,7 @@ export const detectTackle = (playerData, opponentData, ballData, recentFrames = 
  * @param {Array} recentFrames - Last N frames for trend analysis
  * @returns {Object} { confidence, details, reasoning }
  */
-export const detectInterception = (playerData, ballData, opponentData, recentFrames = []) => {
+const detectInterception = (playerData, ballData, opponentData, recentFrames = []) => {
   let confidence = 0;
   const details = {
     positioningFactor: 0,
@@ -285,7 +285,7 @@ export const detectInterception = (playerData, ballData, opponentData, recentFra
  * @param {Object} ballData - Ball tracking data
  * @returns {Object} Quality metrics
  */
-export const calculateDetectionQuality = (actions, playerData, ballData) => {
+const calculateDetectionQuality = (actions, playerData, ballData) => {
   const metrics = {
     totalActionsDetected: actions.length,
     averageActionConfidence: 0,
@@ -314,10 +314,9 @@ export const calculateDetectionQuality = (actions, playerData, ballData) => {
   metrics.detectionCoverage = highConfidenceCount / confidences.length;
 
   // Overall quality score (0-100)
-  metrics.qualityScore = (
+  metrics.qualityScore =
     metrics.averageActionConfidence * 50 +
-    metrics.detectionCoverage * 50
-  ) * 100;
+    metrics.detectionCoverage * 50;
 
   return metrics;
 };
@@ -432,4 +431,12 @@ const calculateReactionSpeed = (frames, playerId) => {
   const vel2 = distance(positions[positions.length - 2], positions[positions.length - 1]);
 
   return Math.min(1, vel2 / (vel1 + 0.001)); // Acceleration ratio
+};
+
+module.exports = {
+  detectShot,
+  detectPass,
+  detectTackle,
+  detectInterception,
+  calculateDetectionQuality,
 };

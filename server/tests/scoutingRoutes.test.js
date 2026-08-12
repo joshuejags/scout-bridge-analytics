@@ -25,7 +25,7 @@ describe('Scouting routes', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         playerId: player._id.toString(),
-        stage: 'watchlist',
+        stage: 'under-review',
         priority: 'high',
         fitScore: 82,
         note: 'Explosive in transition and attacks the weak-side fullback well.',
@@ -41,7 +41,7 @@ describe('Scouting routes', () => {
 
     expect(board.body.summary.totalTargets).toBe(1);
     expect(board.body.summary.highPriority).toBe(1);
-    expect(board.body.summary.byStage.watchlist).toBe(1);
+    expect(board.body.summary.byStage['under-review']).toBe(1);
     expect(board.body.targets[0].player.name).toBe('Tobi Winger');
     expect(board.body.targets[0].player.team.name).toBe('Rivers United');
   });
@@ -53,7 +53,7 @@ describe('Scouting routes', () => {
     const first = await request(app)
       .post('/api/scouting/targets')
       .set('Authorization', `Bearer ${token}`)
-      .send({ playerId: player._id.toString(), stage: 'discovery', priority: 'medium', fitScore: 70 })
+      .send({ playerId: player._id.toString(), stage: 'discovered', priority: 'medium', fitScore: 70 })
       .expect(201);
 
     const second = await request(app)
@@ -61,7 +61,7 @@ describe('Scouting routes', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({
         playerId: player._id.toString(),
-        stage: 'shortlist',
+        stage: 'shortlisted',
         priority: 'high',
         fitScore: 88,
         note: 'Ready for shortlist review.',
@@ -76,7 +76,7 @@ describe('Scouting routes', () => {
       .expect(200);
 
     expect(board.body.targets).toHaveLength(1);
-    expect(board.body.targets[0].stage).toBe('shortlist');
+    expect(board.body.targets[0].stage).toBe('shortlisted');
     expect(board.body.targets[0].priority).toBe('high');
   });
 

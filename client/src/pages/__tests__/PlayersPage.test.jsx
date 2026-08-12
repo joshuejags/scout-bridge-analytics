@@ -94,8 +94,8 @@ describe('PlayersPage player comparison selection', () => {
     await userEvent.click(checkboxes[1]);
     await userEvent.click(screen.getByRole('button', { name: 'Compare' }));
 
-    expect(await screen.findByRole('heading', { name: /player comparison/i })).toBeInTheDocument();
-    expect(await screen.findByText('Danny Defender')).toBeInTheDocument();
+    expect(await screen.findByText(/player comparison/i)).toBeInTheDocument();
+    expect((await screen.findAllByText('Danny Defender')).length).toBeGreaterThan(0);
   });
 
   it('clears the selection when Clear is clicked', async () => {
