@@ -5,7 +5,7 @@ const workerPool = require('../utils/analysisWorkerPool');
 const { persistAnalysis } = require('../controllers/analysisController');
 const { emitEvent } = require('../utils/socket');
 
-const MONGO = process.env.MONGODB_URI || 'mongodb://localhost:27017/scoutbridge';
+const MONGO = process.env.MONGODB_URI || 'mongodb://localhost:27017/scout-bridge-analytics';
 const POLL_INTERVAL = Number(process.env.ANALYSIS_DAEMON_POLL_MS || 2000);
 
 async function processNextJob() {

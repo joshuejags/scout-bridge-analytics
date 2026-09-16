@@ -1,6 +1,7 @@
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const { resolvePythonBinary } = require('./pythonRuntime');
 
 // Mirrors the same path-resolution comment in analysisWorkerPool.js: this
 // file lives in server/utils/, so PROJECT_ROOT assumes a full repo
@@ -8,11 +9,7 @@ const { spawn } = require('child_process');
 // server/ is copied into the image there).
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
-const PYTHON_BIN =
-  process.env.PYTHON_BIN ||
-  (process.platform === 'win32'
-    ? path.join(PROJECT_ROOT, 'venv', 'Scripts', 'python.exe')
-    : path.join(PROJECT_ROOT, 'venv', 'bin', 'python'));
+const PYTHON_BIN = resolvePythonBinary();
 
 const CV_DIR = process.env.CV_DIR || path.join(PROJECT_ROOT, 'server', 'cv');
 const DOWNLOAD_SCRIPT = path.join(CV_DIR, 'download_video.py');

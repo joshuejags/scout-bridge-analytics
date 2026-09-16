@@ -24,12 +24,28 @@ app.use(
     crossOriginEmbedderPolicy: false,
   })
 );
-// CLIENT_URL already exists (used to build password-reset/verify-email
-// links) and is exactly the origin this should be scoped to. Falls back
-// to cors()'s permissive default (reflects any origin) when unset, same
-// as today's behavior, rather than hard-failing local/CI setups that
-// haven't configured it.
-app.use(cors(process.env.CLIENT_URL ? { origin: process.env.CLIENT_URL } : {}));
+// Credentials are required for the browser session cookie used by the SPA.
+// Allow the configured client origin plus the standard local dev origins so a
+// browser running on localhost:3000 can call the API on localhost:5000 without
+// being rejected by browsers' credentials + wildcard CORS rules.
+const clientAllowedOrigins = new Set([
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:4173',
+  'http://127.0.0.1:4173',
+  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
+]);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || clientAllowedOrigins.has(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ limit: '500mb', extended: true }));
 

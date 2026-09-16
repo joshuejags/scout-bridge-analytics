@@ -73,6 +73,14 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Do not intercept requests that belong to the API/backend service or any
+  // other origin. In the local dev setup the client runs on :3000 while the
+  // app API sits on :5000; intercepting those cross-origin requests causes
+  // uploads and analysis actions to be replaced with the generic offline page.
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   // Handle different request types
   if (request.method === 'GET') {
     if (url.pathname.startsWith('/api/')) {
@@ -86,7 +94,9 @@ self.addEventListener('fetch', (event) => {
       event.respondWith(networkFirstStrategy(request, STATIC_CACHE_NAME));
     }
   } else {
-    // Non-GET requests (POST, PATCH, etc) - try network, don't cache
+    // Non-GET requests (POST, PATCH, etc) - try network, don't cache.
+    // API calls to the same-origin app should continue to the backend without
+    // being turned into the offline page.
     event.respondWith(fetch(request).catch(() => offlineResponse()));
   }
 });

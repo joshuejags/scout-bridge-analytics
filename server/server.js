@@ -12,17 +12,21 @@ const errorTracking = require('./utils/errorTracking');
 errorTracking.init();
 
 const app = require('./app');
+const { connectMongo, stopMongoMemoryServer } = require('./utils/mongoMemory');
 const { initSocket } = require('./utils/socket');
 const analysisWorkerPool = require('./utils/analysisWorkerPool');
+const { startAnalysisDaemon, stopAnalysisDaemon } = require('./utils/analysisDaemonManager');
 const { verifySmtpConnection } = require('./utils/email');
 const { getBackendName, verifyStorageConnection } = require('./utils/storage');
 const { reconcileOrphanedJobs } = require('./controllers/analysisController');
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/scout-bridge-analytics', {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+    await connectMongo(mongoose, {
+      mongoose: {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+      },
     });
     console.log('MongoDB connected successfully');
   } catch (error) {
@@ -89,15 +93,22 @@ initSocket(server);
 // first request.
 analysisWorkerPool.warmUp();
 
+// Start the background daemon that claims queued videos and runs the
+// analysis pipeline. Without this, uploads sit forever in 'queued' status
+// even though the frontend and worker pool are otherwise healthy.
+startAnalysisDaemon();
+
 // Python worker child processes don't die automatically when this process
 // exits — without this they'd linger as orphaned processes after every
 // restart (nodemon) or shutdown.
-const shutdown = () => {
+const shutdown = async () => {
+  stopAnalysisDaemon();
   analysisWorkerPool.shutdown();
+  await stopMongoMemoryServer();
   process.exit(0);
 };
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on('SIGINT', () => { shutdown().catch(() => process.exit(0)); });
+process.on('SIGTERM', () => { shutdown().catch(() => process.exit(0)); });
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {

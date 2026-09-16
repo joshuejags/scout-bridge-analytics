@@ -3,6 +3,12 @@
  * Handles service worker registration, update checking, and PWA features
  */
 
+export const shouldBypassServiceWorker = (targetUrl) => {
+  if (!targetUrl) return false;
+  const candidate = new URL(targetUrl, window.location.origin);
+  return candidate.origin !== window.location.origin;
+};
+
 class PWAManager {
   constructor() {
     this.registration = null;

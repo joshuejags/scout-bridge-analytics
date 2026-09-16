@@ -38,6 +38,13 @@ Upload a match video, or import one from a YouTube, Instagram, TikTok, Facebook,
 - **Live Progress**: analysis and import progress stream over WebSocket instead of polling
 - **Pluggable Storage**: local disk by default, or S3 and any S3-compatible provider (MinIO, Cloudflare R2, DigitalOcean Spaces)
 
+## PWA + Analysis Runtime Notes
+
+- The web app ships with a valid install manifest and real PNG icon assets so browsers can offer the install prompt instead of silently rejecting the app as non-installable.
+- Video analysis resolves the Python interpreter from `PYTHON_BIN`, the active virtual environment, or the system `python`/`python3` fallback. This prevents the worker pool from failing when a repo-local `venv` is not present in a container or hosted runtime.
+- The persistent queue uses BullMQ over Redis. Install the Redis client dependency (`ioredis`) and run Redis for production-style queue durability; otherwise the app falls back to in-memory job execution for local-only development.
+- Local development automatically falls back to a temporary in-memory MongoDB instance when no `MONGODB_URI` is reachable, so the app can still boot and the upload/queue flow can be tested without a separate local MongoDB service.
+
 ## Tech Stack
 
 **Backend**: Express.js (Node), MongoDB/Mongoose, Multer, Socket.IO, JWT auth

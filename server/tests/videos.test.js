@@ -14,6 +14,20 @@ const registerUser = async (email) =>
     })
   ).body;
 
+describe('CORS configuration', () => {
+  it('allows the local frontend origin to access the API with credentials', async () => {
+    const res = await request(app)
+      .options('/api/health')
+      .set('Origin', 'http://localhost:3000')
+      .set('Access-Control-Request-Method', 'GET')
+      .set('Access-Control-Request-Headers', 'authorization,content-type');
+
+    expect(res.status).toBe(204);
+    expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000');
+    expect(res.headers['access-control-allow-credentials']).toBe('true');
+  });
+});
+
 describe('Video upload — sport field', () => {
   const dummyVideoPath = path.join(os.tmpdir(), 'sba-test-video.mp4');
   const uploadDir = path.resolve(process.env.UPLOAD_DIR || 'uploads');
