@@ -1,10 +1,26 @@
 const { rateLimit, ipKeyGenerator } = require('express-rate-limit');
+const { isIP } = require('net');
 
 // The test suite registers/logs in dozens of times per run from the same
 // local IP; rate limiting is a production concern (express-rate-limit
 // itself is already tested upstream) so it's disabled under test rather
 // than forcing tests to work around artificial limits.
 const skipInTest = () => process.env.NODE_ENV === 'test';
+
+// Railway forwards the client address in X-Real-IP. Other deployments can
+// choose their trusted proxy header explicitly; local development uses the
+// direct socket IP and ignores forwarded headers.
+const RATE_LIMIT_IP_HEADER = process.env.RATE_LIMIT_IP_HEADER ||
+  (process.env.NODE_ENV === 'production' ? 'x-real-ip' : null);
+
+const getRateLimitIp = (req) => {
+  const forwardedIp = RATE_LIMIT_IP_HEADER ? req.get(RATE_LIMIT_IP_HEADER) : null;
+  const ip = forwardedIp && isIP(forwardedIp) ? forwardedIp : req.ip;
+  return ipKeyGenerator(ip || 'unknown');
+};
+
+const getIpAndEmailKey = (req) =>
+  getRateLimitIp(req) + ':' + (req.body?.email || '').toLowerCase();
 
 /**
  * Login is the classic brute-force target: an attacker with a password
@@ -19,7 +35,7 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many login attempts. Try again in a few minutes.' },
-  keyGenerator: (req, res) => `${ipKeyGenerator(req, res)}:${(req.body?.email || '').toLowerCase()}`,
+  keyGenerator: getIpAndEmailKey,
   skip: skipInTest,
 });
 
@@ -32,7 +48,7 @@ const loginIpLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many login attempts from this address. Try again later.' },
-  keyGenerator: (req, res) => ipKeyGenerator(req, res),
+  keyGenerator: getRateLimitIp,
   skip: skipInTest,
 });
 
@@ -42,7 +58,7 @@ const forgotPasswordIpLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many password reset requests from this address. Try again later.' },
-  keyGenerator: (req, res) => ipKeyGenerator(req, res),
+  keyGenerator: getRateLimitIp,
   skip: skipInTest,
 });
 
@@ -73,7 +89,7 @@ const forgotPasswordLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many password reset requests. Try again in a few minutes.' },
-  keyGenerator: (req, res) => `${ipKeyGenerator(req, res)}:${(req.body?.email || '').toLowerCase()}`,
+  keyGenerator: getIpAndEmailKey,
   skip: skipInTest,
 });
 
