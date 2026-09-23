@@ -56,6 +56,7 @@ The CV pipeline is configured for CPU execution. See [Getting started](#getting-
 │   └── utils/               # Queue, storage, sockets, validation, and shared services
 ├── API_REFERENCE.md         # Expanded endpoint reference
 ├── AWS_FREE_PLAN_DEPLOYMENT.md # AWS EC2 and Cloudflare Tunnel deployment
+├── MONGODB_UPGRADE_RUNBOOK.md # Staged MongoDB 6.0 to 8.0 upgrade procedure
 ├── DEPLOYMENT_GUIDE.md      # General deployment guidance
 ├── ENV_CONFIGURATION.md    # Environment configuration reference
 ├── compose.aws.yml          # Production app, worker, MongoDB, Redis, and tunnel

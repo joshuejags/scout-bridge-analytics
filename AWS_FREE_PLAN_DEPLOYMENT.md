@@ -2,6 +2,8 @@
 
 This guide runs the existing application image, analysis daemon, MongoDB, and Redis on one EC2 instance. Cloudflare Tunnel publishes the app over HTTPS without opening inbound web ports. The root Docker image builds and serves the React client and Node API together; the client uses the same-origin `/api` path.
 
+> **Database security:** This deployment still defaults to MongoDB 6.0 for compatibility with existing data. MongoDB 6.0 is out of support. Review the [MongoDB upgrade runbook](MONGODB_UPGRADE_RUNBOOK.md) and plan a staged 6.0 → 7.0 → 8.0 migration; do not point an existing data volume directly at MongoDB 8.0.
+
 ## Free plan limits
 
 AWS's Free plan includes selected EC2 instance types and uses promotional credits. The plan ends when credits are exhausted or six months after account creation, whichever comes first. AWS closes a Free plan account at that point unless it is upgraded; the hosted app and its data then become unavailable. Check the remaining credit and plan end date in AWS Billing before creating infrastructure.
