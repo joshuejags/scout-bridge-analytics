@@ -52,6 +52,23 @@ async function persistAnalysis(video, result, processingLeaseId = null) {
     if (!leaseIsAlive) throw new Error('Analysis worker lease was lost before persistence');
   }
 
+  // A worker can crash after Analysis.save() but before Video is finalized.
+  // Remove that orphan before creating the replacement so recovered jobs stay
+  // idempotent. The current processing lease is checked immediately above,
+  // making this cleanup safe against a worker that no longer owns the video.
+  const existingAnalysis = await Analysis.findOne({ video: video._id });
+  if (existingAnalysis) {
+    const { deleteAnalysisArtifacts } = require('../utils/artifactStore');
+    try {
+      await deleteAnalysisArtifacts(existingAnalysis._id);
+    } catch (cleanupError) {
+      console.warn(
+        `Failed to clean stale analysis artifacts ${existingAnalysis._id}: ${cleanupError.message}`
+      );
+    }
+    await Analysis.deleteOne({ _id: existingAnalysis._id });
+  }
+
   const teamIds = [video.team, video.opponentTeam].filter(Boolean);
   const rosterQuery = teamIds.length ? { team: { $in: teamIds } } : {};
   const roster = await Player.find(rosterQuery);
@@ -105,7 +122,6 @@ async function persistAnalysis(video, result, processingLeaseId = null) {
   try {
     const { uploadJsonObject } = require('../utils/artifactStore');
     const THRESHOLD = Number(process.env.TRACKING_OFFLOAD_THRESHOLD || 500);
-    const bucket = process.env.S3_BUCKET || null;
     let updated = false;
     for (let i = 0; i < analysis.playerData.length; i++) {
       const p = analysis.playerData[i];
