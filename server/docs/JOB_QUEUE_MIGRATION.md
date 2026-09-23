@@ -4,7 +4,7 @@
 
 The analysis daemon claims videos whose MongoDB status is `queued`. It submits each claimed video to the shared worker-pool interface, which uses BullMQ and Redis when Redis is available. BullMQ workers run the Python CV worker, and the daemon persists the result through `persistAnalysis()`.
 
-The worker-pool wrapper retains a development in-memory fallback. It is enabled outside production unless `DISABLE_FALLBACK_MODE=true`. In production, fallback is disabled by default, so an unavailable Redis service causes analysis submission to fail and the video is marked failed by the daemon. The in-memory fallback does not provide Redis durability or retry guarantees.
+The worker-pool wrapper selects its in-memory fallback during initialization only, when Redis/BullMQ cannot be reached. It is enabled outside production unless `DISABLE_FALLBACK_MODE=true`; in production, fallback is disabled by default, so unavailable Redis causes initialization to fail and the daemon marks the video failed. Once BullMQ is active, submission or runtime errors are surfaced to the caller instead of starting a second in-memory run, because the Redis job may already be queued or running. The in-memory fallback does not provide Redis durability or retry guarantees.
 
 Relevant implementation:
 
