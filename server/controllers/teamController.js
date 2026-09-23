@@ -60,14 +60,7 @@ exports.getTeams = async (req, res) => {
 };
 
 function escapeRegex(value) {
-  return String(value).replace(/[.*+?^()|[\\]\\\\]/g, '\\\\exports.getTeams = async (req, res) => {
-  try {
-    const teams = await Team.find();
-    res.json(teams);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};');
+  return String(value).replace(/[.*+?^()|[\]\\]/g, '\\$&');
 }
 
 exports.getTeamOverview = async (req, res) => {
