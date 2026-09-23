@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import Toast from './Toast';
-import { uploadFileInChunks } from '../utils/chunkedUpload';
+import {
+  isDirectS3UploadEnabled,
+  uploadFileDirectToS3,
+  uploadFileInChunks,
+} from '../utils/chunkedUpload';
 import { apiUrl } from '../utils/api';
 import './VideoUpload.css';
 
@@ -82,27 +86,25 @@ const VideoUpload = ({ onUploadSuccess }) => {
 
     try {
       if (mode === 'file') {
-        // Uploaded as a sequence of chunks rather than one long-lived
-        // multipart POST — see utils/chunkedUpload.js for why (resilience
-        // against a dropped connection, and reverse-proxy/load-balancer
-        // idle-timeout limits on very large single requests).
-        const video = await uploadFileInChunks(
-          file,
-          {
-            sport,
-            team: selectedTeam || undefined,
-            opponentTeam: selectedOpponent || undefined,
-            players: selectedPlayers,
-          },
-          { onProgress: setProgress }
-        );
+        const meta = {
+          sport,
+          team: selectedTeam || undefined,
+          opponentTeam: selectedOpponent || undefined,
+          players: selectedPlayers,
+        };
+
+        // In production with S3/R2, the browser uploads parts directly to
+        // object storage. Express only signs the upload and stores metadata,
+        // so large video bytes no longer consume API bandwidth or memory.
+        // Local/dev deployments continue using the resilient server-side
+        // chunked path.
+        const video = isDirectS3UploadEnabled
+          ? await uploadFileDirectToS3(file, meta, { onProgress: setProgress })
+          : await uploadFileInChunks(file, meta, { onProgress: setProgress });
+
         setMessage('Upload succeeded!');
         if (onUploadSuccess) onUploadSuccess(video);
       } else {
-        // The server responds as soon as the import is queued (202) and
-        // downloads the file in the background; see
-        // videoController.importVideoFromUrl. VideoList picks up progress
-        // from there over the video:import:* socket events.
         const response = await axios.post(apiUrl('/videos/import-url'), {
           url: videoUrl.trim(),
           sport,
@@ -116,7 +118,7 @@ const VideoUpload = ({ onUploadSuccess }) => {
 
       resetFormFields();
     } catch (err) {
-      setError(err.response?.data?.error || (mode === 'file' ? 'Upload failed' : 'Import failed'));
+      setError(err.response?.data?.error || err.message || (mode === 'file' ? 'Upload failed' : 'Import failed'));
     } finally {
       setUploading(false);
     }
