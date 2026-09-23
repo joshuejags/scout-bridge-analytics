@@ -55,10 +55,14 @@ const DashboardPage = () => {
           totalTeams: teamsRes.data.length,
           totalPlayers: playersRes.data.length,
           analyzedVideos: fetchedVideos.filter((v) => v.status === 'analyzed').length,
-          processingVideos: fetchedVideos.filter((v) => v.status === 'processing' || v.status === 'uploaded').length,
+          processingVideos: fetchedVideos.filter((v) => v.status === 'queued' || v.status === 'processing').length,
           failedVideos: fetchedVideos.filter((v) => v.status === 'failed').length,
         });
-        setRecentVideos(fetchedVideos.slice(-6).reverse());
+        setRecentVideos(
+          [...fetchedVideos]
+            .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+            .slice(0, 6)
+        );
       } catch (err) {
         setError('Failed to load dashboard statistics.');
         console.error(err);
