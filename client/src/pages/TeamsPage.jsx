@@ -17,38 +17,33 @@ const TeamsPage = () => {
   const [editingTeamId, setEditingTeamId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false });
 
   useEffect(() => {
-    const fetchTeams = async () => {
+    const timer = setTimeout(async () => {
       try {
-        const response = await axios.get(apiUrl('/teams'));
-        setTeams(response.data);
+        const response = await axios.get(apiUrl('/teams'), {
+          params: { paginated: true, page, limit: 25, q: searchQuery || undefined },
+        });
+        const data = response.data;
+        setTeams(data.items || []);
+        setPagination(data.pagination || pagination);
       } catch (err) {
         setError('Unable to load teams.');
       } finally {
         setLoading(false);
       }
-    };
+    }, searchQuery ? 300 : 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, searchQuery]);
 
-    fetchTeams();
-  }, []);
-
-  const filteredTeams = useMemo(
-    () =>
-      teams.filter((team) => {
-        const haystack = `${team.name} ${team.description || ''}`.toLowerCase();
-        return !searchQuery || haystack.includes(searchQuery.toLowerCase());
-      }),
-    [teams, searchQuery]
-  );
-
-  const summary = useMemo(
-    () => ({
-      total: teams.length,
-      filtered: filteredTeams.length,
-    }),
-    [teams.length, filteredTeams.length]
-  );
+  const filteredTeams = teams;
+  const summary = {
+    total: pagination.total,
+    filtered: pagination.total,
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -170,9 +165,9 @@ const TeamsPage = () => {
         title="Team filters"
         placeholder="Search teams by name or description..."
         value={searchQuery}
-        onChange={setSearchQuery}
+        onChange={(value) => { setSearchQuery(value); setPage(1); }}
         summary={`${filteredTeams.length} visible`}
-        onClear={() => setSearchQuery('')}
+        onClear={() => { setSearchQuery(''); setPage(1); }}
       />
 
       <section className="surface-card teams-list-card">
@@ -237,6 +232,16 @@ const TeamsPage = () => {
           </div>
         )}
       </section>
+
+      {pagination.totalPages > 1 && (
+        <div className="card-title-row" style={{ marginTop: '1rem' }}>
+          <span className="card-subtitle">Page {pagination.page} of {pagination.totalPages}</span>
+          <div className="team-card-actions">
+            <button type="button" className="button button-secondary" disabled={!pagination.hasPreviousPage || loading} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
+            <button type="button" className="button button-secondary" disabled={!pagination.hasNextPage || loading} onClick={() => setPage((value) => value + 1)}>Next</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
