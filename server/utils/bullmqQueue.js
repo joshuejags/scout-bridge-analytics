@@ -350,6 +350,36 @@ async function getJobStatus(jobId) {
 }
 
 /**
+ * List dead-letter jobs without exposing their original payloads or local
+ * file paths to the admin UI.
+ */
+async function getDeadLetterJobs({ limit = 50, offset = 0 } = {}) {
+  if (!deadLetterQueue) {
+    await initializeQueue();
+  }
+  const pageSize = Math.min(100, Math.max(1, Number(limit) || 50));
+  const start = Math.max(0, Number(offset) || 0);
+  const [jobs, total] = await Promise.all([
+    deadLetterQueue.getJobs(['waiting'], start, start + pageSize - 1),
+    deadLetterQueue.count('waiting'),
+  ]);
+
+  return {
+    items: jobs.map((job) => ({
+      id: job.id,
+      originalJobId: job.data.originalJobId,
+      originalJobName: job.data.originalJobName,
+      attemptsMade: job.data.attemptsMade,
+      failedReason: job.data.failedReason || job.failedReason,
+      failedAt: job.data.failedAt,
+    })),
+    limit: pageSize,
+    offset: start,
+    total,
+  };
+}
+
+/**
  * Get queue statistics (for monitoring).
  */
 async function checkRedis() {
@@ -436,6 +466,7 @@ module.exports = {
   startWorker,
   submitJob,
   getJobStatus,
+  getDeadLetterJobs,
   getQueueStats,
   checkRedis,
   shutdown,

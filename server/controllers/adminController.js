@@ -2,7 +2,7 @@ const Video = require('../models/Video');
 const User = require('../models/User');
 const Team = require('../models/Team');
 const Player = require('../models/Player');
-const { getQueueStats, checkRedis } = require('../utils/bullmqQueue');
+const { getQueueStats, getDeadLetterJobs, checkRedis } = require('../utils/bullmqQueue');
 
 async function getSummary(req, res) {
   const [totalUsers, totalTeams, totalPlayers, totalVideos, analyzedVideos, processingVideos, failedVideos, queuedVideos, pendingVerification, recentUsers, recentVideos, adminUsers, scoutUsers, teamUsers, playerUsers] =
@@ -78,6 +78,19 @@ async function listJobs(req, res) {
   res.json({ items: videos });
 }
 
+async function listDeadLetterJobs(req, res) {
+  try {
+    const result = await getDeadLetterJobs({
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error('[admin] Failed to list dead-letter jobs:', error.message);
+    return res.status(503).json({ error: 'Dead-letter queue is unavailable' });
+  }
+}
+
 async function retryJob(req, res) {
   const id = req.params.id;
   const video = await Video.findById(id);
@@ -92,4 +105,4 @@ async function retryJob(req, res) {
   res.json({ ok: true, id: video._id });
 }
 
-module.exports = { getSummary, listJobs, retryJob };
+module.exports = { getSummary, listJobs, listDeadLetterJobs, retryJob };
