@@ -195,24 +195,27 @@ const VideoList = ({ refreshTrigger = 0 }) => {
       return;
     }
 
-    if (socket && socket.connected) {
-      return;
-    }
-
+    // Socket.IO provides fast UI updates, but keep a durable polling fallback.
+    // A socket can disconnect immediately after the 202 response, so relying on
+    // socket events alone could leave the button stuck in "Processing...".
     try {
       const updatedVideo = await poll(async () => {
-        const data = await refreshVideos();
-        const currentVideo = data.find((video) => video._id === videoId);
-        const ready =
-          currentVideo && currentVideo.status !== 'processing' && currentVideo.status !== 'queued';
-        return { ready, data: currentVideo };
+        const response = await axios.get(apiUrl(`/analysis/${videoId}/status`));
+        const status = response.data?.status;
+        const ready = status === 'analyzed' || status === 'failed';
+        return { ready, data: response.data };
       }, 5000, 60);
 
       if (updatedVideo) {
         setVideos((prevVideos) =>
           prevVideos.map((video) =>
             video._id === videoId
-              ? { ...video, status: updatedVideo.status, analysis: updatedVideo.analysis }
+              ? {
+                  ...video,
+                  status: updatedVideo.status,
+                  analysis: updatedVideo.analysis,
+                  lastError: updatedVideo.lastError,
+                }
               : video
           )
         );
@@ -221,7 +224,11 @@ const VideoList = ({ refreshTrigger = 0 }) => {
             ? 'Video analysis complete. You can view the report.'
             : `Video status: ${updatedVideo.status}`
         );
-        setError(null);
+        if (updatedVideo.status === 'failed') {
+          setError(updatedVideo.lastError || 'Video processing failed.');
+        } else {
+          setError(null);
+        }
       } else {
         revertOptimistic(videoId);
       }
