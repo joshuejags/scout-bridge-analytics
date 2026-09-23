@@ -24,8 +24,8 @@ async function readJsonObject(key, { backend } = {}) {
   return JSON.parse(buffer.toString('utf8'));
 }
 
-async function deleteJsonObject(key) {
-  await deleteObject(key);
+async function deleteJsonObject(key, { backend } = {}) {
+  await deleteObject(key, { backend });
 }
 
 async function deleteAnalysisArtifacts(analysisId) {
