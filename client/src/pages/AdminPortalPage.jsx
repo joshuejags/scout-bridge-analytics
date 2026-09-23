@@ -13,6 +13,9 @@ const AdminPortalPage = () => {
   const [summary, setSummary] = useState(null);
   const [users, setUsers] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [deadLetterJobs, setDeadLetterJobs] = useState([]);
+  const [deadLetterError, setDeadLetterError] = useState(null);
+  const [retriedDeadLetterVideoIds, setRetriedDeadLetterVideoIds] = useState([]);
   const [monitoring, setMonitoring] = useState({ summary: null, alerts: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -33,6 +36,14 @@ const AdminPortalPage = () => {
       setSummary(summaryRes.data);
       setUsers(usersRes.data);
       setJobs(jobsRes.data.items || []);
+
+      try {
+        const deadLetterRes = await axios.get(apiUrl('/admin/dead-letter-jobs?limit=8&offset=0'));
+        setDeadLetterJobs(deadLetterRes.data.items || []);
+        setDeadLetterError(null);
+      } catch (deadLetterErr) {
+        setDeadLetterError(deadLetterErr.response?.data?.error || 'Dead-letter queue is unavailable.');
+      }
 
       const orgs = organizationsRes.data.organizations || [];
       if (orgs[0]?._id) {
@@ -76,12 +87,15 @@ const AdminPortalPage = () => {
     }
   };
 
-  const retryJob = async (jobId) => {
+  const retryJob = async (jobId, fromDeadLetter = false) => {
     setRetryingJobId(jobId);
     setError(null);
     try {
       await axios.post(apiUrl(`/admin/jobs/${jobId}/retry`));
       setMessage('Job moved back to the queue.');
+      if (fromDeadLetter) {
+        setRetriedDeadLetterVideoIds((prev) => [...new Set([...prev, jobId])]);
+      }
       await loadPortal();
     } catch (err) {
       setError(err.response?.data?.error || 'Unable to retry job.');
@@ -280,6 +294,43 @@ const AdminPortalPage = () => {
                     ))
                   )}
                 </div>
+              </section>
+
+              <section className="surface-card admin-card">
+                <div className="card-title-row">
+                  <div>
+                    <h2 className="card-title">Dead-letter failures</h2>
+                    <p className="card-subtitle">Analysis jobs that exhausted their automatic retries.</p>
+                  </div>
+                  <span className="pill pill--neutral">{deadLetterJobs.length}</span>
+                </div>
+                {deadLetterError ? (
+                  <div className="empty-state">{deadLetterError}</div>
+                ) : deadLetterJobs.filter((job) => !retriedDeadLetterVideoIds.includes(job.videoId)).length === 0 ? (
+                  <div className="empty-state">No exhausted analysis jobs to review.</div>
+                ) : (
+                  <div className="admin-job-list">
+                    {deadLetterJobs
+                      .filter((job) => !retriedDeadLetterVideoIds.includes(job.videoId))
+                      .map((job) => (
+                        <div key={job.id} className="admin-job-item">
+                          <div>
+                            <strong>{job.videoId ? `Video ${job.videoId}` : job.originalJobId}</strong>
+                            <p>{job.attemptsMade} attempts · {job.failedReason || 'Analysis failed'}</p>
+                            {job.failedAt && <p>Failed {new Date(job.failedAt).toLocaleString()}</p>}
+                          </div>
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            disabled={!job.videoId || retryingJobId === job.videoId}
+                            onClick={() => retryJob(job.videoId, true)}
+                          >
+                            {!job.videoId ? 'Video unavailable' : retryingJobId === job.videoId ? 'Retrying...' : 'Retry video'}
+                          </button>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </section>
             </aside>
           </div>
