@@ -74,7 +74,7 @@ Production deployments should provide a reachable Redis service. The queue's loc
 
 ## Operational notes
 
-- Preserve Redis data during routine deploys; it holds waiting, active, and delayed jobs.
+- Preserve Redis data during routine deploys; it holds waiting, active, and delayed jobs. Graceful worker shutdown finishes active jobs and closes queue connections without draining the queue, so waiting jobs remain available when the worker starts again.
 - Keep Redis access restricted to the application and trusted operators.
 - Analysis results are protected by a unique `Analysis.video` index. See the [duplicate analysis cleanup instructions](../../README.md#analysis-reliability-and-operations) before deploying that index to an older database with potential duplicate records.
 - See [backup strategy](BACKUP_STRATEGY.md) for MongoDB backup and restore procedures.
