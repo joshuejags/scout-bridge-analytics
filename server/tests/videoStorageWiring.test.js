@@ -112,6 +112,6 @@ describe('Video storage backend wiring', () => {
       .delete(`/api/videos/${upload.body._id}`)
       .set('Authorization', `Bearer ${token}`); // first registered user in this test is admin
     expect(del.status).toBe(200);
-    expect(storage.deleteObject).toHaveBeenCalledWith(upload.body.filename);
+    expect(storage.deleteObject).toHaveBeenCalledWith(upload.body.filename, { backend: 's3' });
   });
 });
