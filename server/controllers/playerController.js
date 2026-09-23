@@ -116,8 +116,10 @@ exports.getPlayers = async (req, res) => {
 };
 
 function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\function escapeRegex(value) {
   return String(value).replace(/[.*+?^()|[\]\\]/g, '\\$&');
-};
+};');
+}
 exports.getPlayerOverview = async (req, res) => {
   try {
     const [players, analyses] = await Promise.all([
@@ -170,16 +172,16 @@ exports.getPlayerOverview = async (req, res) => {
 
         summary.totalDistance += matchDistance;
 
+        const actionCountsByTrackId = buildActionCountsByTrackId(analysis.actions);
         let matchActionCount = 0;
-        (analysis.actions || []).forEach((action) => {
-          if (
-            action.playerId &&
-            trackIds.has(action.playerId) &&
-            summary.actionCounts[action.type] !== undefined
-          ) {
-            summary.actionCounts[action.type] += 1;
-            matchActionCount += 1;
-          }
+        trackIds.forEach((trackId) => {
+          const counts = actionCountsByTrackId.get(trackId);
+          if (!counts) return;
+
+          Object.entries(counts).forEach(([type, count]) => {
+            summary.actionCounts[type] += count;
+            matchActionCount += count;
+          });
         });
 
         summary.matches.push({
@@ -254,6 +256,28 @@ exports.getPlayerOverview = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+function buildActionCountsByTrackId(actions) {
+  const countsByTrackId = new Map();
+  const supportedTypes = ['pass', 'shot', 'tackle', 'interception'];
+
+  for (const action of actions || []) {
+    if (!action.playerId || !supportedTypes.includes(action.type)) continue;
+
+    if (!countsByTrackId.has(action.playerId)) {
+      countsByTrackId.set(action.playerId, {
+        pass: 0,
+        shot: 0,
+        tackle: 0,
+        interception: 0,
+      });
+    }
+
+    countsByTrackId.get(action.playerId)[action.type] += 1;
+  }
+
+  return countsByTrackId;
+}
 
 function createEmptyPlayerSummary() {
   return {
@@ -409,16 +433,16 @@ exports.comparePlayers = async (req, res) => {
 
         stats.totalDistance += matchDistance;
 
+        const actionCountsByTrackId = buildActionCountsByTrackId(analysis.actions);
         let matchActionCount = 0;
-        (analysis.actions || []).forEach((action) => {
-          if (
-            action.playerId &&
-            trackIds.has(action.playerId) &&
-            stats.actionCounts[action.type] !== undefined
-          ) {
-            stats.actionCounts[action.type] += 1;
-            matchActionCount += 1;
-          }
+        trackIds.forEach((trackId) => {
+          const counts = actionCountsByTrackId.get(trackId);
+          if (!counts) return;
+
+          Object.entries(counts).forEach(([type, count]) => {
+            stats.actionCounts[type] += count;
+            matchActionCount += count;
+          });
         });
 
         stats.matches.push({
@@ -624,12 +648,16 @@ function aggregatePlayerSummary(id, analyses) {
 
     totalDistance += matchDistance;
 
+    const actionCountsByTrackId = buildActionCountsByTrackId(analysis.actions);
     let matchActionCount = 0;
-    analysis.actions.forEach((action) => {
-      if (action.playerId && trackIds.has(action.playerId) && actionCounts[action.type] !== undefined) {
-        actionCounts[action.type] += 1;
-        matchActionCount += 1;
-      }
+    trackIds.forEach((trackId) => {
+      const counts = actionCountsByTrackId.get(trackId);
+      if (!counts) return;
+
+      Object.entries(counts).forEach(([type, count]) => {
+        actionCounts[type] += count;
+        matchActionCount += count;
+      });
     });
 
     matches.push({
