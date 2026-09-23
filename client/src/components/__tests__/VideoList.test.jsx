@@ -126,10 +126,7 @@ describe('VideoList real-time analysis updates', () => {
     // The current client intentionally keeps a durable polling fallback even
     // while Socket.IO is connected, so a brief disconnect cannot strand the job.
     await waitFor(() =>
-      expect(axios.get).toHaveBeenCalledWith(
-        expect.stringContaining('/analysis/vid1/status'),
-        expect.objectContaining({})
-      )
+      expect(axios.get).toHaveBeenCalledWith(expect.stringContaining('/analysis/vid1/status'))
     );
   });
 
