@@ -200,7 +200,7 @@ class PWAManager {
    * Check if app is running in PWA mode
    */
   isRunningAsPWA() {
-    return window.matchMedia('(display-mode: standalone)').matches ||
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)')?.matches) ||
       window.navigator.standalone === true ||
       document.referrer.includes('android-app://');
   }
