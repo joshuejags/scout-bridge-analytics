@@ -117,6 +117,7 @@ The authoritative list of supported variables and deployment-specific notes is i
 
 - `MONGODB_URI`, `PORT`, and `JWT_SECRET` for the API and database. `JWT_SECRET` must be set in production; startup exits with an error if it is missing. The local development fallback is not suitable for deployed environments.
 - Redis connection settings (`REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, and optional `REDIS_PASSWORD`) for background analysis.
+- `RATE_LIMIT_IP_HEADER` when a reverse proxy provides the client IP in a trusted header. Production defaults to Railway's `X-Real-IP`; configure this variable for other proxy deployments.
 - `ANALYSIS_WORKER_POOL_SIZE`, `ANALYSIS_JOB_TIMEOUT`, and `ANALYSIS_JOB_MAX_ATTEMPTS` for analysis processing.
 - `STORAGE_BACKEND`, upload settings, and optional S3 credentials/endpoint for media storage.
 - `REACT_APP_API_URL` and `CLIENT_URL` for client/API URLs. `CLIENT_URL` must be set to the frontend HTTPS origin in production; startup rejects a missing or malformed value and uses it for CORS and email links.
