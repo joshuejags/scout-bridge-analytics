@@ -59,7 +59,7 @@ This marks the video record `queued` and clears its last error. The analysis dae
 | `DISABLE_FALLBACK_MODE` | `false` | Set to `true` to reject in-memory fallback in development too; production already disables fallback by default |
 | `ANALYSIS_WORKER_POOL_SIZE` | `2` | Concurrent analysis workers |
 | `ANALYSIS_JOB_MAX_ATTEMPTS` | `3` | BullMQ attempts before dead-letter copy |
-| `ANALYSIS_JOB_TIMEOUT` | `1800000` | Maximum time the submitter waits for completion before treating the job as timed out (milliseconds) |
+| `ANALYSIS_JOB_TIMEOUT` | `1800000` | Maximum execution time after a Python worker starts a job; the worker is stopped and BullMQ can retry it (milliseconds) |
 | `ANALYSIS_QUEUE_MAX` | `20` | In-memory fallback queue limit |
 
 Production deployments should provide a reachable Redis service. The queue's local defaults are for development; they are not a managed production Redis configuration.
@@ -67,7 +67,7 @@ Production deployments should provide a reachable Redis service. The queue's loc
 ## Monitoring and recovery
 
 - `GET /api/health` checks MongoDB and Redis and includes queue counts when Redis is available.
-- The worker and queue emit progress and failure details to application logs.
+- The worker and queue emit progress and failure details to application logs. A running Python process is terminated when it exceeds `ANALYSIS_JOB_TIMEOUT`; the error is handled as a failed BullMQ attempt and follows normal retry/backoff behavior.
 - `GET /api/admin/summary` and `GET /api/admin/jobs` provide existing admin views of system and video-job state.
 - `GET /api/admin/dead-letter-jobs` lists terminal analysis failures without returning local file paths.
 - Recover work by retrying the associated failed video through the admin endpoint. If no video ID is present (for older jobs), use the source job ID and service logs to investigate before taking action.
