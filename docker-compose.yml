@@ -10,6 +10,15 @@ services:
     volumes:
       - mongodb_data:/data/db
 
+  redis:
+    image: redis:7-alpine
+    container_name: scout-bridge-redis
+    command: redis-server --appendonly yes
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+
   server:
     build:
       context: ./server
@@ -18,16 +27,13 @@ services:
     environment:
       - NODE_ENV=development
       - MONGODB_URI=mongodb://root:password123@mongodb:27017/scout-bridge-analytics?authSource=admin
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DISABLE_FALLBACK_MODE=false
       - PORT=5000
-      # Overridden with a real secret via a .env file (docker compose reads
-      # .env from the project root automatically) or `docker compose run -e`;
-      # this placeholder only avoids a hard crash on `up` with no config.
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - MAX_FILE_SIZE=500000000
       - CLIENT_URL=http://localhost:3001
-      # Set real SMTP_* values to send real password-reset/verification
-      # emails; unset (the default here) logs them to this container's
-      # console instead — see server/utils/email.js.
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
@@ -37,9 +43,34 @@ services:
       - '5002:5000'
     depends_on:
       - mongodb
+      - redis
     volumes:
       - ./server:/app
       - /app/node_modules
+      - uploads_data:/app/uploads
+
+  analysis-worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: scout-bridge-analysis-worker
+    command: ["node", "scripts/analysisDaemon.js"]
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://root:password123@mongodb:27017/scout-bridge-analytics?authSource=admin
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DISABLE_FALLBACK_MODE=true
+      - ANALYSIS_WORKER_POOL_SIZE=${ANALYSIS_WORKER_POOL_SIZE:-2}
+      - ANALYSIS_JOB_TIMEOUT=${ANALYSIS_JOB_TIMEOUT:-1800000}
+      - ANALYSIS_JOB_MAX_ATTEMPTS=${ANALYSIS_JOB_MAX_ATTEMPTS:-3}
+      - ANALYZER_MAX_FRAMES=${ANALYZER_MAX_FRAMES:-}
+      - UPLOAD_DIR=/app/uploads
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - uploads_data:/app/uploads
 
   client:
     build:
@@ -58,3 +89,5 @@ services:
 
 volumes:
   mongodb_data:
+  redis_data:
+  uploads_data:
