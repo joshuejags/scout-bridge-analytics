@@ -23,14 +23,6 @@ describe('POST /api/analysis/:videoId/process — crash-path handling', () => {
     const { token } = await registerUser('crash-fix@example.com');
     const videoId = new mongoose.Types.ObjectId().toString();
 
-    // processAnalysis's very first line (before any response is sent) is
-    // `await Video.findById(videoId)`. Prior to the fix, that whole
-    // pre-response block had no try/catch — Express 4 doesn't catch async
-    // rejections, so this exact failure became an unhandled promise
-    // rejection capable of crashing the whole Node process for every user,
-    // not just returning an error for this one request. If that guard is
-    // ever removed again, this request hangs or Jest surfaces an unhandled
-    // rejection instead of the assertions below ever running.
     const dbError = new Error('simulated Mongo connection blip');
     jest.spyOn(Video, 'findById').mockRejectedValueOnce(dbError);
 
@@ -43,8 +35,6 @@ describe('POST /api/analysis/:videoId/process — crash-path handling', () => {
   });
 
   it('still returns 404 for a non-owned video once the DB call succeeds normally', async () => {
-    // Sanity check alongside the crash-path test above: confirms the new
-    // try/catch didn't change ordinary (non-throwing) behavior.
     const { token } = await registerUser('crash-fix-control@example.com');
     const videoId = new mongoose.Types.ObjectId().toString();
 
@@ -57,53 +47,73 @@ describe('POST /api/analysis/:videoId/process — crash-path handling', () => {
   });
 });
 
-describe('reconcileOrphanedJobs — startup recovery from a lost in-memory queue', () => {
-  const makeVideo = (status) =>
+describe('reconcileOrphanedJobs — recovery after API/worker restart', () => {
+  const makeVideo = (status, extra = {}) =>
     Video.create({
       filename: `${status}-${Date.now()}-${Math.random().toString(36).slice(2)}.mp4`,
       originalName: 'test.mp4',
       fileSize: 1000,
       filePath: '/tmp/does-not-matter.mp4',
       status,
+      ...extra,
     });
 
-  it('marks queued/processing videos as failed with a clear reason, and leaves other statuses untouched', async () => {
-    // analysisWorkerPool's queue is purely in-memory (see its own module
-    // comment) — a server restart loses any job it was holding, silently
-    // leaving the video stuck exactly at whichever of these two statuses
-    // it was in. Since this simulates that: no worker pool involved, just
-    // Video documents sitting in these states when reconciliation runs.
+  it('leaves queued jobs durable, re-queues stale processing jobs, and leaves other statuses untouched', async () => {
     const queued = await makeVideo('queued');
-    const processing = await makeVideo('processing');
+
+    // processingStartedAt is older than the default 30-minute recovery
+    // window, so this job is treated as abandoned and returned to queued.
+    const staleProcessing = await makeVideo('processing', {
+      processingStartedAt: new Date(Date.now() - 31 * 60 * 1000),
+    });
+
+    const freshProcessing = await makeVideo('processing', {
+      processingStartedAt: new Date(),
+    });
+
     const uploaded = await makeVideo('uploaded');
     const analyzed = await makeVideo('analyzed');
     const alreadyFailed = await makeVideo('failed');
 
     const count = await reconcileOrphanedJobs();
-    expect(count).toBe(2);
+    expect(count).toBe(1);
 
-    const [freshQueued, freshProcessing, freshUploaded, freshAnalyzed, freshFailed] =
-      await Promise.all(
-        [queued, processing, uploaded, analyzed, alreadyFailed].map((v) => Video.findById(v._id))
-      );
-
-    expect(freshQueued.status).toBe('failed');
-    expect(freshQueued.lastError).toBe(
-      'Processing was interrupted by a server restart. Please try again.'
+    const [
+      freshQueued,
+      recoveredProcessing,
+      untouchedProcessing,
+      freshUploaded,
+      freshAnalyzed,
+      freshFailed,
+    ] = await Promise.all(
+      [queued, staleProcessing, freshProcessing, uploaded, analyzed, alreadyFailed].map((v) =>
+        Video.findById(v._id)
+      )
     );
-    expect(freshProcessing.status).toBe('failed');
-    expect(freshProcessing.lastError).toBe(
-      'Processing was interrupted by a server restart. Please try again.'
-    );
 
-    // Untouched: reconciliation only ever affects queued/processing.
+    // Queued is now durable because the separate analysis daemon owns job
+    // claiming; an API restart does not lose it.
+    expect(freshQueued.status).toBe('queued');
+
+    // A worker that was processing for longer than the timeout is presumed
+    // gone, so the daemon can safely claim it again.
+    expect(recoveredProcessing.status).toBe('queued');
+    expect(recoveredProcessing.processingStartedAt).toBeNull();
+    expect(recoveredProcessing.lastError).toBeNull();
+
+    // Recent processing work is still potentially alive and must not be
+    // duplicated.
+    expect(untouchedProcessing.status).toBe('processing');
+
     expect(freshUploaded.status).toBe('uploaded');
     expect(freshAnalyzed.status).toBe('analyzed');
     expect(freshFailed.status).toBe('failed');
     expect(freshFailed.lastError).toBeNull();
   });
 
-  it('is a no-op (returns 0) when nothing is stuck', async () => {
+  it('is a no-op when nothing is stale', async () => {
+    await makeVideo('queued');
+    await makeVideo('processing', { processingStartedAt: new Date() });
     await makeVideo('uploaded');
     await makeVideo('analyzed');
 
