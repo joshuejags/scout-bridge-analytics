@@ -5,6 +5,8 @@ const {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
   HeadBucketCommand,
   CreateMultipartUploadCommand,
   UploadPartCommand,
@@ -224,6 +226,48 @@ async function readObject(key) {
   return Buffer.from(await result.Body.transformToByteArray());
 }
 
+async function deletePrefix(prefix) {
+  if (!prefix) throw new Error('Storage prefix is required');
+
+  if (!isCloudBackend()) {
+    const root = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads'));
+    const target = path.resolve(root, prefix);
+    if (target !== root && !target.startsWith(`${root}${path.sep}`)) {
+      throw new Error('Invalid storage prefix');
+    }
+    await fs.promises.rm(target, { recursive: true, force: true });
+    return { deleted: 1 };
+  }
+
+  const bucket = requireBucket();
+  const client = getS3Client();
+  let continuationToken;
+  let deleted = 0;
+
+  do {
+    const response = await client.send(new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: prefix,
+      ContinuationToken: continuationToken,
+    }));
+    const objects = (response.Contents || [])
+      .filter((object) => object.Key)
+      .map((object) => ({ Key: object.Key }));
+
+    if (objects.length) {
+      await client.send(new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: { Objects: objects, Quiet: true },
+      }));
+      deleted += objects.length;
+    }
+
+    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return { deleted };
+}
+
 async function deleteObject(key) {
   if (!isCloudBackend()) {
     const root = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads'));
@@ -265,6 +309,7 @@ module.exports = {
   pipeObjectToResponse,
   readObject,
   deleteObject,
+  deletePrefix,
   verifyStorageConnection,
   // multipart helpers for presigned direct-to-s3 uploads
   createMultipartPresignedUrls,
