@@ -10,10 +10,51 @@ const MONGO = process.env.MONGODB_URI || 'mongodb://localhost:27017/scout-bridge
 const POLL_INTERVAL = Number(process.env.ANALYSIS_DAEMON_POLL_MS || 2000);
 const SHUTDOWN_TIMEOUT = Number(process.env.SHUTDOWN_TIMEOUT_MS || 30000);
 const LEASE_HEARTBEAT_MS = Number(process.env.ANALYSIS_LEASE_HEARTBEAT_MS || 30000);
+const LEASE_STALE_MS = Number(
+  process.env.ANALYSIS_LEASE_STALE_MS || Math.max(LEASE_HEARTBEAT_MS * 3, 120000)
+);
 let shuttingDown = false;
 let shutdownPromise = null;
 
+async function recoverStaleJobs() {
+  const staleBefore = new Date(Date.now() - LEASE_STALE_MS);
+  const result = await Video.updateMany(
+    {
+      status: 'processing',
+      $or: [
+        { processingHeartbeatAt: { $lt: staleBefore } },
+        { processingHeartbeatAt: null, processingStartedAt: { $lt: staleBefore } },
+        { processingHeartbeatAt: { $exists: false }, processingStartedAt: { $lt: staleBefore } },
+      ],
+    },
+    {
+      $set: {
+        status: 'queued',
+        lastError: 'Recovered after an analysis worker lease expired.',
+        progress: 0,
+      },
+      $unset: {
+        processingStartedAt: 1,
+        processingLeaseId: 1,
+        processingHeartbeatAt: 1,
+      },
+    }
+  );
+
+  if (result.modifiedCount > 0) {
+    console.warn(
+      `[analysis-daemon] Re-queued ${result.modifiedCount} stale processing job(s).`
+    );
+  }
+  return result.modifiedCount;
+}
+
 async function processNextJob() {
+  // Recover jobs whose daemon/worker disappeared. This runs independently
+  // of API startup, so a healthy second daemon can recover work from a dead
+  // daemon without requiring the API process to restart.
+  await recoverStaleJobs();
+
   // Atomically claim a queued video
   const video = await Video.findOneAndUpdate(
     { status: 'queued' },
