@@ -246,26 +246,27 @@ async function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
     throw new Error('Queue not initialized. Call initializeQueue() first.');
   }
 
+  const jobId = `analysis-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const activeHandler = ({ jobId: eventJobId }) => {
+    if (String(eventJobId) === String(jobId) && onDispatch) onDispatch({ jobId });
+  };
+  const progressHandler = ({ jobId: eventJobId, data }) => {
+    if (String(eventJobId) !== String(jobId) || !onProgress) return;
+    const progress = typeof data === 'number' ? data : data?.progress ?? null;
+    onProgress({ progress });
+  };
+
+  queueEvents.on('active', activeHandler);
+  queueEvents.on('progress', progressHandler);
+
   try {
     const job = await analysisQueue.add('analyze', params, {
-      jobId: `analysis-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      jobId,
       priority: 5,
     });
 
     console.log(`[analysisQueue] Job ${job.id} submitted to queue`);
     if (onQueued) onQueued({ jobId: job.id });
-
-    const activeHandler = ({ jobId }) => {
-      if (String(jobId) === String(job.id) && onDispatch) onDispatch({ jobId: job.id });
-    };
-    const progressHandler = ({ jobId, data }) => {
-      if (String(jobId) !== String(job.id) || !onProgress) return;
-      const progress = typeof data === 'number' ? data : data?.progress ?? null;
-      onProgress({ progress });
-    };
-
-    queueEvents.on('active', activeHandler);
-    queueEvents.on('progress', progressHandler);
 
     try {
       return await job.waitUntilFinished(queueEvents, JOB_TIMEOUT);
@@ -274,6 +275,8 @@ async function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
       queueEvents.off('progress', progressHandler);
     }
   } catch (err) {
+    queueEvents.off('active', activeHandler);
+    queueEvents.off('progress', progressHandler);
     if (err.message.includes('timeout')) {
       throw new Error('Analysis job timed out - try again later');
     }
