@@ -34,6 +34,8 @@ const PlayersPage = () => {
   const [selectedForCompare, setSelectedForCompare] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
+  const [editingPlayerId, setEditingPlayerId] = useState(null);
+  const [editPlayer, setEditPlayer] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -123,6 +125,62 @@ const PlayersPage = () => {
       setMessage('Player added successfully.');
     } catch (err) {
       setError(err.response?.data?.error || 'Unable to create player.');
+    }
+  };
+
+  const startEdit = (player) => {
+    setEditingPlayerId(player._id);
+    setEditPlayer({
+      name: player.name || '',
+      team: player.team?._id || '',
+      position: player.position || '',
+      jerseyNumber: player.jerseyNumber ?? '',
+      age: player.age ?? '',
+      heightCm: player.heightCm ?? '',
+      weightKg: player.weightKg ?? '',
+      nationality: player.nationality || '',
+      preferredFoot: player.preferredFoot || '',
+      contractStatus: player.contractStatus || '',
+      profileSummary: player.profileSummary || '',
+    });
+    setError(null);
+    setMessage(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingPlayerId(null);
+    setEditPlayer({});
+  };
+
+  const updateEditPlayer = (field, value) => {
+    setEditPlayer((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleUpdate = async (event) => {
+    event.preventDefault();
+    if (!editingPlayerId) return;
+    try {
+      const payload = {
+        ...editPlayer,
+        team: editPlayer.team || null,
+        jerseyNumber: editPlayer.jerseyNumber === '' ? null : Number(editPlayer.jerseyNumber),
+        age: editPlayer.age === '' ? null : Number(editPlayer.age),
+        heightCm: editPlayer.heightCm === '' ? null : Number(editPlayer.heightCm),
+        weightKg: editPlayer.weightKg === '' ? null : Number(editPlayer.weightKg),
+      };
+      const response = await axios.put(apiUrl(`/players/${editingPlayerId}`), payload);
+      const team = teams.find((item) => item._id === response.data.team);
+      setPlayers((prev) =>
+        prev.map((player) =>
+          player._id === editingPlayerId
+            ? { ...response.data, team: team || null }
+            : player
+        )
+      );
+      cancelEdit();
+      setMessage('Player updated successfully.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Unable to update player.');
     }
   };
 
@@ -311,6 +369,52 @@ const PlayersPage = () => {
           <div className="players-grid">
             {filteredPlayers.map((player) => (
               <article key={player._id} className="player-card surface-card">
+{editingPlayerId === player._id ? (
+                  <form className="player-form" onSubmit={handleUpdate}>
+                    <div className="players-form-grid">
+                      {[
+                        ['name', 'Name', 'text'],
+                        ['position', 'Position', 'text'],
+                        ['jerseyNumber', 'Jersey number', 'number'],
+                        ['age', 'Age', 'number'],
+                        ['heightCm', 'Height (cm)', 'number'],
+                        ['weightKg', 'Weight (kg)', 'number'],
+                        ['nationality', 'Nationality', 'text'],
+                        ['preferredFoot', 'Preferred foot', 'text'],
+                        ['contractStatus', 'Contract status', 'text'],
+                        ['profileSummary', 'Profile summary', 'text'],
+                      ].map(([field, label, type]) => (
+                        <div className="form-row" key={field}>
+                          <label htmlFor={`editPlayer-${field}-${player._id}`}>{label}</label>
+                          <input
+                            id={`editPlayer-${field}-${player._id}`}
+                            type={type}
+                            value={editPlayer[field] ?? ''}
+                            onChange={(event) => updateEditPlayer(field, event.target.value)}
+                          />
+                        </div>
+                      ))}
+                      <div className="form-row">
+                        <label htmlFor={`editPlayer-team-${player._id}`}>Team</label>
+                        <select
+                          id={`editPlayer-team-${player._id}`}
+                          value={editPlayer.team || ''}
+                          onChange={(event) => updateEditPlayer('team', event.target.value)}
+                        >
+                          <option value="">No team</option>
+                          {teams.map((team) => (
+                            <option key={team._id} value={team._id}>{team.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="player-card-actions">
+                      <button type="submit" className="button button-primary">Save</button>
+                      <button type="button" className="button button-secondary" onClick={cancelEdit}>Cancel</button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
                 <div className="player-card-top">
                   <label className="player-compare-checkbox">
                     <input
@@ -343,10 +447,15 @@ const PlayersPage = () => {
                   <Link to={`/players/${player._id}`} className="button button-secondary">
                     View profile
                   </Link>
+                  <button type="button" className="button button-secondary" onClick={() => startEdit(player)}>
+                    Edit
+                  </button>
                   <button type="button" className="button button-danger" onClick={() => handleDelete(player._id)}>
                     Delete
                   </button>
                 </div>
+                  </>
+                )}
               </article>
             ))}
           </div>
