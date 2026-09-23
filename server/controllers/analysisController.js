@@ -510,15 +510,26 @@ exports.mergePlayerTracks = async (req, res) => {
       return String(pointer).replace(/^s3:\/\/[^/]+\//, '');
     };
 
-    const previousSourceArtifact = artifactKeyFromPointer(source.trackingData);
-    const previousTargetArtifact = artifactKeyFromPointer(target.trackingData);
+    const artifactInfoFromPointer = (value) => {
+      if (!value || typeof value !== 'object') return null;
+      const pointer = value.key || value.s3;
+      if (!pointer) return null;
+      const rawPointer = String(pointer);
+      return {
+        key: rawPointer.replace(/^s3:\/\/[^/]+\//, ''),
+        backend: value.backend || (rawPointer.startsWith('s3://') ? 's3' : undefined),
+      };
+    };
+
+    const previousSourceArtifact = artifactInfoFromPointer(source.trackingData);
+    const previousTargetArtifact = artifactInfoFromPointer(target.trackingData);
     let replacementArtifact = null;
 
     if (combined.length > threshold) {
       const key = `artifacts/analysis/${analysis._id}/player-${target.trackId || targetIdx}-tracking.json`;
       const stored = await uploadJsonObject(key, combined);
       target.trackingData = { backend: stored.backend, key };
-      replacementArtifact = key;
+      replacementArtifact = { key, backend: stored.backend };
     } else {
       target.trackingData = combined;
     }
@@ -531,14 +542,14 @@ exports.mergePlayerTracks = async (req, res) => {
     const staleArtifacts = [previousSourceArtifact, previousTargetArtifact]
       .filter(Boolean)
       .filter((key, index, keys) => keys.indexOf(key) === index)
-      .filter((key) => key !== replacementArtifact);
+      .filter((artifact) => !replacementArtifact || artifact.key !== replacementArtifact.key);
 
     if (staleArtifacts.length) {
       const { deleteJsonObject } = require('../utils/artifactStore');
       await Promise.all(
         staleArtifacts.map((key) =>
-          deleteJsonObject(key).catch((err) => {
-            console.warn(`artifact cleanup failed for ${key}: ${err.message}`);
+          deleteJsonObject(artifact.key, { backend: artifact.backend }).catch((err) => {
+            console.warn(`artifact cleanup failed for ${artifact.key}: ${err.message}`);
           })
         )
       );
