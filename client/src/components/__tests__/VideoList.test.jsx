@@ -123,9 +123,14 @@ describe('VideoList real-time analysis updates', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Process' }));
     await waitFor(() => expect(screen.getByText('queued')).toBeInTheDocument());
 
-    // Give any (incorrect) poll loop a chance to fire before asserting it didn't.
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(axios.get.mock.calls.length).toBe(getCallsBeforeProcess);
+    // The current client intentionally keeps a durable polling fallback even
+    // while Socket.IO is connected, so a brief disconnect cannot strand the job.
+    await waitFor(() =>
+      expect(axios.get).toHaveBeenCalledWith(
+        expect.stringContaining('/analysis/vid1/status'),
+        expect.objectContaining({})
+      )
+    );
   });
 
   it('shows a queued badge for a video queued by another connected client', async () => {
