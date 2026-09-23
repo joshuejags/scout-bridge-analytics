@@ -25,7 +25,7 @@ RUN npm install --omit=dev
 COPY server/requirements.txt server/requirements-easyocr.txt ./
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
-RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir torch torchvision --extra-index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir --no-deps -r requirements-easyocr.txt \
     && python3 -c "import cv2; assert hasattr(cv2, 'VideoCapture'), 'cv2 install broken'" \
