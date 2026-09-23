@@ -120,11 +120,84 @@ function escapeRegex(value) {
 };
 exports.getPlayerOverview = async (req, res) => {
   try {
-    const players = await Player.find().populate('team').sort({ createdAt: -1 });
-    const analyses = await Analysis.find({ 'playerData.0': { $exists: true } }).populate(
-      'video',
-      'originalName createdAt status sport'
-    );
+    const [players, analyses] = await Promise.all([
+      Player.find()
+        .select(
+          'name position jerseyNumber age heightCm weightKg nationality preferredFoot contractStatus marketValue profileSummary team'
+        )
+        .populate('team')
+        .sort({ createdAt: -1 })
+        .lean(),
+      Analysis.find({ 'playerData.0': { $exists: true } })
+        .select('video playerData actions')
+        .populate('video', 'originalName createdAt status sport')
+        .lean(),
+    ]);
+
+    // Aggregate all players in one pass over analyses instead of scanning every
+    // analysis once per player. This changes the dominant work from O(players × analyses)
+    // to O(analyses × tracked players in each analysis).
+    const summaryByPlayerId = new Map();
+    players.forEach((player) => {
+      summaryByPlayerId.set(String(player._id), createEmptyPlayerSummary());
+    });
+
+    analyses.forEach((analysis) => {
+      const tracksByPlayer = new Map();
+
+      (analysis.playerData || []).forEach((track) => {
+        if (!track.playerId) return;
+        const playerId = String(track.playerId);
+        if (!summaryByPlayerId.has(playerId)) return;
+        if (!tracksByPlayer.has(playerId)) tracksByPlayer.set(playerId, []);
+        tracksByPlayer.get(playerId).push(track);
+      });
+
+      tracksByPlayer.forEach((tracks, playerId) => {
+        const summary = summaryByPlayerId.get(playerId);
+        summary.matchesPlayed += 1;
+
+        const trackIds = new Set();
+        let matchDistance = 0;
+
+        tracks.forEach((track) => {
+          matchDistance += track.statistics?.distanceCovered || 0;
+          summary.totalSprints += track.statistics?.sprintCount || 0;
+          if (track.statistics?.averageSpeed) summary.speedSamples.push(track.statistics.averageSpeed);
+          if (track.verified) summary.verifiedTracks += 1;
+          if (track.trackId) trackIds.add(track.trackId);
+        });
+
+        summary.totalDistance += matchDistance;
+
+        let matchActionCount = 0;
+        (analysis.actions || []).forEach((action) => {
+          if (
+            action.playerId &&
+            trackIds.has(action.playerId) &&
+            summary.actionCounts[action.type] !== undefined
+          ) {
+            summary.actionCounts[action.type] += 1;
+            matchActionCount += 1;
+          }
+        });
+
+        summary.matches.push({
+          analysisId: analysis._id,
+          video: analysis.video
+            ? {
+                _id: analysis.video._id,
+                originalName: analysis.video.originalName,
+                createdAt: analysis.video.createdAt,
+                status: analysis.video.status,
+                sport: analysis.video.sport,
+              }
+            : null,
+          distanceCovered: round2(matchDistance),
+          actionCount: matchActionCount,
+        });
+      });
+    });
 
     const playerSummaries = players.map((player) => ({
       player: {
@@ -142,7 +215,7 @@ exports.getPlayerOverview = async (req, res) => {
         profileSummary: player.profileSummary,
         team: player.team,
       },
-      summary: aggregatePlayerSummary(String(player._id), analyses),
+      summary: finalizePlayerSummary(summaryByPlayerId.get(String(player._id))),
     }));
 
     const trackedProfiles = playerSummaries.filter((item) => item.summary.matchesPlayed > 0);
@@ -181,6 +254,41 @@ exports.getPlayerOverview = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+function createEmptyPlayerSummary() {
+  return {
+    matchesPlayed: 0,
+    totalDistance: 0,
+    totalSprints: 0,
+    speedSamples: [],
+    verifiedTracks: 0,
+    actionCounts: { pass: 0, shot: 0, tackle: 0, interception: 0 },
+    matches: [],
+  };
+}
+
+function finalizePlayerSummary(summary) {
+  const averageSpeed = summary.speedSamples.length
+    ? round2(summary.speedSamples.reduce((sum, value) => sum + value, 0) / summary.speedSamples.length)
+    : 0;
+
+  return {
+    matchesPlayed: summary.matchesPlayed,
+    totalDistanceCovered: round2(summary.totalDistance),
+    averageDistancePerMatch: summary.matchesPlayed
+      ? round2(summary.totalDistance / summary.matchesPlayed)
+      : 0,
+    averageSpeed,
+    totalSprints: summary.totalSprints,
+    averageSprintsPerMatch: summary.matchesPlayed
+      ? round2(summary.totalSprints / summary.matchesPlayed)
+      : 0,
+    actions: summary.actionCounts,
+    totalActions: Object.values(summary.actionCounts).reduce((sum, value) => sum + value, 0),
+    verifiedTracks: summary.verifiedTracks,
+    matches: summary.matches,
+  };
+}
 
 exports.getPlayerById = async (req, res) => {
   try {
