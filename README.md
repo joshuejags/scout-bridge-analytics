@@ -149,11 +149,8 @@ GitHub Actions runs the repository checks for server tests, client tests and bui
 Additional references:
 
 - [API reference](API_REFERENCE.md)
-- [Setup guide](SETUP.md)
 - [Testing and QA guide](TESTING_QA_GUIDE.md)
 - [Deployment guide](DEPLOYMENT_GUIDE.md)
-- [Project summary](PROJECT_SUMMARY.md)
-- [Improvement plan](PROJECT_IMPROVEMENT_PLAN.md)
 
 ## License
 
