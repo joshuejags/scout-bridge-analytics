@@ -43,6 +43,10 @@ function isCloudBackend() {
   return BACKEND === 's3';
 }
 
+function isBackendCloud(backend) {
+  return String(backend || BACKEND).toLowerCase() === 's3';
+}
+
 let s3Client = null;
 function getS3Client() {
   if (s3Client) return s3Client;
@@ -229,7 +233,7 @@ async function readObject(key) {
 async function deletePrefix(prefix) {
   if (!prefix) throw new Error('Storage prefix is required');
 
-  if (!isCloudBackend()) {
+  if (!isBackendCloud()) {
     const root = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads'));
     const target = path.resolve(root, prefix);
     if (target !== root && !target.startsWith(`${root}${path.sep}`)) {
@@ -268,8 +272,8 @@ async function deletePrefix(prefix) {
   return { deleted };
 }
 
-async function deleteObject(key) {
-  if (!isCloudBackend()) {
+async function deleteObject(key, { backend } = {}) {
+  if (!isBackendCloud(backend)) {
     const root = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads'));
     const target = path.resolve(root, key);
     if (target !== root && !target.startsWith(`${root}${path.sep}`)) {
