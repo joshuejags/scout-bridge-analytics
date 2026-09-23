@@ -210,6 +210,19 @@ async function pipeObjectToResponse(key, res) {
   result.Body.pipe(res);
 }
 
+async function readObject(key) {
+  if (!isCloudBackend()) {
+    const root = require('path').resolve(process.env.UPLOAD_DIR || require('path').join(process.cwd(), 'uploads'));
+    return fs.promises.readFile(require('path').join(root, key));
+  }
+
+  const bucket = requireBucket();
+  const client = getS3Client();
+  const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  if (!result.Body) throw new Error(`Storage object has no response body: ${key}`);
+  return Buffer.from(await result.Body.transformToByteArray());
+}
+
 async function deleteObject(key) {
   const bucket = requireBucket();
   const client = getS3Client();
@@ -239,6 +252,7 @@ module.exports = {
   isCloudBackend,
   storeFile,
   pipeObjectToResponse,
+  readObject,
   deleteObject,
   verifyStorageConnection,
   // multipart helpers for presigned direct-to-s3 uploads
