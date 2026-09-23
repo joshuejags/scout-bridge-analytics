@@ -129,7 +129,7 @@ The analysis pipeline has been hardened to avoid duplicate persisted results and
 
 1. Analysis jobs run through BullMQ with configurable retry attempts and exponential backoff.
 2. When a job exhausts its retries, the worker copies its identifying metadata and failure details to the `analysis-dead-letter` queue. A deterministic dead-letter job ID prevents duplicate copies if the final failure event repeats.
-3. The admin API exposes a paginated summary at `GET /api/admin/dead-letter-jobs?limit=50&offset=0`. The response includes job IDs, attempts, failure reason, and timestamp; it omits the original job payload and local video paths. Access is admin-only.
+3. The admin API exposes a paginated summary at `GET /api/admin/dead-letter-jobs?limit=50&offset=0`. The response includes the related video ID, job IDs, attempts, failure reason, and timestamp; it omits the original job payload and local video paths. Access is admin-only.
 4. A unique index on `Analysis.video` enforces one persisted analysis per video. Before deploying that index to a database that may contain older duplicate records, run the duplicate audit and review its output:
    ```bash
    cd server
