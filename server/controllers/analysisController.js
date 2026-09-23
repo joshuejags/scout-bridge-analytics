@@ -414,6 +414,13 @@ exports.mergePlayerTracks = async (req, res) => {
     const source = analysis.playerData[sourceIdx];
     const target = analysis.playerData[targetIdx];
 
+    if (!Array.isArray(source.trackingData) || !Array.isArray(target.trackingData)) {
+      return res.status(409).json({
+        error: 'These tracks contain offloaded tracking data and cannot be merged yet.',
+        code: 'TRACKING_DATA_OFFLOADED',
+      });
+    }
+
     // Merge tracking data, sorted chronologically.
     const combined = [...target.trackingData, ...source.trackingData].sort(
       (a, b) => a.frameNumber - b.frameNumber
