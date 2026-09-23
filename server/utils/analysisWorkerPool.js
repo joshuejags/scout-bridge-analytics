@@ -21,7 +21,8 @@ const REDIS_PASSWORD = process.env.REDIS_PASSWORD;
 
 // Fallback to in-memory mode if Redis is not available (for backward compatibility)
 // This can be disabled via DISABLE_FALLBACK_MODE=true
-const FALLBACK_MODE_ENABLED = process.env.DISABLE_FALLBACK_MODE !== 'true';
+const FALLBACK_MODE_ENABLED =
+  process.env.DISABLE_FALLBACK_MODE !== 'true' && process.env.NODE_ENV !== 'production';
 
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 const CV_DIR = process.env.CV_DIR || path.join(PROJECT_ROOT, 'server', 'cv');
@@ -64,21 +65,18 @@ async function ensureInitialized() {
 
     // Quick Redis connectivity check
     const testClient = redis.createClient({
-      host: REDIS_HOST,
-      port: REDIS_PORT,
+      socket: {
+        host: REDIS_HOST,
+        port: Number(REDIS_PORT),
+        connectTimeout: 2000,
+      },
+      database: Number(REDIS_DB),
       ...(REDIS_PASSWORD && { password: REDIS_PASSWORD }),
-      db: REDIS_DB,
-      connectTimeout: 2000,
-      retryStrategy: () => null, // fail fast on timeout
     });
 
-    await new Promise((resolve, reject) => {
-      testClient.on('ready', resolve);
-      testClient.on('error', reject);
-      setTimeout(() => reject(new Error('Redis connection timeout')), 3000);
-    });
-
-    testClient.quit();
+    await testClient.connect();
+    await testClient.ping();
+    await testClient.quit();
 
     // Redis is available, initialize BullMQ
     bullmqQueue = require('./bullmqQueue');
@@ -232,7 +230,7 @@ function dispatchNext() {
 
 /**
  * Submit an analysis job. Returns a Promise resolving to the analyzer result.
- * Transparently uses BullMQ if Redis is available, otherwise in-memory pool.
+ * Uses durable BullMQ/Redis in production; in-memory mode is development-only.
  */
 async function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
   await ensureInitialized();
