@@ -8,6 +8,7 @@ const { requireAuth } = require('./middleware/auth');
 const authorizeUploadAccess = require('./middleware/uploadAccess');
 const storage = require('./utils/storage');
 const errorTracking = require('./utils/errorTracking');
+const { checkRedis, getQueueStats } = require('./utils/bullmqQueue');
 
 const app = express();
 
@@ -72,11 +73,24 @@ app.use(
 // something like Railway's healthcheck — checking Mongo's connection
 // state (not issuing a real query, just reading the driver's own tracked
 // state) means a down database is reported as unhealthy instead of hidden.
-app.get('/api/health', (req, res) => {
-  const dbConnected = mongoose.connection.readyState === 1;
-  res
-    .status(dbConnected ? 200 : 503)
-    .json({ status: dbConnected ? 'ok' : 'degraded', database: dbConnected ? 'connected' : 'disconnected' });
+app.get('/api/health', async (req, res) => {
+  const database = mongoose.connection.readyState === 1;
+  const redisResult = await checkRedis();
+  const redis = redisResult.ok;
+  const healthy = database && redis;
+
+  let queue = null;
+  if (redis) {
+    try { queue = await getQueueStats(); } catch (_) {}
+  }
+
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'degraded',
+    database: database ? 'connected' : 'disconnected',
+    redis: redis ? 'connected' : 'disconnected',
+    queue,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Auth routes are unprotected (register/login must be reachable without a token)
