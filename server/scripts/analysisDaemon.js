@@ -15,6 +15,8 @@ const LEASE_STALE_MS = Number(
 );
 let shuttingDown = false;
 let shutdownPromise = null;
+let lastRecoveryAt = 0;
+const RECOVERY_INTERVAL_MS = Number(process.env.ANALYSIS_LEASE_RECOVERY_INTERVAL_MS || 10000);
 
 async function recoverStaleJobs() {
   const staleBefore = new Date(Date.now() - LEASE_STALE_MS);
@@ -50,10 +52,13 @@ async function recoverStaleJobs() {
 }
 
 async function processNextJob() {
-  // Recover jobs whose daemon/worker disappeared. This runs independently
-  // of API startup, so a healthy second daemon can recover work from a dead
-  // daemon without requiring the API process to restart.
-  await recoverStaleJobs();
+  // Recover jobs whose daemon/worker disappeared. Throttle the recovery
+  // query so multiple daemon replicas do not hammer MongoDB every poll.
+  const now = Date.now();
+  if (now - lastRecoveryAt >= RECOVERY_INTERVAL_MS) {
+    lastRecoveryAt = now;
+    await recoverStaleJobs();
+  }
 
   // Atomically claim a queued video
   const video = await Video.findOneAndUpdate(
