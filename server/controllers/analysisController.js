@@ -121,7 +121,21 @@ async function persistAnalysis(video, result, processingLeaseId = null) {
   }
 
   const finalUpdate = {
-    $set: { analysis: analysis._id, status: 'analyzed', lastError: null },
+    $set: {
+      analysis: analysis._id,
+      status: 'analyzed',
+      lastError: null,
+      ...(result.metadata
+        ? {
+            metadata: {
+              width: result.metadata.width,
+              height: result.metadata.height,
+              fps: result.metadata.fps,
+              frameCount: result.metadata.frameCount,
+            },
+          }
+        : {}),
+    },
     $unset: { processingStartedAt: 1, processingLeaseId: 1, processingHeartbeatAt: 1 },
   };
   if (processingLeaseId) {
