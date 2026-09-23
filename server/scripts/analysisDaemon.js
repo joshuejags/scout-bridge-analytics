@@ -105,7 +105,7 @@ async function processNextJob() {
 
   try {
     const result = await workerPool.submitJob(
-      { videoPath, maxFrames, thumbnailDir, sport: video.sport, enableJerseyOcr: true },
+      { videoId: videoIdStr, videoPath, maxFrames, thumbnailDir, sport: video.sport, enableJerseyOcr: true },
       { onProgress, onQueued, onDispatch }
     );
     const analysis = await persistAnalysis(video, result, processingLeaseId);
