@@ -206,7 +206,12 @@ The workflow can assume a narrowly scoped IAM role when the `AWS_ROLE_TO_ASSUME`
        {
          "Effect": "Allow",
          "Action": "s3:ListBucket",
-         "Resource": "arn:aws:s3:::scout-bridge-database-backups"
+         "Resource": "arn:aws:s3:::scout-bridge-database-backups",
+         "Condition": {
+           "StringLike": {
+             "s3:prefix": ["backups/", "backups/*"]
+           }
+         }
        },
        {
          "Effect": "Allow",
