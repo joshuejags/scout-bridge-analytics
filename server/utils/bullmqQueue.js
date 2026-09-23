@@ -241,7 +241,7 @@ async function processAnalysisJob(job) {
  * Submit an analysis job to the queue.
  * Returns a promise that resolves when the job completes successfully.
  */
-async function submitJob(params) {
+async function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
   if (!analysisQueue) {
     throw new Error('Queue not initialized. Call initializeQueue() first.');
   }
@@ -253,10 +253,26 @@ async function submitJob(params) {
     });
 
     console.log(`[analysisQueue] Job ${job.id} submitted to queue`);
+    if (onQueued) onQueued({ jobId: job.id });
 
-    // Wait for job completion with timeout
-    const result = await job.waitUntilFinished(queueEvents, JOB_TIMEOUT);
-    return result;
+    const activeHandler = ({ jobId }) => {
+      if (String(jobId) === String(job.id) && onDispatch) onDispatch({ jobId: job.id });
+    };
+    const progressHandler = ({ jobId, data }) => {
+      if (String(jobId) !== String(job.id) || !onProgress) return;
+      const progress = typeof data === 'number' ? data : data?.progress ?? null;
+      onProgress({ progress });
+    };
+
+    queueEvents.on('active', activeHandler);
+    queueEvents.on('progress', progressHandler);
+
+    try {
+      return await job.waitUntilFinished(queueEvents, JOB_TIMEOUT);
+    } finally {
+      queueEvents.off('active', activeHandler);
+      queueEvents.off('progress', progressHandler);
+    }
   } catch (err) {
     if (err.message.includes('timeout')) {
       throw new Error('Analysis job timed out - try again later');
@@ -294,6 +310,24 @@ async function getJobStatus(jobId) {
 /**
  * Get queue statistics (for monitoring).
  */
+async function checkRedis() {
+  const { createClient } = require('redis');
+  const client = createClient({
+    socket: { host: REDIS_HOST, port: Number(REDIS_PORT), connectTimeout: 2000 },
+    database: Number(REDIS_DB),
+    ...(REDIS_PASSWORD && { password: REDIS_PASSWORD }),
+  });
+  try {
+    await client.connect();
+    await client.ping();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  } finally {
+    try { if (client.isOpen) await client.quit(); } catch (_) {}
+  }
+}
+
 async function getQueueStats() {
   if (!analysisQueue) {
     return null;
@@ -350,5 +384,6 @@ module.exports = {
   submitJob,
   getJobStatus,
   getQueueStats,
+  checkRedis,
   shutdown,
 };
