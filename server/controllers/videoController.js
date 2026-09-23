@@ -530,6 +530,12 @@ exports.deleteVideo = async (req, res) => {
       await Analysis.findByIdAndDelete(video.analysis).catch((err) => {
         console.error(`Failed to delete analysis for video ${video._id}: ${err.message}`);
       });
+      try {
+        const { deleteAnalysisArtifacts } = require('../utils/artifactStore');
+        await deleteAnalysisArtifacts(video.analysis);
+      } catch (err) {
+        console.error(`Failed to delete analysis artifacts for video ${video._id}: ${err.message}`);
+      }
     }
     const thumbnailDir = path.join(THUMBNAILS_ROOT, String(video._id));
     fs.rm(thumbnailDir, { recursive: true, force: true }, (err) => {
