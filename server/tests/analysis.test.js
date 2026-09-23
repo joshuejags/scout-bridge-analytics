@@ -3,6 +3,7 @@ const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../app');
 const Video = require('../models/Video');
+const Analysis = require('../models/Analysis');
 const { reconcileOrphanedJobs } = require('../controllers/analysisController');
 
 const registerUser = async (email) =>
@@ -95,21 +96,12 @@ describe('reconcileOrphanedJobs — recovery after API/worker restart', () => {
       )
     );
 
-    // Queued is now durable because the separate analysis daemon owns job
-    // claiming; an API restart does not lose it.
     expect(freshQueued.status).toBe('queued');
-
-    // A worker that was processing for longer than the timeout is presumed
-    // gone, so the daemon can safely claim it again.
     expect(recoveredProcessing.status).toBe('queued');
     expect(recoveredProcessing.processingStartedAt).toBeNull();
     expect(recoveredProcessing.lastError).toBeNull();
-
-    // Recent processing work is still potentially alive and must not be
-    // duplicated.
     expect(untouchedProcessing.status).toBe('processing');
     expect(untouchedProcessing.processingLeaseId).toBe('live-worker');
-
     expect(freshUploaded.status).toBe('uploaded');
     expect(freshAnalyzed.status).toBe('analyzed');
     expect(freshFailed.status).toBe('failed');
@@ -118,11 +110,61 @@ describe('reconcileOrphanedJobs — recovery after API/worker restart', () => {
 
   it('is a no-op when nothing is stale', async () => {
     await makeVideo('queued');
-    await makeVideo('processing', { processingStartedAt: new Date(), processingHeartbeatAt: new Date(), processingLeaseId: 'live-worker' });
+    await makeVideo('processing', {
+      processingStartedAt: new Date(),
+      processingHeartbeatAt: new Date(),
+      processingLeaseId: 'live-worker',
+    });
     await makeVideo('uploaded');
     await makeVideo('analyzed');
 
     const count = await reconcileOrphanedJobs();
     expect(count).toBe(0);
+  });
+});
+
+describe('Analysis persistence invariant', () => {
+  it('rejects a second analysis for the same video', async () => {
+    const video = await Video.create({
+      filename: `analysis-unique-${Date.now()}.mp4`,
+      originalName: 'analysis-unique.mp4',
+      fileSize: 1000,
+      filePath: '/tmp/does-not-matter.mp4',
+      status: 'uploaded',
+    });
+
+    await Analysis.create({
+      video: video._id,
+      playerData: [],
+      ballData: { trackingData: [], possessionStats: [] },
+      actions: [],
+      heatmapData: { grid: [], cellSize: 50 },
+      tacticalData: { teams: [] },
+      summary: {
+        totalPlayers: 0,
+        matchDuration: 0,
+        highlightedMoments: [],
+        qualityFlag: null,
+      },
+    });
+
+    await expect(
+      Analysis.create({
+        video: video._id,
+        playerData: [],
+        ballData: { trackingData: [], possessionStats: [] },
+        actions: [],
+        heatmapData: { grid: [], cellSize: 50 },
+        tacticalData: { teams: [] },
+        summary: {
+          totalPlayers: 0,
+          matchDuration: 0,
+          highlightedMoments: [],
+          qualityFlag: null,
+        },
+      })
+    ).rejects.toMatchObject({ code: 11000 });
+
+    expect(await Analysis.countDocuments({ video: video._id })).toBe(1);
   });
 });
