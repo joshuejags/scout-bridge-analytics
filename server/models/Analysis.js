@@ -1,15 +1,5 @@
 const mongoose = require('mongoose');
 
-const TrackingDataSchema = new mongoose.Schema(
-  {
-    frameNumber: Number,
-    position: { x: Number, y: Number },
-    confidence: Number,
-    pose: Object,
-  },
-  { _id: false }
-);
-
 const PlayerDataSchema = new mongoose.Schema(
   {
     playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player' },
@@ -140,5 +130,8 @@ const AnalysisSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Supports cross-match player analytics queries without scanning every analysis.
+AnalysisSchema.index({ 'playerData.playerId': 1 });
 
 module.exports = mongoose.model('Analysis', AnalysisSchema);
