@@ -418,16 +418,61 @@ async function runUrlImport(videoId, url) {
 exports.getVideos = async (req, res) => {
   try {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const videos = await Video.find(ownershipFilter(req))
-      .populate('analysis')
-      .populate('team')
-      .populate('opponentTeam')
-      .populate('players');
+    const paginated = String(req.query.paginated || '').toLowerCase() === 'true';
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const requestedLimit = Number.parseInt(req.query.limit, 10) || 25;
+    const limit = Math.min(100, Math.max(1, requestedLimit));
+    const skip = (page - 1) * limit;
+    const query = String(req.query.q || '').trim();
+    const status = String(req.query.status || '').trim();
+
+    const filter = { ...ownershipFilter(req) };
+
+    if (query) {
+      filter.$or = [
+        { originalName: { $regex: query, $options: 'i' } },
+        { filename: { $regex: query, $options: 'i' } },
+      ];
+    }
+
+    if (status && ['importing', 'uploaded', 'queued', 'processing', 'analyzed', 'failed'].includes(status)) {
+      filter.status = status;
+    }
+
+    const findQuery = Video.find(filter)
+      .sort({ createdAt: -1 })
+      // List views do not need the full analysis payload. Large tracking
+      // arrays can make an otherwise cheap library request very expensive.
+      .populate('analysis', '_id')
+      .populate('team', 'name')
+      .populate('opponentTeam', 'name')
+      .populate('players', 'name position jerseyNumber');
+
+    const [videos, total] = await Promise.all([
+      (paginated ? findQuery.skip(skip).limit(limit) : findQuery).lean(),
+      paginated ? Video.countDocuments(filter) : Promise.resolve(null),
+    ]);
+
     const response = videos.map((video) => ({
-      ...video.toObject(),
+      ...video,
       url: `${baseUrl}/uploads/${video.filename}`,
     }));
-    res.json(response);
+
+    if (!paginated) {
+      return res.json(response);
+    }
+
+    res.json({
+      items: response,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        hasNextPage: page * limit < total,
+        hasPreviousPage: page > 1,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
