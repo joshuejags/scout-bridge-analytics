@@ -79,10 +79,8 @@ describe('MobileVideoPlayer', () => {
       await waitFor(() => {
         expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalled();
       });
-      fireEvent.pause(video);
-      await waitFor(() => {
-        expect(onPause).toHaveBeenCalled();
-      });
+      fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+      expect(onPause).toHaveBeenCalled();
     });
   });
 
