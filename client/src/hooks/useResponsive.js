@@ -171,7 +171,7 @@ export function useInstallPrompt() {
     window.addEventListener('appinstalled', handleAppInstalled);
 
     // Check if app is already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (window.matchMedia && window.matchMedia('(display-mode: standalone)')?.matches) {
       setIsInstalled(true);
     }
 
@@ -211,7 +211,7 @@ export function useStandalone() {
 
   useEffect(() => {
     const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)')?.matches) ||
       window.navigator.standalone === true ||
       document.referrer.includes('android-app://');
 
