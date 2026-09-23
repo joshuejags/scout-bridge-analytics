@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Toast from '../components/Toast';
@@ -35,60 +35,57 @@ const PlayersPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [editingPlayerId, setEditingPlayerId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1, hasNextPage: false, hasPreviousPage: false });
   const [editPlayer, setEditPlayer] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchData = async () => {
+    const timer = setTimeout(async () => {
       try {
         const [teamRes, playerRes] = await Promise.all([
-          axios.get(apiUrl('/teams')),
-          axios.get(apiUrl('/players')),
+          axios.get(apiUrl('/teams'), { params: { paginated: true, limit: 100 } }),
+          axios.get(apiUrl('/players'), {
+            params: {
+              paginated: true,
+              page,
+              limit: 25,
+              q: searchQuery || undefined,
+              teamAssigned: activeFilter === 'assigned' ? 'true' : activeFilter === 'unassigned' ? 'false' : undefined,
+              hasJersey: activeFilter === 'num' ? 'true' : undefined,
+            },
+          }),
         ]);
-        setTeams(teamRes.data);
-        setPlayers(playerRes.data);
+        const teamData = teamRes.data.items || teamRes.data;
+        const playerData = playerRes.data;
+        setTeams(teamData);
+        setPlayers(playerData.items || []);
+        setPagination(playerData.pagination || pagination);
       } catch (err) {
         setError('Unable to load players or teams.');
       } finally {
         setLoading(false);
       }
-    };
+    }, searchQuery ? 300 : 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, searchQuery, activeFilter]);
 
-    fetchData();
-  }, []);
+  const summary = {
+    total: pagination.total,
+    assigned: activeFilter === 'assigned' ? pagination.total : '—',
+    numbered: activeFilter === 'num' ? pagination.total : '—',
+    selected: selectedForCompare.length,
+  };
 
-  const filteredPlayers = useMemo(() => {
-    return players.filter((player) => {
-      const haystack = [player.name, player.position, player.team?.name, player.jerseyNumber]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-      const matchesSearch = !searchQuery || haystack.includes(searchQuery.toLowerCase());
-      const matchesFilter =
-        activeFilter === 'all' ||
-        (activeFilter === 'assigned' && player.team) ||
-        (activeFilter === 'unassigned' && !player.team) ||
-        (activeFilter === 'num' && player.jerseyNumber != null);
-      return matchesSearch && matchesFilter;
-    });
-  }, [players, searchQuery, activeFilter]);
+  const filteredPlayers = players;
 
-  const summary = useMemo(() => {
-    const assigned = players.filter((player) => player.team).length;
-    const numbered = players.filter((player) => player.jerseyNumber != null).length;
-    return {
-      total: players.length,
-      assigned,
-      numbered,
-      selected: selectedForCompare.length,
-    };
-  }, [players, selectedForCompare.length]);
-
-  const currentPlayerFilters = useMemo(() => ({ searchQuery, activeFilter }), [searchQuery, activeFilter]);
+  const currentPlayerFilters = { searchQuery, activeFilter };
 
   const handleApplyPreset = (preset) => {
     setSearchQuery(preset.filters?.searchQuery || '');
     setActiveFilter(preset.filters?.activeFilter || 'all');
+    setPage(1);
   };
 
   const handleSubmit = async (e) => {
@@ -324,12 +321,13 @@ const PlayersPage = () => {
         title="Player filters"
         placeholder="Search by name, position, team, or jersey..."
         value={searchQuery}
-        onChange={setSearchQuery}
+        onChange={(value) => { setSearchQuery(value); setPage(1); }}
         filters={filterOptions.map((filter) => ({ ...filter, active: activeFilter === filter.id }))}
-        onFilterChange={setActiveFilter}
+        onFilterChange={(value) => { setActiveFilter(value); setPage(1); }}
         onClear={() => {
           setSearchQuery('');
           setActiveFilter('all');
+          setPage(1);
         }}
         summary={`${filteredPlayers.length} visible`}
       />
@@ -461,6 +459,16 @@ const PlayersPage = () => {
           </div>
         )}
       </section>
+
+      {pagination.totalPages > 1 && (
+        <div className="card-title-row" style={{ marginTop: '1rem' }}>
+          <span className="card-subtitle">Page {pagination.page} of {pagination.totalPages}</span>
+          <div className="player-card-actions">
+            <button type="button" className="button button-secondary" disabled={!pagination.hasPreviousPage || loading} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
+            <button type="button" className="button button-secondary" disabled={!pagination.hasNextPage || loading} onClick={() => setPage((value) => value + 1)}>Next</button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
