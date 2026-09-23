@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { storeFile, isCloudBackend, readObject } = require('./storage');
+const { storeFile, isCloudBackend, readObject, deleteObject } = require('./storage');
 const { v4: uuidv4 } = require('uuid');
 
 async function uploadJsonObject(key, obj) {
@@ -24,4 +24,8 @@ async function readJsonObject(key) {
   return JSON.parse(buffer.toString('utf8'));
 }
 
-module.exports = { uploadJsonObject, readJsonObject, isCloudBackend };
+async function deleteJsonObject(key) {
+  await deleteObject(key);
+}
+
+module.exports = { uploadJsonObject, readJsonObject, deleteJsonObject, isCloudBackend };
