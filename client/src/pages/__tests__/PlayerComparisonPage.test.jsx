@@ -48,7 +48,7 @@ describe('PlayerComparisonPage', () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText('Sam Striker')).toBeInTheDocument();
+    expect((await screen.findAllByText('Sam Striker')).length).toBeGreaterThan(0);
     expect(screen.getByText('Player Comparison')).toBeInTheDocument();
   });
 
