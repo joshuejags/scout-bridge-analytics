@@ -20,6 +20,24 @@ const THUMBNAILS_ROOT = path.join(UPLOAD_DIR, 'thumbnails');
 const ALLOWED_SPORTS = ['soccer', 'basketball', 'hockey', 'rugby'];
 const ALLOWED_EXTENSIONS = ['.mp4', '.avi', '.mov', '.mkv', '.flv'];
 
+async function cleanupStoredUpload(stored, fallbackLocalPath) {
+  try {
+    if (stored?.backend === 's3' && stored.key) {
+      await storage.deleteObject(stored.key, { backend: 's3' });
+      return;
+    }
+
+    const localPath = stored?.localPath || fallbackLocalPath;
+    if (localPath) {
+      await fs.promises.unlink(localPath).catch((error) => {
+        if (error.code !== 'ENOENT') throw error;
+      });
+    }
+  } catch (error) {
+    console.error('[video-upload] Failed to clean up an unpersisted upload:', error.message);
+  }
+}
+
 // Every video a non-admin user lists or fetches is scoped to their own
 // uploads — admins see everything (needed to manage the app, and the only
 // way to reach videos uploaded before the `user` field existed, which have
@@ -34,6 +52,8 @@ exports.isOwnerOrAdmin = isOwnerOrAdmin;
 
 // Upload video file
 exports.uploadVideo = async (req, res) => {
+  let stored = null;
+  let saved = false;
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -48,7 +68,7 @@ exports.uploadVideo = async (req, res) => {
     // multer's diskStorage already wrote this to local disk; storeFile is a
     // no-op for the local backend (default) and promotes it to S3 (deleting
     // the local temp copy) when STORAGE_BACKEND=s3 — see utils/storage.js.
-    const stored = await storage.storeFile(req.file.path, req.file.filename);
+    stored = await storage.storeFile(req.file.path, req.file.filename);
 
     const video = new Video({
       filename: req.file.filename,
@@ -69,8 +89,10 @@ exports.uploadVideo = async (req, res) => {
     });
 
     await video.save();
+    saved = true;
     res.status(201).json(video);
   } catch (error) {
+    if (!saved) await cleanupStoredUpload(stored, req.file?.path);
     res.status(500).json({ error: error.message });
   }
 };
@@ -171,6 +193,9 @@ exports.getChunkedUploadStatus = (req, res) => {
 // as the single-shot uploadVideo above, just fed from a session instead of
 // a multer req.file.
 exports.completeChunkedUpload = async (req, res) => {
+  let stored = null;
+  let saved = false;
+  let artifactPath = null;
   try {
     const { uploadId } = req.params;
     const session = chunkedUploads.getSession(uploadId);
@@ -179,10 +204,11 @@ exports.completeChunkedUpload = async (req, res) => {
     }
 
     const finalFilename = `${Date.now()}${path.extname(session.meta.originalName)}`;
-    let stored;
+    artifactPath = path.join(chunkedUploads.UPLOAD_DIR, finalFilename);
     try {
       stored = await chunkedUploads.finalize(uploadId, finalFilename);
     } catch (e) {
+      await cleanupStoredUpload(null, artifactPath);
       return res.status(409).json({ error: e.message });
     }
 
@@ -201,8 +227,10 @@ exports.completeChunkedUpload = async (req, res) => {
       sport: session.meta.sport,
     });
     await video.save();
+    saved = true;
     res.status(201).json(video);
   } catch (error) {
+    if (!saved) await cleanupStoredUpload(stored, artifactPath);
     res.status(500).json({ error: error.message });
   }
 };
@@ -255,8 +283,13 @@ exports.presignMultipartInit = async (req, res) => {
 };
 
 exports.completePresignedMultipartUpload = async (req, res) => {
+  let stored = null;
+  let uploadCompleted = false;
+  let videoSaved = false;
+  let sessionId = null;
   try {
     const { filename, uploadId, fileSize, parts } = req.body;
+    sessionId = uploadId;
     if (!storage.isCloudBackend()) {
       return res.status(400).json({ error: 'Presigned multipart uploads require STORAGE_BACKEND=s3' });
     }
@@ -290,7 +323,8 @@ exports.completePresignedMultipartUpload = async (req, res) => {
     }
 
     await storage.completeMultipartUpload(session.key, session.uploadId, normalizedParts);
-    await multipartSessions.deleteSession(uploadId);
+    uploadCompleted = true;
+    stored = { backend: 's3', key: session.key };
 
     const video = new Video({
       filename: session.key,
@@ -311,8 +345,18 @@ exports.completePresignedMultipartUpload = async (req, res) => {
       sport: ALLOWED_SPORTS.includes(req.body.sport) ? req.body.sport : 'soccer',
     });
     await video.save();
+    videoSaved = true;
+    await multipartSessions.deleteSession(uploadId).catch((sessionError) => {
+      console.error('[video-upload] Failed to clear completed multipart session:', sessionError.message);
+    });
     res.status(201).json(video);
   } catch (error) {
+    if (!videoSaved && uploadCompleted) {
+      await cleanupStoredUpload(stored);
+      await multipartSessions.deleteSession(sessionId).catch((sessionError) => {
+        console.error('[video-upload] Failed to clear failed multipart session:', sessionError.message);
+      });
+    }
     res.status(500).json({ error: error.message });
   }
 };
@@ -373,11 +417,15 @@ exports.importVideoFromUrl = async (req, res) => {
 
 async function runUrlImport(videoId, url) {
   const videoIdStr = String(videoId);
+  let stored = null;
+  let downloadedPath = null;
+  let saved = false;
   emitEvent('video:import:queued', { videoId: videoIdStr });
 
   try {
     const outputTemplate = path.join(UPLOAD_DIR, `${videoIdStr}.%(ext)s`);
     const result = await videoUrlImport.importFromUrl(url, outputTemplate);
+    downloadedPath = result.filePath;
 
     const ext = path.extname(result.filePath).toLowerCase();
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
@@ -388,10 +436,13 @@ async function runUrlImport(videoId, url) {
     // the local copy (STORAGE_BACKEND=s3) - nothing to stat afterward.
     const fileSize = fs.statSync(result.filePath).size;
     const filename = path.basename(result.filePath);
-    const stored = await storage.storeFile(result.filePath, filename);
+    stored = await storage.storeFile(result.filePath, filename);
 
     const video = await Video.findById(videoId);
-    if (!video) return; // deleted while the download was still running
+    if (!video) {
+      await cleanupStoredUpload(stored, downloadedPath);
+      return; // deleted while the download was still running
+    }
 
     video.filename = filename;
     video.originalName = result.title || url;
@@ -403,9 +454,11 @@ async function runUrlImport(videoId, url) {
     video.status = 'uploaded';
     video.lastError = null;
     await video.save();
+    saved = true;
 
     emitEvent('video:import:complete', { videoId: videoIdStr });
   } catch (error) {
+    if (!saved) await cleanupStoredUpload(stored, downloadedPath);
     console.error(`[video-import] Failed for video ${videoIdStr}: ${error.message}`);
     await Video.findByIdAndUpdate(videoId, { status: 'failed', lastError: error.message }).catch((e) => {
       console.error(`[video-import] Also failed to mark video ${videoIdStr} as failed: ${e.message}`);
