@@ -276,3 +276,9 @@
     padding: 18px;
   }
 }
+
+.analysis-job-status{margin:16px 0;padding:16px;border:1px solid var(--border-color,#ddd);border-radius:12px;background:var(--surface,#fff)}
+.analysis-job-status__row{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:10px}
+.analysis-job-status__progress{height:8px;border-radius:999px;background:#e5e7eb;overflow:hidden}
+.analysis-job-status__progress>span{display:block;height:100%;background:currentColor;transition:width .25s ease}
+.analysis-job-status--failed{color:#b91c1c}.analysis-job-status--completed{color:#166534}
