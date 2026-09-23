@@ -177,82 +177,68 @@ RESTORE_CONFIRM=yes node scripts/restoreDatabase.js scout-bridge-analytics-2024-
 
 ### Prerequisites
 
-1. **Install MongoDB Database Tools**
-   ```bash
-   # On macOS
-   brew install mongodb-database-tools
+1. Install MongoDB Database Tools on the machine that runs `mongodump`. The scheduled GitHub Actions workflow uses MongoDB's Ubuntu 22.04 package on an Ubuntu 22.04 runner.
+2. Create a dedicated S3 bucket for database backups. Keep it separate from video storage. Enable bucket versioning and block public access.
+3. Configure the backup workflow with the bucket name and AWS region. For AWS S3, prefer GitHub OIDC so the workflow receives short-lived credentials instead of storing permanent AWS keys.
 
-   # On Ubuntu
-   sudo apt-get install mongodb-org-database-tools
+### GitHub Actions with AWS OIDC (recommended)
 
-   # On Windows
-   # Download from https://www.mongodb.com/try/download/database-tools
+The workflow can assume a narrowly scoped IAM role when the `AWS_ROLE_TO_ASSUME` repository secret is configured and `S3_ENDPOINT` is empty.
+
+1. In AWS IAM, create the GitHub Actions OIDC identity provider if one does not already exist:
+   - Provider URL: `https://token.actions.githubusercontent.com`
+   - Audience: `sts.amazonaws.com`
+
+2. Create an IAM role with a trust policy restricted to this repository's default branch. For this repository, the subject is:
+
+   ```text
+   repo:joshuejags/scout-bridge-analytics:ref:refs/heads/master
    ```
 
-2. **S3 Bucket Setup**
-   ```bash
-   # Create S3 bucket
-   aws s3 mb s3://my-company-backups
+   Require audience `sts.amazonaws.com` and use an exact subject match. Do not use a wildcard subject. If GitHub changes the subject format for this repository, confirm the claim format before changing the trust policy.
 
-   # Enable versioning (recommended)
-   aws s3api put-bucket-versioning \
-     --bucket my-company-backups \
-     --versioning-configuration Status=Enabled
+3. Attach a permission policy scoped to the backup bucket. Replace the example bucket name with the value used for `BACKUP_S3_BUCKET`:
 
-   # Add lifecycle policy for extra retention
-   # (keeps deleted versions for 90 days)
-   ```
-
-3. **IAM Credentials**
-   ```bash
-   # Create IAM user for backups with these permissions:
+   ```json
    {
      "Version": "2012-10-17",
      "Statement": [
        {
          "Effect": "Allow",
-         "Action": [
-           "s3:PutObject",
-           "s3:GetObject",
-           "s3:ListBucket",
-           "s3:DeleteObject"
-         ],
-         "Resource": [
-           "arn:aws:s3:::my-company-backups",
-           "arn:aws:s3:::my-company-backups/*"
-         ]
+         "Action": "s3:ListBucket",
+         "Resource": "arn:aws:s3:::scout-bridge-database-backups"
+       },
+       {
+         "Effect": "Allow",
+         "Action": ["s3:PutObject", "s3:DeleteObject"],
+         "Resource": "arn:aws:s3:::scout-bridge-database-backups/backups/*"
        }
      ]
    }
    ```
 
-4. **Configure Environment**
-   ```bash
-   # Add to .env
-   BACKUP_S3_BUCKET=my-company-backups
-   S3_REGION=us-east-1
-   S3_ACCESS_KEY_ID=AKIA...
-   S3_SECRET_ACCESS_KEY=...
-   ```
+4. Add these GitHub repository secrets:
+   - `AWS_ROLE_TO_ASSUME`: the IAM role ARN
+   - `BACKUP_S3_BUCKET`: the dedicated bucket name
+   - `S3_REGION`: the bucket's AWS region
+   - `MONGODB_URI`: the production MongoDB connection string
 
-### GitHub Actions Automation
+   Leave `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY` unset for AWS S3. The workflow requests `contents: read` and `id-token: write`; the IAM role trust policy still limits which repository and branch can assume it.
 
-1. **Add Secrets to GitHub**
-   - `MONGODB_URI`
-   - `BACKUP_S3_BUCKET`
-   - `S3_REGION`
-   - `S3_ACCESS_KEY_ID`
-   - `S3_SECRET_ACCESS_KEY`
+5. Run the backup workflow manually from the `master` branch and verify that the backup appears under `backups/` in the private bucket. After successful OIDC operation, remove and revoke any old long-lived IAM access keys that were used only by this workflow.
 
-2. **Enable Workflow**
-   - Workflow file: `.github/workflows/backup.yml`
-   - Runs daily at 2 AM UTC
-   - Can be triggered manually
+### S3-compatible providers
 
-3. **Verify Execution**
-   - Check GitHub Actions tab for workflow runs
-   - Check S3 bucket for new backup files
-   - Check CloudWatch logs (if using AWS)
+For Cloudflare R2 or another S3-compatible provider, do not configure `AWS_ROLE_TO_ASSUME`. Set `S3_ENDPOINT` and the provider's `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY` repository secrets. The workflow will use those static S3-compatible credentials instead of AWS OIDC.
+
+The `S3_ENDPOINT` value should be the provider endpoint for the account or bucket. Keep the access key restricted to the backup bucket and required operations.
+
+### Workflow behavior
+
+- Workflow file: `.github/workflows/backup.yml`
+- Scheduled daily at 03:00 UTC; can also be run manually.
+- If the AWS role secret is configured and no custom endpoint is set, OIDC credentials are used and static-key environment variables are left empty.
+- Without OIDC, the workflow can use the existing static S3 credential secrets. For AWS S3, migrate to OIDC and then revoke the permanent keys.
 
 ## Testing Backup & Recovery
 
