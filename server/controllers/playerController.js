@@ -129,7 +129,7 @@ exports.getPlayerOverview = async (req, res) => {
         .sort({ createdAt: -1 })
         .lean(),
       Analysis.find({ 'playerData.0': { $exists: true } })
-        .select('video playerData actions')
+        .select('video playerData.playerId playerData.trackId playerData.verified playerData.statistics actions')
         .populate('video', 'originalName createdAt status sport')
         .lean(),
     ]);
@@ -359,7 +359,7 @@ exports.comparePlayers = async (req, res) => {
     }
 
     const analyses = await Analysis.find({ 'playerData.playerId': { $in: ids } })
-      .select('video playerData actions')
+      .select('video playerData.playerId playerData.trackId playerData.verified playerData.statistics actions')
       .populate('video', 'originalName createdAt')
       .lean();
 
@@ -507,7 +507,7 @@ exports.getPlayerProfile = async (req, res) => {
     }
 
     const analyses = await Analysis.find({ 'playerData.playerId': id })
-      .select('video playerData actions')
+      .select('video playerData.playerId playerData.trackId playerData.verified playerData.statistics actions')
       .populate('video', 'originalName createdAt status sport')
       .lean();
     const summary = aggregatePlayerSummary(id, analyses);
