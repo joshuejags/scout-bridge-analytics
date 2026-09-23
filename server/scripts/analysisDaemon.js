@@ -26,7 +26,10 @@ async function processNextJob() {
 
   const videoIdStr = String(video._id);
   const onQueued = () => emitEvent('analysis:queued', { videoId: videoIdStr });
-  const onDispatch = () => emitEvent('analysis:started', { videoId: videoIdStr });
+  const onDispatch = () => {
+    emitEvent('analysis:started', { videoId: videoIdStr });
+    Video.updateOne({ _id: video._id }, { status: 'processing' }).catch(() => {});
+  };
   const onProgress = ({ frame, total, progress }) => {
     emitEvent('analysis:progress', { videoId: videoIdStr, frame, total, progress });
     if (progress != null && progress % 10 === 0) {
