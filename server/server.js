@@ -16,6 +16,8 @@ const { initSocket } = require('./utils/socket');
 const { verifySmtpConnection } = require('./utils/email');
 const { getBackendName, verifyStorageConnection } = require('./utils/storage');
 const { reconcileOrphanedJobs } = require('./controllers/analysisController');
+const analysisWorkerPool = require('./utils/analysisWorkerPool');
+const multipartSessions = require('./utils/multipartUploadSessions');
 
 const connectDB = async () => {
   try {
@@ -88,3 +90,34 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+let shuttingDown = false;
+const gracefulShutdown = async (signal) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[shutdown] Received ${signal}; draining workers and closing connections...`);
+
+  const forceExit = setTimeout(() => {
+    console.error('[shutdown] Graceful shutdown timed out; forcing exit.');
+    process.exit(1);
+  }, Number(process.env.SHUTDOWN_TIMEOUT_MS) || 30000);
+  forceExit.unref();
+
+  server.close(async () => {
+    try {
+      await analysisWorkerPool.shutdown();
+      await multipartSessions.close();
+      await mongoose.connection.close();
+      console.log('[shutdown] HTTP, analysis workers, Redis, and MongoDB closed.');
+      clearTimeout(forceExit);
+      process.exit(0);
+    } catch (error) {
+      console.error('[shutdown] Error while closing resources:', error);
+      clearTimeout(forceExit);
+      process.exit(1);
+    }
+  });
+};
+
+process.on('SIGTERM', () => { gracefulShutdown('SIGTERM'); });
+process.on('SIGINT', () => { gracefulShutdown('SIGINT'); });
