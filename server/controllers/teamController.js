@@ -21,12 +21,54 @@ exports.createTeam = async (req, res) => {
 
 exports.getTeams = async (req, res) => {
   try {
+    const paginated = String(req.query.paginated || '').toLowerCase() === 'true';
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 25));
+    const skip = (page - 1) * limit;
+    const query = String(req.query.q || '').trim();
+    const filter = query
+      ? {
+          $or: [
+            { name: { $regex: escapeRegex(query), $options: 'i' } },
+            { description: { $regex: escapeRegex(query), $options: 'i' } },
+          ],
+        }
+      : {};
+
+    const findQuery = Team.find(filter).sort({ name: 1 });
+    const [teams, total] = await Promise.all([
+      (paginated ? findQuery.skip(skip).limit(limit) : findQuery).lean(),
+      paginated ? Team.countDocuments(filter) : Promise.resolve(null),
+    ]);
+
+    if (!paginated) return res.json(teams);
+
+    res.json({
+      items: teams,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        hasNextPage: page * limit < total,
+        hasPreviousPage: page > 1,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^()|[\\]\\\\]/g, '\\\\exports.getTeams = async (req, res) => {
+  try {
     const teams = await Team.find();
     res.json(teams);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
-};
+};');
+}
 
 exports.getTeamOverview = async (req, res) => {
   try {
