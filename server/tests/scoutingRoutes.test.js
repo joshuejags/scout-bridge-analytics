@@ -76,7 +76,7 @@ describe('Scouting routes', () => {
       .expect(200);
 
     expect(board.body.targets).toHaveLength(1);
-    expect(board.body.targets[0].stage).toBe('shortlist');
+    expect(board.body.targets[0].stage).toBe('shortlisted');
     expect(board.body.targets[0].priority).toBe('high');
   });
 
