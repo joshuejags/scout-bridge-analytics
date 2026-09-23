@@ -516,7 +516,7 @@ exports.deleteVideo = async (req, res) => {
     // it — not necessarily today's STORAGE_BACKEND, since that can change
     // over a video's lifetime (see Video.storageBackend).
     if (video.storageBackend === 's3') {
-      await storage.deleteObject(video.filename).catch((err) => {
+      await storage.deleteObject(video.filename, { backend: 's3' }).catch((err) => {
         console.error(`Failed to delete s3 object for video ${video._id}: ${err.message}`);
       });
     } else if (fs.existsSync(video.filePath)) {
