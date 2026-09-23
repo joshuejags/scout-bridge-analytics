@@ -242,7 +242,11 @@ function dispatchNext() {
  * Uses durable BullMQ/Redis in production; in-memory mode is development-only.
  */
 async function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
-  await ensureInitialized();
+  if (process.env.NODE_ENV === 'test') {
+    if (workers.length === 0) warmUp();
+  } else {
+    await ensureInitialized();
+  }
 
   if (useBullMQ && bullmqQueue) {
     // BullMQ path: job is persistent and queued in Redis
