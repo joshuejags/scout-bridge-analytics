@@ -2,6 +2,7 @@ const Video = require('../models/Video');
 const User = require('../models/User');
 const Team = require('../models/Team');
 const Player = require('../models/Player');
+const { getQueueStats, checkRedis } = require('../utils/bullmqQueue');
 
 async function getSummary(req, res) {
   const [totalUsers, totalTeams, totalPlayers, totalVideos, analyzedVideos, processingVideos, failedVideos, queuedVideos, pendingVerification, recentUsers, recentVideos, adminUsers, scoutUsers, teamUsers, playerUsers] =
@@ -26,7 +27,17 @@ async function getSummary(req, res) {
       User.countDocuments({ role: 'player' }),
     ]);
 
+  let queue = null;
+  let redis = { ok: false, error: 'not checked' };
+  try {
+    redis = await checkRedis();
+    if (redis.ok) queue = await getQueueStats();
+  } catch (error) {
+    redis = { ok: false, error: error.message };
+  }
+
   res.json({
+    infrastructure: { redis, queue },
     users: {
       total: totalUsers,
       pendingVerification,
