@@ -87,7 +87,7 @@ const AnalysisSchema = new mongoose.Schema(
   {
     // Indexed: looked up via Analysis.findOne({ video }) every time a
     // report page loads (see analysisController.getAnalysisByVideo).
-    video: { type: mongoose.Schema.Types.ObjectId, ref: 'Video', required: true, index: true },
+    video: { type: mongoose.Schema.Types.ObjectId, ref: 'Video', required: true },
     // Track the AI model version used for this analysis for reproducibility
     // and to enable model comparison across analyses
     modelVersion: {
