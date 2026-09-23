@@ -25,6 +25,7 @@ const THUMBNAILS_ROOT = path.join(UPLOAD_DIR, 'thumbnails');
  * parent video. Returns the saved Analysis.
  */
 async function persistAnalysis(video, result, processingLeaseId = null) {
+  let analysis = null;
   const { validateAnalysisResult } = require('../utils/validateResult');
   const validation = validateAnalysisResult(result);
   if (!validation.valid) {
@@ -79,7 +80,7 @@ async function persistAnalysis(video, result, processingLeaseId = null) {
     };
   });
 
-  const analysis = new Analysis({
+  analysis = new Analysis({
     video: video._id,
     playerData,
     ballData: result.ballData || { trackingData: [], possessionStats: [] },
@@ -145,6 +146,12 @@ async function persistAnalysis(video, result, processingLeaseId = null) {
     );
     if (finalized.modifiedCount !== 1) {
       await Analysis.deleteOne({ _id: analysis._id });
+      try {
+        const { deleteAnalysisArtifacts } = require('../utils/artifactStore');
+        await deleteAnalysisArtifacts(analysis._id);
+      } catch (cleanupError) {
+        console.error(`Failed to clean analysis artifacts after lost lease: ${cleanupError.message}`);
+      }
       throw new Error('Analysis worker lease was lost before completion');
     }
   } else {
