@@ -42,6 +42,10 @@ const MAX_QUEUE_LENGTH = process.env.ANALYSIS_QUEUE_MAX
   ? Number(process.env.ANALYSIS_QUEUE_MAX)
   : 20;
 
+const JOB_TIMEOUT = process.env.ANALYSIS_JOB_TIMEOUT
+  ? Number(process.env.ANALYSIS_JOB_TIMEOUT)
+  : 1800000;
+
 let useBullMQ = false;
 let bullmqQueue = null;
 
@@ -121,7 +125,7 @@ function handleWorkerMessage(workerState, msg) {
   }
 
   const job = activeJobs.get(msg.jobId);
-  if (!job) return;
+  if (!job || job.timedOut) return;
 
   if (msg.type === 'progress') {
     if (job.onProgress) {
@@ -132,6 +136,7 @@ function handleWorkerMessage(workerState, msg) {
     return;
   }
   if (msg.type === 'result') {
+    clearTimeout(job.timeout);
     activeJobs.delete(msg.jobId);
     workerState.busy = false;
     job.resolve(msg.data);
@@ -139,6 +144,7 @@ function handleWorkerMessage(workerState, msg) {
     return;
   }
   if (msg.type === 'error') {
+    clearTimeout(job.timeout);
     activeJobs.delete(msg.jobId);
     workerState.busy = false;
     job.reject(new Error(msg.message));
@@ -189,8 +195,11 @@ function spawnWorker() {
     }
     for (const [jobId, job] of activeJobs) {
       if (job.worker === workerState) {
+        clearTimeout(job.timeout);
         activeJobs.delete(jobId);
-        job.reject(new Error('Analysis worker exited unexpectedly'));
+        job.reject(job.timedOut
+          ? new Error(`Analysis job timed out after ${JOB_TIMEOUT}ms`)
+          : new Error('Analysis worker exited unexpectedly'));
       }
     }
     if (!shuttingDown) spawnWorker();
@@ -219,6 +228,11 @@ function dispatchNext() {
   idleWorker.busy = true;
   job.worker = idleWorker;
   activeJobs.set(job.jobId, job);
+  job.timeout = setTimeout(() => {
+    job.timedOut = true;
+    console.error(`[analysis-worker] Job ${job.jobId} exceeded its ${JOB_TIMEOUT}ms execution timeout; stopping worker.`);
+    idleWorker.proc.kill();
+  }, JOB_TIMEOUT);
   if (job.onDispatch) job.onDispatch();
 
   idleWorker.proc.stdin.write(
