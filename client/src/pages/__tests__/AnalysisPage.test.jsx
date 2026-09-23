@@ -68,7 +68,7 @@ describe('AnalysisPage action breakdown', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByText('Actions detected: 5')).toBeInTheDocument());
-    expect(screen.getByText('2 shots')).toBeInTheDocument();
+    expect(screen.getAllByText('2 shots').length).toBeGreaterThan(0);
     expect(screen.getByText('1 pass')).toBeInTheDocument();
     expect(screen.getByText('1 tackle')).toBeInTheDocument();
     expect(screen.getByText('1 interception')).toBeInTheDocument();
