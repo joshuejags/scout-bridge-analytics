@@ -216,6 +216,21 @@ async function processAnalysisJob(job) {
     let stdoutBuffer = '';
     let stderrBuffer = '';
     let result = null;
+    let timedOut = false;
+    let settled = false;
+    let timeout;
+    const settle = (error, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (error) reject(error);
+      else resolve(value);
+    };
+    timeout = setTimeout(() => {
+      timedOut = true;
+      console.error(`[analysisWorker] Job ${job.id} exceeded its ${JOB_TIMEOUT}ms execution timeout; stopping Python worker.`);
+      proc.kill();
+    }, JOB_TIMEOUT);
 
     // Handle stdout from Python worker
     proc.stdout.on('data', (data) => {
@@ -250,15 +265,18 @@ async function processAnalysisJob(job) {
 
     // Handle process errors
     proc.on('error', (err) => {
-      reject(new Error(`Failed to spawn analysis worker: ${err.message}`));
+      settle(new Error(`Failed to spawn analysis worker: ${err.message}`));
     });
 
     // Handle process exit
     proc.on('exit', (code) => {
+      if (timedOut) {
+        return settle(new Error(`Analysis job timed out after ${JOB_TIMEOUT}ms`));
+      }
       if (code === 0 && result) {
-        resolve(result);
+        settle(null, result);
       } else {
-        reject(new Error(`Analysis worker exited with code ${code}`));
+        settle(new Error(`Analysis worker exited with code ${code}`));
       }
     });
 
@@ -308,7 +326,10 @@ async function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
     if (onQueued) onQueued({ jobId: job.id });
 
     try {
-      return await job.waitUntilFinished(queueEvents, JOB_TIMEOUT);
+      // The worker enforces the execution timeout itself. Do not time out this
+      // waiter while a job is merely queued, or the daemon could release its
+      // video lease while BullMQ still has the job waiting/active.
+      return await job.waitUntilFinished(queueEvents);
     } finally {
       queueEvents.off('active', activeHandler);
       queueEvents.off('progress', progressHandler);
@@ -316,9 +337,6 @@ async function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
   } catch (err) {
     queueEvents.off('active', activeHandler);
     queueEvents.off('progress', progressHandler);
-    if (err.message.includes('timeout')) {
-      throw new Error('Analysis job timed out - try again later');
-    }
     throw err;
   }
 }
