@@ -67,6 +67,9 @@ const videoSchema = new mongoose.Schema(
     opponentTeam: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
     players: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Player' }],
     progress: { type: Number, default: 0 },
+    // Timestamp set atomically when the analysis daemon claims this video.
+    // Used to recover jobs left processing after a worker crash/restart.
+    processingStartedAt: { type: Date, default: null },
     // Set whenever status transitions to 'failed' — either a real analysis
     // error, or (see analysisController.reconcileOrphanedJobs) a job lost
     // to a server restart while queued/processing. Cleared on success, so
