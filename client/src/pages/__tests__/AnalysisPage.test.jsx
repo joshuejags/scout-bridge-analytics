@@ -35,6 +35,15 @@ const baseAnalysis = {
   },
 };
 
+const mockAnalysisResponses = (analysis = baseAnalysis) => {
+  axios.get.mockImplementation((url) => {
+    if (url.includes('/status')) return Promise.resolve({ data: { status: 'analyzed', progress: 100 } });
+    if (url.includes('/analysis/')) return Promise.resolve({ data: analysis });
+    if (url.includes('/players')) return Promise.resolve({ data: [] });
+    return Promise.resolve({ data: [] });
+  });
+};
+
 const renderPage = () =>
   render(
     <MemoryRouter initialEntries={['/analysis/vid1']}>
@@ -51,6 +60,7 @@ describe('AnalysisPage action breakdown', () => {
 
   it('shows a per-type count badge for each action type present', async () => {
     axios.get.mockImplementation((url) => {
+      if (url.includes('/status')) return Promise.resolve({ data: { status: 'analyzed', progress: 100 } });
       if (url.includes('/analysis/')) return Promise.resolve({ data: baseAnalysis });
       return Promise.resolve({ data: [] });
     });
@@ -103,6 +113,7 @@ describe('AnalysisPage player stats table', () => {
 
   it('renders player stats as a real table with a header row and one row per player', async () => {
     axios.get.mockImplementation((url) => {
+      if (url.includes('/status')) return Promise.resolve({ data: { status: 'analyzed', progress: 100 } });
       if (url.includes('/analysis/')) return Promise.resolve({ data: { ...baseAnalysis, playerData } });
       return Promise.resolve({ data: [] });
     });
@@ -144,6 +155,7 @@ describe('AnalysisPage player stats table', () => {
       statistics: { distanceCovered: 100 * i, averageSpeed: 4, sprintCount: i, activationArea: 'Center' },
     }));
     axios.get.mockImplementation((url) => {
+      if (url.includes('/status')) return Promise.resolve({ data: { status: 'analyzed', progress: 100 } });
       if (url.includes('/analysis/'))
         return Promise.resolve({ data: { ...baseAnalysis, playerData: manyPlayers } });
       return Promise.resolve({ data: [] });
@@ -182,6 +194,7 @@ describe('AnalysisPage tactical shape panel', () => {
 
   it('renders a card per team with its shape metrics and formation lineup', async () => {
     axios.get.mockImplementation((url) => {
+      if (url.includes('/status')) return Promise.resolve({ data: { status: 'analyzed', progress: 100 } });
       if (url.includes('/analysis/')) return Promise.resolve({ data: { ...baseAnalysis, tacticalData } });
       return Promise.resolve({ data: [] });
     });
@@ -198,6 +211,7 @@ describe('AnalysisPage tactical shape panel', () => {
 
   it('omits the tactical panel entirely when tacticalData has no teams', async () => {
     axios.get.mockImplementation((url) => {
+      if (url.includes('/status')) return Promise.resolve({ data: { status: 'analyzed', progress: 100 } });
       if (url.includes('/analysis/'))
         return Promise.resolve({ data: { ...baseAnalysis, tacticalData: { teams: [] } } });
       return Promise.resolve({ data: [] });
@@ -234,6 +248,7 @@ describe('AnalysisPage saved reports workflow', () => {
 
     it('renders the derived recruitment intelligence section from report insights', async () => {
       axios.get.mockImplementation((url) => {
+        if (url.includes('/status')) return Promise.resolve({ data: { status: 'analyzed', progress: 100 } });
         if (url.includes('/analysis/')) {
           return Promise.resolve({
             data: {
