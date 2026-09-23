@@ -44,6 +44,7 @@ describe('PlayersPage player comparison selection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     axios.get.mockImplementation((url) => {
+      if (url.includes('/filter-presets')) return Promise.resolve({ data: [] });
       if (url.includes('/teams')) return Promise.resolve({ data: [] });
       if (url.includes('/players/compare')) return Promise.resolve({ data: comparisonData });
       return Promise.resolve({ data: { items: players, pagination: { page: 1, limit: 25, total: players.length, totalPages: 1, hasNextPage: false, hasPreviousPage: false } } });
