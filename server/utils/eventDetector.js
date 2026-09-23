@@ -314,10 +314,9 @@ const calculateDetectionQuality = (actions, playerData, ballData) => {
   metrics.detectionCoverage = highConfidenceCount / confidences.length;
 
   // Overall quality score (0-100)
-  metrics.qualityScore = (
+  metrics.qualityScore =
     metrics.averageActionConfidence * 50 +
-    metrics.detectionCoverage * 50
-  ) * 100;
+    metrics.detectionCoverage * 50;
 
   return metrics;
 };
