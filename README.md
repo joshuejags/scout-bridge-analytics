@@ -14,6 +14,7 @@ Scout Bridge Analytics is a sports video analysis and scouting platform for coac
 - Provides a human review flow for correcting player identity and jersey-number results.
 - Presents player statistics, heatmaps, comparisons, detected actions, match reports, and recruitment insights.
 - Supports teams, player profiles, scouting targets/watchlists, saved reports, reusable filter presets, and role-specific admin, scout, team, and player workspaces.
+- Invalidates previously issued JWT sessions after a successful password reset.
 - Streams import and analysis progress through Socket.IO.
 - Stores media on local disk by default, with S3-compatible storage support.
 
