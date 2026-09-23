@@ -1,6 +1,8 @@
 node_modules/
 .env
 .env.local
+.env.aws
+.env.tunnel
 .DS_Store
 dist/
 build/
