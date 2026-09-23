@@ -134,4 +134,10 @@ const AnalysisSchema = new mongoose.Schema(
 // Supports cross-match player analytics queries without scanning every analysis.
 AnalysisSchema.index({ 'playerData.playerId': 1 });
 
+// A video can have exactly one persisted analysis. The analysis daemon uses
+// lease-safe finalization, but a worker can still die after saving an Analysis
+// and before attaching it to Video. A unique index prevents that failure mode
+// from leaving duplicate analyses for the same video after recovery.
+AnalysisSchema.index({ video: 1 }, { unique: true });
+
 module.exports = mongoose.model('Analysis', AnalysisSchema);
