@@ -11,9 +11,10 @@ permissions:
 #   BACKUP_S3_BUCKET      — destination bucket (kept separate from video
 #                           storage on purpose — see the script's comments)
 #   S3_REGION             — required by the AWS SDK even for non-AWS providers
-#   S3_ACCESS_KEY_ID       — omit both key secrets to use the AWS SDK's normal
-#   S3_SECRET_ACCESS_KEY    credential chain (e.g. an IAM role) instead
-#   S3_ENDPOINT            — only for a non-AWS S3-compatible provider
+#   AWS_ROLE_TO_ASSUME      — optional AWS IAM role to assume through GitHub OIDC
+#   S3_ACCESS_KEY_ID        — static key pair; omit for AWS OIDC
+#   S3_SECRET_ACCESS_KEY    — required with S3_ACCESS_KEY_ID
+#   S3_ENDPOINT             — only for a non-AWS S3-compatible provider
 # Until those are set, scheduled runs will fail fast with a clear "not
 # configured" message rather than silently doing nothing — same "loud
 # about what it's actually doing" principle as utils/email.js.
