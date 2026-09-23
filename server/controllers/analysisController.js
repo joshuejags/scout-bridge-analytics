@@ -414,23 +414,41 @@ exports.mergePlayerTracks = async (req, res) => {
     const source = analysis.playerData[sourceIdx];
     const target = analysis.playerData[targetIdx];
 
-    if (!Array.isArray(source.trackingData) || !Array.isArray(target.trackingData)) {
-      return res.status(409).json({
-        error: 'These tracks contain offloaded tracking data and cannot be merged yet.',
-        code: 'TRACKING_DATA_OFFLOADED',
-      });
-    }
+    // Tracking data may be inline or stored as an artifact. Rehydrate it
+    // transparently so manual track merging remains available even after
+    // MongoDB offloading has reduced the analysis document size.
+    const { readJsonObject, uploadJsonObject } = require('../utils/artifactStore');
+    const readTrackingData = async (value) => {
+      if (Array.isArray(value)) return value;
+      if (!value || typeof value !== 'object') return [];
+
+      const pointer = value.s3 || value.key;
+      if (!pointer) return [];
+
+      const key = String(pointer).startsWith('s3://')
+        ? String(pointer).replace(/^s3:\/\/[^/]+\//, '')
+        : String(pointer);
+
+      const data = await readJsonObject(key);
+      if (!Array.isArray(data)) throw new Error('Tracking artifact is not a valid array');
+      return data;
+    };
+
+    const [sourceTrackingData, targetTrackingData] = await Promise.all([
+      readTrackingData(source.trackingData),
+      readTrackingData(target.trackingData),
+    ]);
 
     // Merge tracking data, sorted chronologically.
-    const combined = [...target.trackingData, ...source.trackingData].sort(
-      (a, b) => a.frameNumber - b.frameNumber
+    const combined = [...targetTrackingData, ...sourceTrackingData].sort(
+      (a, b) => (a.frameNumber ?? 0) - (b.frameNumber ?? 0)
     );
     target.trackingData = combined;
 
     // Merge statistics: sum distances/sprints, weight-average speed by
     // each track's frame count (a rough but reasonable approximation).
-    const tFrames = target.trackingData.length || 1;
-    const sFrames = source.trackingData.length || 1;
+    const tFrames = targetTrackingData.length || 1;
+    const sFrames = sourceTrackingData.length || 1;
     const totalFrames = tFrames + sFrames;
     target.statistics = {
       distanceCovered: round2(
@@ -472,6 +490,18 @@ exports.mergePlayerTracks = async (req, res) => {
 
     analysis.playerData.splice(sourceIdx, 1);
     analysis.summary.totalPlayers = analysis.playerData.length;
+
+    // Keep the merged result compact: large tracks are written back to the
+    // same artifact storage mechanism used by the analysis worker.
+    const threshold = Number(process.env.TRACKING_OFFLOAD_THRESHOLD || 500);
+    if (combined.length > threshold) {
+      const key = `artifacts/analysis/${analysis._id}/player-${target.trackId || targetIdx}-tracking.json`;
+      await uploadJsonObject(key, combined);
+      const bucket = process.env.S3_BUCKET || null;
+      target.trackingData = { s3: bucket ? `s3://${bucket}/${key}` : key };
+    } else {
+      target.trackingData = combined;
+    }
 
     await analysis.save();
     const populated = await Analysis.findById(analysisId).populate('playerData.playerId');
