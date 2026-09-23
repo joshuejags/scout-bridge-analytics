@@ -13,6 +13,12 @@ const mongoose = require('mongoose');
 
 beforeAll(async () => {
   await mongoose.connect(process.env.MONGODB_URI);
+
+  // Mongoose's automatic index creation can race the first test when the
+  // connection is established before all models have registered their
+  // indexes. Build the declared indexes explicitly so tests exercise the
+  // same uniqueness constraints as the application.
+  await Promise.all(mongoose.modelNames().map((name) => mongoose.model(name).syncIndexes()));
 });
 
 afterEach(async () => {
