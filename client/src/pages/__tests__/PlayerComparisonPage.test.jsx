@@ -49,7 +49,7 @@ describe('PlayerComparisonPage', () => {
     );
 
     expect((await screen.findAllByText('Sam Striker')).length).toBeGreaterThan(0);
-    expect(screen.getByText('Player Comparison')).toBeInTheDocument();
+    expect(screen.getByText('Multi-match scouting view')).toBeInTheDocument();
   });
 
   it('shows guidance when fewer than two players are provided', async () => {
