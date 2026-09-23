@@ -14,6 +14,12 @@ router.post(
   analysisController.processAnalysis
 );
 router.get(
+  '/:videoId/status',
+  [param('videoId').isMongoId().withMessage('Invalid video id')],
+  validate,
+  analysisController.getAnalysisStatus
+);
+router.get(
   '/:videoId',
   [param('videoId').isMongoId().withMessage('Invalid video id')],
   validate,
