@@ -45,6 +45,7 @@ const JOB_MAX_ATTEMPTS = process.env.ANALYSIS_JOB_MAX_ATTEMPTS
   : 3;
 
 let analysisQueue = null;
+let deadLetterQueue = null;
 let worker = null;
 let queueEvents = null;
 let isShuttingDown = false;
@@ -74,6 +75,13 @@ async function initializeQueue() {
         },
         removeOnFail: false, // keep failed jobs for debugging
       },
+    });
+
+    // Jobs that exhaust their retries are retained separately for inspection
+    // and an explicit operator-driven replay.
+    deadLetterQueue = new Queue('analysis-dead-letter', {
+      connection: CONNECTION,
+      defaultJobOptions: { removeOnComplete: { age: 30 * 24 * 60 * 60 }, removeOnFail: false },
     });
 
     // Queue events listener for debugging/monitoring
@@ -142,7 +150,14 @@ async function startWorker() {
     });
 
     worker.on('failed', (job, err) => {
+      if (!job) return;
       console.error(`[analysisWorker] Job ${job.id} failed after ${job.attemptsMade} attempts:`, err.message);
+      const maxAttempts = Number(job.opts.attempts) || 1;
+      if (job.attemptsMade < maxAttempts) return;
+
+      moveToDeadLetter(job, err).catch((deadLetterError) => {
+        console.error(`[analysisWorker] Failed to move job ${job.id} to the dead-letter queue:`, deadLetterError.message);
+      });
     });
 
     worker.on('error', (err) => {
@@ -155,6 +170,30 @@ async function startWorker() {
     console.error('[analysisWorker] Failed to start worker:', err);
     throw err;
   }
+}
+
+/**
+ * Store an exhausted analysis job in a separate queue. The deterministic ID
+ * makes this safe if BullMQ emits the final failure event more than once.
+ */
+async function moveToDeadLetter(job, error) {
+  if (!deadLetterQueue) {
+    throw new Error('Dead-letter queue is not initialized');
+  }
+  const originalJobId = String(job.id);
+  await deadLetterQueue.add(
+    'failed-analysis',
+    {
+      originalQueue: 'analysis',
+      originalJobId,
+      originalJobName: job.name,
+      data: job.data,
+      attemptsMade: job.attemptsMade,
+      failedReason: error?.message || job.failedReason || 'Unknown failure',
+      failedAt: new Date().toISOString(),
+    },
+    { jobId: `dlq-${encodeURIComponent(originalJobId)}` }
+  );
 }
 
 /**
@@ -348,6 +387,7 @@ async function getQueueStats() {
       completed: await analysisQueue.count('completed'),
       failed: await analysisQueue.count('failed'),
       delayed: await analysisQueue.count('delayed'),
+      deadLetterWaiting: deadLetterQueue ? await deadLetterQueue.count('waiting') : 0,
     };
   } catch (err) {
     console.error('[analysisQueue] Error fetching stats:', err);
@@ -380,6 +420,11 @@ async function shutdown() {
       await analysisQueue.drain();
       await analysisQueue.close();
       console.log('[analysisQueue] Queue closed and drained');
+    }
+
+    if (deadLetterQueue) {
+      await deadLetterQueue.close();
+      console.log('[analysisQueue] Dead-letter queue closed');
     }
   } catch (err) {
     console.error('[analysisQueue] Error during shutdown:', err);
