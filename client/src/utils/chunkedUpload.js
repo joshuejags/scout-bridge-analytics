@@ -49,6 +49,7 @@ export const uploadFileDirectToS3 = async (
 
   const initRes = await axios.post(apiUrl('/videos/upload/presign-multipart/init'), {
     filename: file.name,
+    fileSize: file.size,
     partCount,
     contentType: file.type || 'application/octet-stream',
   });
@@ -63,48 +64,78 @@ export const uploadFileDirectToS3 = async (
   let nextPart = 0;
   const concurrency = Math.max(1, Math.min(Number(partConcurrency) || 1, partCount));
 
-  const uploadPart = async () => {
-    while (true) {
-      const index = nextPart++;
-      if (index >= partCount) return;
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-      const start = index * partSize;
-      const body = file.slice(start, Math.min(start + partSize, file.size));
-      const response = await axios.put(presignedUrls[index].url, body, {
-        headers: { 'Content-Type': file.type || 'application/octet-stream' },
-        transformRequest: [(data) => data],
-      });
+  const uploadPartWithRetry = async (index) => {
+    const start = index * partSize;
+    const body = file.slice(start, Math.min(start + partSize, file.size));
+    let lastError;
 
-      const etag = response.headers.etag || response.headers.ETag;
-      if (!etag) {
-        throw new Error(
-          'S3 did not expose the multipart ETag. Enable ETag in the bucket CORS ExposeHeaders setting.'
-        );
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await axios.put(presignedUrls[index].url, body, {
+          headers: { 'Content-Type': file.type || 'application/octet-stream' },
+          transformRequest: [(data) => data],
+        });
+
+        const etag = response.headers.etag || response.headers.ETag;
+        if (!etag) {
+          throw new Error(
+            'S3 did not expose the multipart ETag. Enable ETag in the bucket CORS ExposeHeaders setting.'
+          );
+        }
+
+        return { PartNumber: index + 1, ETag: etag, bytes: body.size };
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) await sleep(500 * (2 ** attempt));
       }
+    }
 
-      completedParts[index] = {
-        PartNumber: index + 1,
-        ETag: etag,
-      };
-      completedBytes += body.size;
-      if (onProgress) {
-        onProgress(Math.min(100, Math.round((completedBytes / file.size) * 100)));
-      }
+    throw lastError;
+  };
+
+  const abortUpload = async () => {
+    try {
+      await axios.post(apiUrl(`/videos/upload/presign-multipart/${encodeURIComponent(uploadId)}/abort`));
+    } catch (abortError) {
+      console.error('[direct-upload] Failed to abort multipart upload:', abortError);
     }
   };
 
-  await Promise.all(Array.from({ length: concurrency }, uploadPart));
+  try {
+    const uploadPart = async () => {
+      while (true) {
+        const index = nextPart++;
+        if (index >= partCount) return;
 
-  const completeRes = await axios.post(apiUrl('/videos/upload/presign-multipart/complete'), {
-    filename: key,
-    uploadId,
-    fileSize: file.size,
-    parts: completedParts,
-    ...meta,
-  });
+        const result = await uploadPartWithRetry(index);
+        completedParts[index] = {
+          PartNumber: result.PartNumber,
+          ETag: result.ETag,
+        };
+        completedBytes += result.bytes;
+        if (onProgress) {
+          onProgress(Math.min(100, Math.round((completedBytes / file.size) * 100)));
+        }
+      }
+    };
 
-  return completeRes.data;
+    await Promise.all(Array.from({ length: concurrency }, uploadPart));
+
+    const completeRes = await axios.post(apiUrl('/videos/upload/presign-multipart/complete'), {
+      filename: key,
+      uploadId,
+      fileSize: file.size,
+      parts: completedParts,
+      ...meta,
+    });
+
+    return completeRes.data;
+  } catch (error) {
+    await abortUpload();
+    throw error;
+  }
 };
-
 export const isDirectS3UploadEnabled =
   process.env.REACT_APP_DIRECT_S3_UPLOADS === 'true';
