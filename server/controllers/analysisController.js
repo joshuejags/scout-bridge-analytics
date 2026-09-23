@@ -24,14 +24,21 @@ const THUMBNAILS_ROOT = path.join(UPLOAD_DIR, 'thumbnails');
  * Persist the analyzer's JSON output as an Analysis document and update the
  * parent video. Returns the saved Analysis.
  */
-async function persistAnalysis(video, result) {
+async function persistAnalysis(video, result, processingLeaseId = null) {
   const { validateAnalysisResult } = require('../utils/validateResult');
   const validation = validateAnalysisResult(result);
   if (!validation.valid) {
     console.warn('analysis result validation failed', validation.errors);
-    video.status = 'failed';
-    video.lastError = 'analysis result validation failed';
-    await video.save();
+    if (processingLeaseId) {
+      await Video.updateOne(
+        { _id: video._id, status: 'processing', processingLeaseId },
+        { $set: { status: 'failed', lastError: 'analysis result validation failed' }, $unset: { processingStartedAt: 1, processingLeaseId: 1, processingHeartbeatAt: 1 } }
+      );
+    } else {
+      video.status = 'failed';
+      video.lastError = 'analysis result validation failed';
+      await video.save();
+    }
     return null;
   }
   // Map schema: the analyzer emits per-track data with an OCR-read jersey
@@ -39,6 +46,11 @@ async function persistAnalysis(video, result) {
   // a real Player document by jersey number, scoped to the video's team(s)
   // when known, so a roster player's stats reflect the track that actually
   // showed their number rather than an arbitrary first-track attachment.
+  if (processingLeaseId) {
+    const leaseIsAlive = await Video.exists({ _id: video._id, status: 'processing', processingLeaseId });
+    if (!leaseIsAlive) throw new Error('Analysis worker lease was lost before persistence');
+  }
+
   const teamIds = [video.team, video.opponentTeam].filter(Boolean);
   const rosterQuery = teamIds.length ? { team: { $in: teamIds } } : {};
   const roster = await Player.find(rosterQuery);
@@ -108,9 +120,27 @@ async function persistAnalysis(video, result) {
     console.warn('artifact offload failed:', err.message);
   }
 
-  video.analysis = analysis._id;
-  video.status = 'analyzed';
-  video.lastError = null;
+  const finalUpdate = {
+    $set: { analysis: analysis._id, status: 'analyzed', lastError: null },
+    $unset: { processingStartedAt: 1, processingLeaseId: 1, processingHeartbeatAt: 1 },
+  };
+  if (processingLeaseId) {
+    const finalized = await Video.updateOne(
+      { _id: video._id, status: 'processing', processingLeaseId },
+      finalUpdate
+    );
+    if (finalized.modifiedCount !== 1) {
+      await Analysis.deleteOne({ _id: analysis._id });
+      throw new Error('Analysis worker lease was lost before completion');
+    }
+  } else {
+    video.analysis = analysis._id;
+    video.status = 'analyzed';
+    video.lastError = null;
+    video.processingStartedAt = null;
+    video.processingLeaseId = null;
+    video.processingHeartbeatAt = null;
+  }
   if (result.metadata) {
     video.metadata = {
       width: result.metadata.width,
@@ -119,7 +149,7 @@ async function persistAnalysis(video, result) {
       frameCount: result.metadata.frameCount,
     };
   }
-  await video.save();
+  if (!processingLeaseId) await video.save();
 
   return analysis;
 }
@@ -231,7 +261,7 @@ exports.getAnalysisStatus = async (req, res) => {
   try {
     const { videoId } = req.params;
     const video = await Video.findById(videoId).select(
-      '_id status progress lastError analysis updatedAt processingStartedAt'
+      '_id status progress lastError analysis updatedAt processingStartedAt processingHeartbeatAt'
     );
 
     if (!video || !isOwnerOrAdmin(video, req.user)) {
@@ -246,6 +276,7 @@ exports.getAnalysisStatus = async (req, res) => {
       analysisId: video.analysis || null,
       updatedAt: video.updatedAt,
       processingStartedAt: video.processingStartedAt || null,
+      processingHeartbeatAt: video.processingHeartbeatAt || null,
     });
   } catch (error) {
     console.error(error);
@@ -456,11 +487,18 @@ exports.reconcileOrphanedJobs = async () => {
   const staleAfterMs = Number(process.env.ANALYSIS_JOB_TIMEOUT || 1800000);
   const staleBefore = new Date(Date.now() - staleAfterMs);
   const result = await Video.updateMany(
-    { status: 'processing', processingStartedAt: { $lt: staleBefore } },
+    {
+      status: 'processing',
+      $or: [
+        { processingHeartbeatAt: { $lt: staleBefore } },
+        { processingHeartbeatAt: null, processingStartedAt: { $lt: staleBefore } },
+        { processingHeartbeatAt: { $exists: false }, processingStartedAt: { $lt: staleBefore } },
+      ],
+    },
     {
       status: 'queued',
       lastError: null,
-      $unset: { processingStartedAt: 1 },
+      $unset: { processingStartedAt: 1, processingLeaseId: 1, processingHeartbeatAt: 1 },
     }
   );
   if (result.modifiedCount > 0) {
