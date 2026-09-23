@@ -18,6 +18,8 @@ const userSchema = new mongoose.Schema(
     },
     password: { type: String, required: true, minlength: 8, select: false },
     role: { type: String, enum: ['admin', 'scout', 'team', 'player'], default: 'scout' },
+    // Incremented after credential resets so existing JWTs can be revoked.
+    tokenVersion: { type: Number, default: 0, select: false },
 
     emailVerified: { type: Boolean, default: false },
     // Only the SHA-256 hash of each token is stored, matching how the
