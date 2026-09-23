@@ -14,7 +14,7 @@ errorTracking.init();
 const app = require('./app');
 const { initSocket } = require('./utils/socket');
 const { verifySmtpConnection } = require('./utils/email');
-const { getBackendName, verifyStorageConnection } = require('./utils/storage');
+const { getBackendName, verifyStorageConnection, cleanupAbandonedMultipartUploads } = require('./utils/storage');
 const { reconcileOrphanedJobs } = require('./controllers/analysisController');
 const analysisWorkerPool = require('./utils/analysisWorkerPool');
 const multipartSessions = require('./utils/multipartUploadSessions');
@@ -79,6 +79,16 @@ verifyStorageConnection().then((result) => {
     console.log(`[storage] S3 bucket "${process.env.S3_BUCKET}" reachable.`);
   }
 });
+
+// Safety net for direct multipart uploads abandoned by a browser/network
+// failure. S3 lifecycle rules remain the preferred long-term cleanup, but
+// this startup sweep also protects providers where lifecycle configuration
+// is unavailable or not yet configured.
+if (getBackendName() === 's3') {
+  cleanupAbandonedMultipartUploads()
+    .then(({ scanned, aborted }) => console.log(`[storage] Multipart cleanup: scanned ${scanned}, aborted ${aborted} abandoned upload(s).`))
+    .catch((error) => console.error(`[storage] Multipart cleanup failed: ${error.message}`));
+}
 
 // socket.io needs the raw HTTP server (not just the Express app) so it can
 // upgrade connections to WebSocket alongside the existing HTTP routes.
