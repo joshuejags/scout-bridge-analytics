@@ -77,8 +77,8 @@ describe('ScoutPortalPage', () => {
     expect(screen.getAllByText('Tobi Winger').length).toBeGreaterThan(0);
     expect(screen.getByText('Tracked prospects')).toBeInTheDocument();
 
-    await userEvent.selectOptions(screen.getAllByLabelText('Stage')[1], 'shortlisted');
-    await userEvent.selectOptions(screen.getAllByLabelText('Priority')[1], 'medium');
+    await userEvent.selectOptions(screen.getAllByLabelText('Stage')[2], 'shortlisted');
+    await userEvent.selectOptions(screen.getAllByLabelText('Priority')[2], 'medium');
     await userEvent.clear(screen.getAllByLabelText('Fit score')[1]);
     await userEvent.type(screen.getAllByLabelText('Fit score')[1], '84');
     await userEvent.click(screen.getByRole('button', { name: 'Save target' }));
