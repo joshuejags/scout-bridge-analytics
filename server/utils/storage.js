@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const {
   S3Client,
   PutObjectCommand,
@@ -212,8 +213,8 @@ async function pipeObjectToResponse(key, res) {
 
 async function readObject(key) {
   if (!isCloudBackend()) {
-    const root = require('path').resolve(process.env.UPLOAD_DIR || require('path').join(process.cwd(), 'uploads'));
-    return fs.promises.readFile(require('path').join(root, key));
+    const root = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads'));
+    return fs.promises.readFile(path.join(root, key));
   }
 
   const bucket = requireBucket();
@@ -224,6 +225,16 @@ async function readObject(key) {
 }
 
 async function deleteObject(key) {
+  if (!isCloudBackend()) {
+    const root = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads'));
+    const target = path.resolve(root, key);
+    if (target !== root && !target.startsWith(`${root}${path.sep}`)) {
+      throw new Error('Invalid storage key');
+    }
+    await fs.promises.rm(target, { force: true });
+    return;
+  }
+
   const bucket = requireBucket();
   const client = getS3Client();
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
