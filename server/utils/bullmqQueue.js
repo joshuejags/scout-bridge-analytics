@@ -316,7 +316,12 @@ async function getJobStatus(jobId) {
 async function checkRedis() {
   const { createClient } = require('redis');
   const client = createClient({
-    socket: { host: REDIS_HOST, port: Number(REDIS_PORT), connectTimeout: 2000 },
+    socket: {
+        host: REDIS_HOST,
+        port: Number(REDIS_PORT),
+        connectTimeout: 2000,
+        reconnectStrategy: false,
+      },
     database: Number(REDIS_DB),
     ...(REDIS_PASSWORD && { password: REDIS_PASSWORD }),
   });
