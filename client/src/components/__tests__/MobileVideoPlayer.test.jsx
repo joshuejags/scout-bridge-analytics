@@ -74,11 +74,9 @@ describe('MobileVideoPlayer', () => {
       const { container } = render(<MobileVideoPlayer src={mockVideoSrc} onPause={onPause} />);
       const video = container.querySelector('video');
       
-      // Simulate playing then pausing
-      fireEvent.play(video);
-      await waitFor(() => {
-        expect(window.HTMLMediaElement.prototype.play).toHaveBeenCalled();
-      });
+      // Start playback through the same control a user would press.
+      fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument());
       Object.defineProperty(video, 'paused', { configurable: true, value: false });
       fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
       expect(onPause).toHaveBeenCalled();
