@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { poll } from '../utils/polling';
@@ -356,7 +356,7 @@ const VideoList = ({ refreshTrigger = 0 }) => {
 
       {filteredVideos.length === 0 ? (
         <div className="empty-state-card surface-card">
-          <p>{pagination.total === 0 ? 'No videos match your search or filter.' : 'No videos uploaded yet.'}</p>
+          <p>{videos.length === 0 && (searchQuery || statusFilter !== 'all') ? 'No videos match your search or filter.' : 'No videos uploaded yet.'}</p>
         </div>
       ) : (
         <div className="data-table-wrap">
