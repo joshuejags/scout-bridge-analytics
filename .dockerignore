@@ -7,6 +7,8 @@ server/node_modules
 **/.cache
 **/*.log
 .env
+.env.aws
+.env.tunnel
 server/.env
 client/.env
 docker-compose.yml
