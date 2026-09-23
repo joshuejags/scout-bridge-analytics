@@ -4,7 +4,6 @@ const Video = require('../models/Video');
 const Analysis = require('../models/Analysis');
 const Player = require('../models/Player');
 const { emitEvent } = require('../utils/socket');
-const workerPool = require('../utils/analysisWorkerPool');
 const { isOwnerOrAdmin } = require('./videoController');
 const { buildReportInsights } = require('../utils/reportInsights');
 
@@ -181,40 +180,41 @@ exports.processAnalysis = async (req, res) => {
     status: 'queued',
   });
 
-  const videoIdStr = String(video._id);
+  emitEvent('analysis:queued', { videoId: String(video._id) });
 
-  // Progress updates are pushed live via socket on every throttled log line,
-  // but only persisted to Mongo every 10% — full per-frame DB writes would
-  // add write load with no real benefit, since the socket push is what
-  // drives the live UI and the DB copy only needs to be fresh enough to
-  // survive a page reload mid-analysis.
-  let lastPersistedProgress = 0;
-  const onProgress = ({ frame, total, progress }) => {
-    emitEvent('analysis:progress', { videoId: videoIdStr, frame, total, progress });
-    if (progress != null && progress - lastPersistedProgress >= 10) {
-      lastPersistedProgress = progress;
-      Video.updateOne({ _id: video._id }, { progress }).catch(() => {});
-    }
-  };
-  const onQueued = () => {
-    emitEvent('analysis:queued', { videoId: videoIdStr });
-  };
-  const onDispatch = () => {
-    emitEvent('analysis:started', { videoId: videoIdStr });
-    Video.updateOne({ _id: video._id }, { status: 'processing' }).catch(() => {});
-  };
+  return;
 
-  // Previously this controller directly invoked the in-process worker
-  // pool (workerPool.submitJob) which kept the queue purely in-memory.
-  // To make analysis durable across restarts we only mark the Video as
-  // 'queued' here and return; a separate analysis daemon will claim
-  // queued videos and run them. The daemon uses an atomic
-  // findOneAndUpdate to avoid duplicate processing across processes.
 };
 
 // Export helper so external daemons can persist analysis results after
 // running the analyzer (used by server/scripts/analysisDaemon.js).
 module.exports.persistAnalysis = persistAnalysis;
+
+exports.getAnalysisStatus = async (req, res) => {
+  try {
+    const { videoId } = req.params;
+    const video = await Video.findById(videoId).select(
+      '_id status progress lastError analysis updatedAt processingStartedAt'
+    );
+
+    if (!video || !isOwnerOrAdmin(video, req.user)) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+
+    res.json({
+      videoId: video._id,
+      status: video.status,
+      progress: video.progress || 0,
+      lastError: video.lastError || null,
+      analysisId: video.analysis || null,
+      updatedAt: video.updatedAt,
+      processingStartedAt: video.processingStartedAt || null,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
 
 exports.getAnalysisByVideo = async (req, res) => {
   try {
@@ -413,16 +413,22 @@ function round2(n) {
  * apply to it, so a human decides whether to try again.
  */
 exports.reconcileOrphanedJobs = async () => {
+  // Queued jobs are durable: the separate analysis daemon will pick them up
+  // after an API restart. Only recover processing jobs that have exceeded the
+  // configured timeout, which indicates the worker that claimed them is gone.
+  const staleAfterMs = Number(process.env.ANALYSIS_JOB_TIMEOUT || 1800000);
+  const staleBefore = new Date(Date.now() - staleAfterMs);
   const result = await Video.updateMany(
-    { status: { $in: ['queued', 'processing'] } },
+    { status: 'processing', processingStartedAt: { $lt: staleBefore } },
     {
-      status: 'failed',
-      lastError: 'Processing was interrupted by a server restart. Please try again.',
+      status: 'queued',
+      lastError: null,
+      $unset: { processingStartedAt: 1 },
     }
   );
   if (result.modifiedCount > 0) {
     console.warn(
-      `[analysis] Reconciled ${result.modifiedCount} video(s) stuck in queued/processing from a previous run.`
+      `[analysis] Re-queued ${result.modifiedCount} stale processing video(s) after restart.`
     );
   }
 
