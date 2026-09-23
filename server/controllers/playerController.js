@@ -116,10 +116,9 @@ exports.getPlayers = async (req, res) => {
 };
 
 function escapeRegex(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\function escapeRegex(value) {
-  return String(value).replace(/[.*+?^()|[\]\\]/g, '\\$&');
-};');
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
 exports.getPlayerOverview = async (req, res) => {
   try {
     const [players, analyses] = await Promise.all([
