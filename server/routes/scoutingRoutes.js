@@ -12,7 +12,7 @@ const targetBody = [
   body('playerId').optional().isMongoId().withMessage('Invalid player id'),
   body('stage')
     .optional()
-    .isIn(['discovery', 'watchlist', 'shortlist', 'live', 'decision'])
+    .isIn(['discovered', 'under-review', 'shortlisted', 'scouted', 'recommended', 'trial', 'signed', 'rejected'])
     .withMessage('Invalid recruitment stage'),
   body('priority')
     .optional()
