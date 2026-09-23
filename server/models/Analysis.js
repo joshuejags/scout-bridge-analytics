@@ -21,7 +21,7 @@ const PlayerDataSchema = new mongoose.Schema(
     // True once a human has confirmed or corrected this track's identity
     // via the manual review UI, as opposed to an OCR-only guess.
     verified: { type: Boolean, default: false },
-    trackingData: { type: [TrackingDataSchema], default: [] },
+    trackingData: { type: mongoose.Schema.Types.Mixed, default: [] },
     statistics: {
       distanceCovered: Number,
       averageSpeed: Number,
