@@ -11,6 +11,7 @@ const POLL_INTERVAL = Number(process.env.ANALYSIS_DAEMON_POLL_MS || 2000);
 const SHUTDOWN_TIMEOUT = Number(process.env.SHUTDOWN_TIMEOUT_MS || 30000);
 const LEASE_HEARTBEAT_MS = Number(process.env.ANALYSIS_LEASE_HEARTBEAT_MS || 30000);
 let shuttingDown = false;
+let shutdownPromise = null;
 
 async function processNextJob() {
   // Atomically claim a queued video
@@ -103,6 +104,34 @@ async function runDaemon() {
   }
 }
 
+async function shutdown(signal) {
+  if (shutdownPromise) return shutdownPromise;
+  shuttingDown = true;
+  console.log(`[analysis-daemon] Received ${signal}; stopping new claims and draining workers...`);
+
+  shutdownPromise = (async () => {
+    const forceExit = setTimeout(() => {
+      console.error('[analysis-daemon] Graceful shutdown timed out; forcing exit.');
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT);
+    forceExit.unref();
+
+    try {
+      await workerPool.shutdown();
+      await mongoose.connection.close();
+      clearTimeout(forceExit);
+      console.log('[analysis-daemon] Workers and MongoDB closed.');
+      process.exit(0);
+    } catch (err) {
+      console.error('[analysis-daemon] Shutdown failed:', err);
+      clearTimeout(forceExit);
+      process.exit(1);
+    }
+  })();
+
+  return shutdownPromise;
+}
+
 if (require.main === module) {
   process.on('SIGTERM', () => { shutdown('SIGTERM'); });
   process.on('SIGINT', () => { shutdown('SIGINT'); });
@@ -113,4 +142,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { processNextJob };
+module.exports = { processNextJob, shutdown };
