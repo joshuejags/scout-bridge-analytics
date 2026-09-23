@@ -23,6 +23,29 @@ const loginLimiter = rateLimit({
   skip: skipInTest,
 });
 
+// Pair-keyed limits above prevent repeated attempts against one account,
+// while these IP-wide caps stop a single source from bypassing them by
+// rotating through many email addresses.
+const loginIpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts from this address. Try again later.' },
+  keyGenerator: (req, res) => ipKeyGenerator(req, res),
+  skip: skipInTest,
+});
+
+const forgotPasswordIpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many password reset requests from this address. Try again later.' },
+  keyGenerator: (req, res) => ipKeyGenerator(req, res),
+  skip: skipInTest,
+});
+
 /**
  * Registration is less sensitive than login (no credential to guess) but
  * still worth capping to slow down mass fake-account creation from a
@@ -95,8 +118,10 @@ const analysisLimiter = rateLimit({
 
 module.exports = {
   loginLimiter,
+  loginIpLimiter,
   registerLimiter,
   forgotPasswordLimiter,
+  forgotPasswordIpLimiter,
   uploadLimiter,
   analysisLimiter,
 };
