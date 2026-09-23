@@ -13,7 +13,6 @@ errorTracking.init();
 
 const app = require('./app');
 const { initSocket } = require('./utils/socket');
-const analysisWorkerPool = require('./utils/analysisWorkerPool');
 const { verifySmtpConnection } = require('./utils/email');
 const { getBackendName, verifyStorageConnection } = require('./utils/storage');
 const { reconcileOrphanedJobs } = require('./controllers/analysisController');
@@ -84,20 +83,6 @@ verifyStorageConnection().then((result) => {
 const server = http.createServer(app);
 initSocket(server);
 
-// Spawn the analysis worker pool now, not on the first upload, so its
-// ~2-3s EasyOCR cold start is paid once here rather than on a user's
-// first request.
-analysisWorkerPool.warmUp();
-
-// Python worker child processes don't die automatically when this process
-// exits — without this they'd linger as orphaned processes after every
-// restart (nodemon) or shutdown.
-const shutdown = () => {
-  analysisWorkerPool.shutdown();
-  process.exit(0);
-};
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
