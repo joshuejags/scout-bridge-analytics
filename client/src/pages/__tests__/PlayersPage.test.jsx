@@ -95,7 +95,7 @@ describe('PlayersPage player comparison selection', () => {
     await userEvent.click(checkboxes[1]);
     await userEvent.click(screen.getByRole('button', { name: 'Compare' }));
 
-    expect(await screen.findByRole('heading', { name: /player comparison/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /multi-match scouting view/i })).toBeInTheDocument();
     expect(await screen.findByText('Danny Defender')).toBeInTheDocument();
   });
 
