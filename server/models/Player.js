@@ -20,4 +20,7 @@ const playerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Matches the player list's team filtering and createdAt ordering.
+playerSchema.index({ team: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Player', playerSchema);
