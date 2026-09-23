@@ -53,12 +53,16 @@ The CV pipeline is configured for CPU execution. See [Getting started](#getting-
 │   ├── scripts/             # Daemon, backup, seed, migration, and maintenance tools
 │   ├── services/            # Export, monitoring, notifications, audit, billing
 │   ├── tests/               # Server tests
-│   └── utils/                # Queue, storage, sockets, validation, and shared services
+│   └── utils/               # Queue, storage, sockets, validation, and shared services
 ├── API_REFERENCE.md         # Expanded endpoint reference
-├── DEPLOYMENT_GUIDE.md      # Deployment guidance
+├── AWS_FREE_PLAN_DEPLOYMENT.md # AWS EC2 and Cloudflare Tunnel deployment
+├── DEPLOYMENT_GUIDE.md      # General deployment guidance
 ├── ENV_CONFIGURATION.md    # Environment configuration reference
+├── compose.aws.yml          # Production app, worker, MongoDB, Redis, and tunnel
 ├── docker-compose.yml       # Multi-service local/container setup
-├── Dockerfile               # Root deployment image
+├── Dockerfile               # Root image with API, CV pipeline, and client build
+├── .env.aws.example         # AWS deployment variables (no secrets)
+├── .env.tunnel.example      # Cloudflare Tunnel variable (no token)
 └── README.md
 ```
 
@@ -123,7 +127,7 @@ The authoritative list of supported variables and deployment-specific notes is i
 - `REACT_APP_API_URL` and `CLIENT_URL` for client/API URLs. `CLIENT_URL` must be set to the frontend HTTPS origin in production; startup rejects a missing or malformed value and uses it for CORS and email links.
 - Optional email, Sentry, and backup settings for deployment integrations.
 
-Do not commit production secrets. See [Deployment](DEPLOYMENT_GUIDE.md) and [Environment configuration](ENV_CONFIGURATION.md) before deploying.
+Do not commit production secrets. See [Deployment](DEPLOYMENT_GUIDE.md), [AWS Free plan deployment](AWS_FREE_PLAN_DEPLOYMENT.md), and [Environment configuration](ENV_CONFIGURATION.md) before deploying.
 
 ## Analysis reliability and operations
 
@@ -151,6 +155,7 @@ Additional references:
 - [API reference](API_REFERENCE.md)
 - [Testing and QA guide](TESTING_QA_GUIDE.md)
 - [Deployment guide](DEPLOYMENT_GUIDE.md)
+- [AWS Free plan deployment](AWS_FREE_PLAN_DEPLOYMENT.md)
 
 ## License
 
