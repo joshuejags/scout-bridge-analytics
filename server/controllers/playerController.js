@@ -54,6 +54,11 @@ exports.getPlayers = async (req, res) => {
 
     if (req.query.position) filters.position = { $regex: escapeRegex(req.query.position), $options: 'i' };
 
+    if (req.query.teamAssigned === 'true') filters.team = { $ne: null };
+    if (req.query.teamAssigned === 'false') filters.team = null;
+    if (req.query.hasJersey === 'true') filters.jerseyNumber = { $ne: null };
+    if (req.query.hasJersey === 'false') filters.jerseyNumber = null;
+
     const clubQuery = req.query.club?.trim();
     if (clubQuery) {
       const safeClub = escapeRegex(clubQuery);
