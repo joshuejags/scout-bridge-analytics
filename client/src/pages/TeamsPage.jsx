@@ -14,6 +14,9 @@ const TeamsPage = () => {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [editingTeamId, setEditingTeamId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
   useEffect(() => {
     const fetchTeams = async () => {
@@ -63,6 +66,36 @@ const TeamsPage = () => {
       setMessage('Team added successfully.');
     } catch (err) {
       setError(err.response?.data?.error || 'Unable to create team.');
+    }
+  };
+
+  const startEdit = (team) => {
+    setEditingTeamId(team._id);
+    setEditName(team.name || '');
+    setEditDescription(team.description || '');
+    setError(null);
+    setMessage(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingTeamId(null);
+    setEditName('');
+    setEditDescription('');
+  };
+
+  const handleUpdate = async (event) => {
+    event.preventDefault();
+    if (!editingTeamId) return;
+    try {
+      const response = await axios.put(apiUrl(`/teams/${editingTeamId}`), {
+        name: editName,
+        description: editDescription,
+      });
+      setTeams((prev) => prev.map((team) => (team._id === editingTeamId ? response.data : team)));
+      cancelEdit();
+      setMessage('Team updated successfully.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Unable to update team.');
     }
   };
 
@@ -156,18 +189,49 @@ const TeamsPage = () => {
           <div className="teams-grid">
             {filteredTeams.map((team) => (
               <article key={team._id} className="team-card surface-card">
-                <div>
-                  <strong>{team.name}</strong>
-                  <p>{team.description || 'No description'}</p>
-                </div>
-                <div className="team-card-actions">
-                  <Link to={`/teams/${team._id}/analytics`} className="button button-secondary">
-                    View analytics
-                  </Link>
-                  <button type="button" className="button button-danger" onClick={() => handleDelete(team._id)}>
-                    Delete
-                  </button>
-                </div>
+                {editingTeamId === team._id ? (
+                  <form className="team-form" onSubmit={handleUpdate}>
+                    <div className="form-row">
+                      <label htmlFor={`editTeamName-${team._id}`}>Name</label>
+                      <input
+                        id={`editTeamName-${team._id}`}
+                        value={editName}
+                        onChange={(event) => setEditName(event.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="form-row">
+                      <label htmlFor={`editTeamDescription-${team._id}`}>Description</label>
+                      <textarea
+                        id={`editTeamDescription-${team._id}`}
+                        value={editDescription}
+                        onChange={(event) => setEditDescription(event.target.value)}
+                      />
+                    </div>
+                    <div className="team-card-actions">
+                      <button type="submit" className="button button-primary">Save</button>
+                      <button type="button" className="button button-secondary" onClick={cancelEdit}>Cancel</button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div>
+                      <strong>{team.name}</strong>
+                      <p>{team.description || 'No description'}</p>
+                    </div>
+                    <div className="team-card-actions">
+                      <Link to={`/teams/${team._id}/analytics`} className="button button-secondary">
+                        View analytics
+                      </Link>
+                      <button type="button" className="button button-secondary" onClick={() => startEdit(team)}>
+                        Edit
+                      </button>
+                      <button type="button" className="button button-danger" onClick={() => handleDelete(team._id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
               </article>
             ))}
           </div>
