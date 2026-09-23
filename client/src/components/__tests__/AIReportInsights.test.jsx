@@ -77,22 +77,6 @@ describe('AIReportInsights', () => {
   });
 
   describe('Export Functionality', () => {
-    beforeEach(() => {
-      // Mock document methods for file download
-      global.URL.createObjectURL = jest.fn();
-      const originalCreateElement = document.createElement.bind(document);
-      global.document.createElement = jest.fn((...args) => {
-        if (args[0] === 'a') {
-          return {
-            setAttribute: jest.fn(),
-            style: {},
-            click: jest.fn(),
-          };
-        }
-        return originalCreateElement(...args);
-      });
-    });
-
     it('should show export buttons when showExport is true', () => {
       render(<AIReportInsights analysis={mockAnalysis} showExport={true} />);
       expect(screen.getByText(/Export as Markdown/i)).toBeInTheDocument();
