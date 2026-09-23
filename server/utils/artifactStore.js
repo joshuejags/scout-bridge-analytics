@@ -19,8 +19,8 @@ async function uploadJsonObject(key, obj) {
   return storeFile(fname, key);
 }
 
-async function readJsonObject(key) {
-  const buffer = await readObject(key);
+async function readJsonObject(key, { backend } = {}) {
+  const buffer = await readObject(key, { backend });
   return JSON.parse(buffer.toString('utf8'));
 }
 
