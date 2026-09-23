@@ -24,8 +24,9 @@ afterAll(() => {
 describe('SavedReportsPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    axios.get.mockResolvedValue({
-      data: [
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/filter-presets')) return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: [
         {
           _id: 'r1',
           title: 'Weekend report',
@@ -44,6 +45,7 @@ describe('SavedReportsPage', () => {
           video: { _id: 'v1', originalName: 'weekend.mp4', sport: 'soccer', status: 'analyzed' },
         },
       ],
+      });
     });
   });
 
