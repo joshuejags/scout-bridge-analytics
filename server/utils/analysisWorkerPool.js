@@ -58,6 +58,15 @@ let shuttingDown = false;
 async function ensureInitialized() {
   if (useBullMQ || bullmqQueue) return;
 
+  // Unit tests exercise the local worker-pool contract with mocked Python
+  // processes. Avoid an asynchronous Redis connection attempt here because
+  // it makes those tests race the mocked worker events and couples them to
+  // whether a developer/CI runner happens to have Redis available.
+  if (process.env.NODE_ENV === 'test') {
+    warmUp();
+    return;
+  }
+
   try {
     // Attempt to use BullMQ + Redis
     const bullmq = require('bullmq');
