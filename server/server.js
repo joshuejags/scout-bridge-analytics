@@ -8,6 +8,10 @@ const http = require('http');
 // never actually being loaded by the bare dotenv.config() default.
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
+// Fail during startup instead of accepting production traffic with a known
+// fallback signing key. Local development retains the documented fallback.
+require('./utils/jwt').getJwtSecret();
+
 const errorTracking = require('./utils/errorTracking');
 errorTracking.init();
 
