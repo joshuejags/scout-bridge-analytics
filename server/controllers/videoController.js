@@ -34,7 +34,7 @@ async function cleanupStoredUpload(stored, fallbackLocalPath) {
       });
     }
   } catch (error) {
-    console.error('[video-upload] Failed to clean up an unpersisted upload:', error.message);
+    console.error('[upload-cleanup] Failed to clean up an unpersisted upload:', error.message);
   }
 }
 
@@ -195,7 +195,6 @@ exports.getChunkedUploadStatus = (req, res) => {
 exports.completeChunkedUpload = async (req, res) => {
   let stored = null;
   let saved = false;
-  let artifactPath = null;
   try {
     const { uploadId } = req.params;
     const session = chunkedUploads.getSession(uploadId);
@@ -204,11 +203,9 @@ exports.completeChunkedUpload = async (req, res) => {
     }
 
     const finalFilename = `${Date.now()}${path.extname(session.meta.originalName)}`;
-    artifactPath = path.join(chunkedUploads.UPLOAD_DIR, finalFilename);
     try {
       stored = await chunkedUploads.finalize(uploadId, finalFilename);
     } catch (e) {
-      await cleanupStoredUpload(null, artifactPath);
       return res.status(409).json({ error: e.message });
     }
 
@@ -230,7 +227,7 @@ exports.completeChunkedUpload = async (req, res) => {
     saved = true;
     res.status(201).json(video);
   } catch (error) {
-    if (!saved) await cleanupStoredUpload(stored, artifactPath);
+    if (!saved) await cleanupStoredUpload(stored);
     res.status(500).json({ error: error.message });
   }
 };
