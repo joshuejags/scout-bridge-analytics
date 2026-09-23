@@ -58,7 +58,7 @@ describe('VideoList real-time analysis updates', () => {
     jest.clearAllMocks();
     fakeSocket = createFakeSocket();
     useAuth.mockReturnValue({ socket: fakeSocket });
-    axios.get.mockResolvedValue({ data: [baseVideo] });
+    axios.get.mockResolvedValue({ data: { items: [baseVideo], pagination: { page: 1, limit: 25, total: 1, totalPages: 1, hasNextPage: false, hasPreviousPage: false } } });
   });
 
   it('shows live progress percentage from analysis:progress events', async () => {
@@ -93,7 +93,7 @@ describe('VideoList real-time analysis updates', () => {
     await fakeSocket.__trigger('analysis:progress', { videoId: 'vid1', frame: 30, total: 100, progress: 30 });
     await waitFor(() => expect(screen.getByText('processing (30%)')).toBeInTheDocument());
 
-    axios.get.mockResolvedValueOnce({ data: [{ ...baseVideo, status: 'analyzed' }] });
+    axios.get.mockResolvedValueOnce({ data: { items: [{ ...baseVideo, status: 'analyzed' }], pagination: { page: 1, limit: 25, total: 1, totalPages: 1, hasNextPage: false, hasPreviousPage: false } } });
     await fakeSocket.__trigger('analysis:complete', { videoId: 'vid1', analysisId: 'a1' });
 
     await waitFor(() => expect(screen.getByText('analyzed')).toBeInTheDocument());
