@@ -22,10 +22,18 @@ const AnalysisPage = () => {
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [saveDraft, setSaveDraft] = useState({ title: '', summary: '', tags: '', template: 'scout-summary' });
+  const [jobStatus, setJobStatus] = useState(null);
 
   useEffect(() => {
+    let timer;
     const fetchAnalysis = async () => {
       try {
+        const statusRes = await axios.get(apiUrl(`/analysis/${videoId}/status`));
+        setJobStatus(statusRes.data);
+        if (statusRes.data.status !== 'analyzed') {
+          setLoading(false);
+          return;
+        }
         const [analysisRes, playersRes] = await Promise.all([
           axios.get(apiUrl(`/analysis/${videoId}`)),
           axios.get(apiUrl('/players')),
@@ -41,6 +49,8 @@ const AnalysisPage = () => {
     };
 
     fetchAnalysis();
+    timer = setInterval(fetchAnalysis, 3000);
+    return () => clearInterval(timer);
   }, [videoId]);
 
   const actionCounts = useMemo(
@@ -71,6 +81,24 @@ const AnalysisPage = () => {
 
   if (loading) {
     return <LoadingSpinner fullScreen message="Loading analysis..." />;
+  }
+
+  if (!analysis && jobStatus && jobStatus.status !== 'analyzed') {
+    const failed = jobStatus.status === 'failed';
+    return (
+      <div className="page-shell analysis-page">
+        <div className={`surface-card analysis-job-status ${failed ? 'analysis-job-status--failed' : ''}`}>
+          <div className="analysis-job-status__row">
+            <strong>{failed ? 'Analysis failed' : jobStatus.status === 'processing' ? 'Analysis in progress' : 'Analysis queued'}</strong>
+            <span>{Math.round(jobStatus.progress || 0)}%</span>
+          </div>
+          <div className="analysis-job-status__progress">
+            <span style={{ width: `${Math.min(100, Math.max(0, jobStatus.progress || 0))}%` }} />
+          </div>
+          <p>{failed ? (jobStatus.lastError || 'The analysis worker failed. Please try again.') : 'You can leave this page. The analysis continues in the background.'}</p>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
