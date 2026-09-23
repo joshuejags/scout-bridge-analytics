@@ -25,6 +25,8 @@ async function processNextJob() {
   const thumbnailDir = require('path').join(process.env.UPLOAD_DIR || require('path').join(PROJECT_ROOT, 'server', 'uploads', 'thumbnails'), String(video._id));
 
   const videoIdStr = String(video._id);
+  const onQueued = () => emitEvent('analysis:queued', { videoId: videoIdStr });
+  const onDispatch = () => emitEvent('analysis:started', { videoId: videoIdStr });
   const onProgress = ({ frame, total, progress }) => {
     emitEvent('analysis:progress', { videoId: videoIdStr, frame, total, progress });
     if (progress != null && progress % 10 === 0) {
@@ -35,9 +37,11 @@ async function processNextJob() {
   try {
     const result = await workerPool.submitJob(
       { videoPath, maxFrames, thumbnailDir, sport: video.sport, enableJerseyOcr: true },
-      { onProgress }
+      { onProgress, onQueued, onDispatch }
     );
     const analysis = await persistAnalysis(video, result);
+    if (!analysis) throw new Error('Analysis result could not be persisted');
+    await Video.updateOne({ _id: video._id }, { $unset: { processingStartedAt: 1 } });
     console.log(`Analysis complete for video ${video._id}`);
     emitEvent('analysis:complete', { videoId: videoIdStr, analysisId: String(analysis._id) });
     return { ok: true, analysisId: analysis._id };
@@ -48,6 +52,7 @@ async function processNextJob() {
       if (fresh) {
         fresh.status = 'failed';
         fresh.lastError = err.message;
+        fresh.processingStartedAt = null;
         await fresh.save();
       }
     } catch (saveErr) {
