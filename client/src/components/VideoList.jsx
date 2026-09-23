@@ -22,10 +22,24 @@ const VideoList = ({ refreshTrigger = 0 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [liveProgress, setLiveProgress] = useState({});
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 25,
+    total: 0,
+    totalPages: 1,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  });
 
   useEffect(() => {
-    fetchVideos();
-  }, [refreshTrigger]);
+    const timer = setTimeout(() => {
+      fetchVideos(page);
+    }, searchQuery ? 300 : 0);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTrigger, page, searchQuery, statusFilter]);
 
   useEffect(() => {
     if (!socket) return;
@@ -90,29 +104,32 @@ const VideoList = ({ refreshTrigger = 0 }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket]);
 
-  const filteredVideos = useMemo(() => {
-    let filtered = videos;
+  const filteredVideos = videos;
 
-    if (searchQuery) {
-      filtered = filtered.filter((video) =>
-        video.originalName.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((video) => video.status === statusFilter);
-    }
-
-    return filtered;
-  }, [videos, searchQuery, statusFilter]);
-
-  const fetchVideos = async () => {
+  const fetchVideos = async (requestedPage = page) => {
     setLoading(true);
     setStatusMessage(null);
     try {
-      const response = await axios.get(apiUrl('/videos'));
-      setVideos(response.data);
-      return response.data;
+      const response = await axios.get(apiUrl('/videos'), {
+        params: {
+          paginated: true,
+          page: requestedPage,
+          limit: 25,
+          q: searchQuery || undefined,
+          status: statusFilter === 'all' ? undefined : statusFilter,
+        },
+      });
+      const data = response.data;
+      setVideos(data.items || []);
+      setPagination(data.pagination || {
+        page: requestedPage,
+        limit: 25,
+        total: data.items?.length || 0,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: requestedPage > 1,
+      });
+      return data.items || [];
     } catch (fetchError) {
       console.error('Error fetching videos:', fetchError);
       setError('Unable to fetch videos.');
@@ -124,9 +141,19 @@ const VideoList = ({ refreshTrigger = 0 }) => {
 
   const refreshVideos = async () => {
     try {
-      const response = await axios.get(apiUrl('/videos'));
-      setVideos(response.data);
-      return response.data;
+      const response = await axios.get(apiUrl('/videos'), {
+        params: {
+          paginated: true,
+          page,
+          limit: 25,
+          q: searchQuery || undefined,
+          status: statusFilter === 'all' ? undefined : statusFilter,
+        },
+      });
+      const data = response.data;
+      setVideos(data.items || []);
+      setPagination(data.pagination || pagination);
+      return data.items || [];
     } catch (refreshError) {
       console.error('Error refreshing videos:', refreshError);
       return [];
@@ -269,7 +296,10 @@ const VideoList = ({ refreshTrigger = 0 }) => {
           <p className="card-subtitle">Search, filter, process, and open scouting reports.</p>
         </div>
         <span className="pill pill--neutral">
-          {filteredVideos.length} of {videos.length}
+          {pagination.total === 0 ? 0 : ((pagination.page - 1) * pagination.limit) + 1}–{Math.min(
+            pagination.page * pagination.limit,
+            pagination.total
+          )} of {pagination.total}
         </span>
       </div>
 
@@ -280,12 +310,19 @@ const VideoList = ({ refreshTrigger = 0 }) => {
         title="Library filters"
         placeholder="Search videos by name..."
         value={searchQuery}
-        onChange={setSearchQuery}
+        onChange={(value) => {
+          setSearchQuery(value);
+          setPage(1);
+        }}
         filters={statusFilters}
-        onFilterChange={(filterId) => setStatusFilter(filterId)}
+        onFilterChange={(filterId) => {
+          setStatusFilter(filterId);
+          setPage(1);
+        }}
         onClear={() => {
           setSearchQuery('');
           setStatusFilter('all');
+          setPage(1);
         }}
         summary={
           statusFilter === 'all'
@@ -319,7 +356,7 @@ const VideoList = ({ refreshTrigger = 0 }) => {
 
       {filteredVideos.length === 0 ? (
         <div className="empty-state-card surface-card">
-          <p>{videos.length === 0 ? 'No videos uploaded yet.' : 'No videos match your search or filter.'}</p>
+          <p>{pagination.total === 0 ? 'No videos match your search or filter.' : 'No videos uploaded yet.'}</p>
         </div>
       ) : (
         <div className="data-table-wrap">
@@ -408,6 +445,32 @@ const VideoList = ({ refreshTrigger = 0 }) => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {pagination.totalPages > 1 && (
+        <div className="card-title-row" style={{ marginTop: '1rem' }}>
+          <span className="card-subtitle">
+            Page {pagination.page} of {pagination.totalPages}
+          </span>
+          <div className="video-actions">
+            <button
+              type="button"
+              className="button button-secondary"
+              disabled={!pagination.hasPreviousPage || loading}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="button button-secondary"
+              disabled={!pagination.hasNextPage || loading}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>
