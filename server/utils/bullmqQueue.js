@@ -445,7 +445,8 @@ async function getQueueStats() {
 }
 
 /**
- * Graceful shutdown: drain pending jobs and close connections.
+ * Graceful shutdown: finish active jobs and close connections while keeping
+ * waiting jobs in Redis for the next worker process.
  */
 async function shutdown() {
   if (isShuttingDown) return;
@@ -465,10 +466,10 @@ async function shutdown() {
     }
 
     if (analysisQueue) {
-      // Drain queue: wait for all active jobs to complete
-      await analysisQueue.drain();
+      // Closing the Queue only releases its Redis connection. Do not call
+      // drain(): BullMQ removes waiting jobs when a queue is drained.
       await analysisQueue.close();
-      console.log('[analysisQueue] Queue closed and drained');
+      console.log('[analysisQueue] Queue closed; waiting jobs remain in Redis');
     }
 
     if (deadLetterQueue) {
