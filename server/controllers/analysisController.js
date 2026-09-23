@@ -111,8 +111,8 @@ async function persistAnalysis(video, result, processingLeaseId = null) {
       const p = analysis.playerData[i];
       if (Array.isArray(p.trackingData) && p.trackingData.length > THRESHOLD) {
         const key = `artifacts/analysis/${analysis._id}/player-${p.trackId || i}-tracking.json`;
-        await uploadJsonObject(key, p.trackingData);
-        p.trackingData = { s3: bucket ? `s3://${bucket}/${key}` : key };
+        const stored = await uploadJsonObject(key, p.trackingData);
+        p.trackingData = { backend: stored.backend, key };
         updated = true;
       }
     }
@@ -429,14 +429,16 @@ exports.mergePlayerTracks = async (req, res) => {
       if (Array.isArray(value)) return value;
       if (!value || typeof value !== 'object') return [];
 
-      const pointer = value.s3 || value.key;
+      const pointer = value.key || value.s3;
       if (!pointer) return [];
 
-      const key = String(pointer).startsWith('s3://')
-        ? String(pointer).replace(/^s3:\/\/[^/]+\//, '')
-        : String(pointer);
+      const rawPointer = String(pointer);
+      const key = rawPointer.startsWith('s3://')
+        ? rawPointer.replace(/^s3:\/\/[^/]+\//, '')
+        : rawPointer;
+      const backend = value.backend || (rawPointer.startsWith('s3://') ? 's3' : undefined);
 
-      const data = await readJsonObject(key);
+      const data = await readJsonObject(key, { backend });
       if (!Array.isArray(data)) throw new Error('Tracking artifact is not a valid array');
       return data;
     };
@@ -503,7 +505,7 @@ exports.mergePlayerTracks = async (req, res) => {
     const threshold = Number(process.env.TRACKING_OFFLOAD_THRESHOLD || 500);
     const artifactKeyFromPointer = (value) => {
       if (!value || typeof value !== 'object') return null;
-      const pointer = value.s3 || value.key;
+      const pointer = value.key || value.s3;
       if (!pointer) return null;
       return String(pointer).replace(/^s3:\/\/[^/]+\//, '');
     };
@@ -514,9 +516,8 @@ exports.mergePlayerTracks = async (req, res) => {
 
     if (combined.length > threshold) {
       const key = `artifacts/analysis/${analysis._id}/player-${target.trackId || targetIdx}-tracking.json`;
-      await uploadJsonObject(key, combined);
-      const bucket = process.env.S3_BUCKET || null;
-      target.trackingData = { s3: bucket ? `s3://${bucket}/${key}` : key };
+      const stored = await uploadJsonObject(key, combined);
+      target.trackingData = { backend: stored.backend, key };
       replacementArtifact = key;
     } else {
       target.trackingData = combined;
