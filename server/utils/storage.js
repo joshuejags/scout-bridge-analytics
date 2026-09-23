@@ -9,6 +9,7 @@ const {
   UploadPartCommand,
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand,
+  ListMultipartUploadsCommand,
 } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
@@ -146,6 +147,47 @@ async function abortMultipartUpload(key, uploadId) {
   await client.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }));
 }
 
+/**
+ * Abort abandoned multipart uploads. Redis sessions expire independently,
+ * so this sweeps S3 itself for uploads that outlived the configured grace
+ * period. This is a safety net; production buckets should also have an
+ * S3 lifecycle rule that aborts incomplete multipart uploads.
+ */
+async function cleanupAbandonedMultipartUploads({ maxAgeMs = Number(process.env.MULTIPART_UPLOAD_CLEANUP_AGE_MS || 86400000) } = {}) {
+  if (!isCloudBackend()) return { scanned: 0, aborted: 0 };
+  const bucket = requireBucket();
+  const client = getS3Client();
+  const cutoff = Date.now() - maxAgeMs;
+  let keyMarker;
+  let uploadIdMarker;
+  let scanned = 0;
+  let aborted = 0;
+
+  do {
+    const response = await client.send(new ListMultipartUploadsCommand({
+      Bucket: bucket,
+      KeyMarker: keyMarker,
+      UploadIdMarker: uploadIdMarker,
+    }));
+    for (const upload of response.Uploads || []) {
+      scanned += 1;
+      const initiatedAt = upload.Initiated ? new Date(upload.Initiated).getTime() : Date.now();
+      if (upload.Key && upload.UploadId && initiatedAt < cutoff) {
+        await client.send(new AbortMultipartUploadCommand({
+          Bucket: bucket,
+          Key: upload.Key,
+          UploadId: upload.UploadId,
+        }));
+        aborted += 1;
+      }
+    }
+    keyMarker = response.IsTruncated ? response.NextKeyMarker : undefined;
+    uploadIdMarker = response.IsTruncated ? response.NextUploadIdMarker : undefined;
+  } while (keyMarker || uploadIdMarker);
+
+  return { scanned, aborted };
+}
+
 
 /**
  * Streams an S3 object straight into an Express response (headers +
@@ -203,4 +245,5 @@ module.exports = {
   createMultipartPresignedUrls,
   completeMultipartUpload,
   abortMultipartUpload,
+  cleanupAbandonedMultipartUploads,
 };
