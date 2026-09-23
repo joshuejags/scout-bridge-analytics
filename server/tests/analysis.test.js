@@ -65,10 +65,14 @@ describe('reconcileOrphanedJobs — recovery after API/worker restart', () => {
     // window, so this job is treated as abandoned and returned to queued.
     const staleProcessing = await makeVideo('processing', {
       processingStartedAt: new Date(Date.now() - 31 * 60 * 1000),
+      processingHeartbeatAt: new Date(Date.now() - 31 * 60 * 1000),
+      processingLeaseId: 'stale-worker',
     });
 
     const freshProcessing = await makeVideo('processing', {
-      processingStartedAt: new Date(),
+      processingStartedAt: new Date(Date.now() - 31 * 60 * 1000),
+      processingHeartbeatAt: new Date(),
+      processingLeaseId: 'live-worker',
     });
 
     const uploaded = await makeVideo('uploaded');
@@ -104,6 +108,7 @@ describe('reconcileOrphanedJobs — recovery after API/worker restart', () => {
     // Recent processing work is still potentially alive and must not be
     // duplicated.
     expect(untouchedProcessing.status).toBe('processing');
+    expect(untouchedProcessing.processingLeaseId).toBe('live-worker');
 
     expect(freshUploaded.status).toBe('uploaded');
     expect(freshAnalyzed.status).toBe('analyzed');
@@ -113,7 +118,7 @@ describe('reconcileOrphanedJobs — recovery after API/worker restart', () => {
 
   it('is a no-op when nothing is stale', async () => {
     await makeVideo('queued');
-    await makeVideo('processing', { processingStartedAt: new Date() });
+    await makeVideo('processing', { processingStartedAt: new Date(), processingHeartbeatAt: new Date(), processingLeaseId: 'live-worker' });
     await makeVideo('uploaded');
     await makeVideo('analyzed');
 
