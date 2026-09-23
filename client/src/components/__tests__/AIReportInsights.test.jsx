@@ -43,7 +43,7 @@ describe('AIReportInsights', () => {
 
     it('should render report summary', () => {
       render(<AIReportInsights analysis={mockAnalysis} />);
-      expect(screen.getByText(/Executive Summary/i)).toBeInTheDocument();
+      expect(screen.getByText('Summary')).toBeInTheDocument();
     });
 
     it('should render metrics section with values', () => {
@@ -80,6 +80,7 @@ describe('AIReportInsights', () => {
     beforeEach(() => {
       // Mock document methods for file download
       global.URL.createObjectURL = jest.fn();
+      const originalCreateElement = document.createElement.bind(document);
       global.document.createElement = jest.fn((...args) => {
         if (args[0] === 'a') {
           return {
@@ -88,7 +89,7 @@ describe('AIReportInsights', () => {
             click: jest.fn(),
           };
         }
-        return document.createElement(...args);
+        return originalCreateElement(...args);
       });
     });
 
