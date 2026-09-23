@@ -114,7 +114,7 @@ An optional demo-data command is available at `node server/scripts/seedDemoData.
 
 The authoritative list of supported variables and deployment-specific notes is in [.env.example](.env.example) and [ENV_CONFIGURATION.md](ENV_CONFIGURATION.md). Common settings include:
 
-- `MONGODB_URI`, `PORT`, and `JWT_SECRET` for the API and database.
+- `MONGODB_URI`, `PORT`, and `JWT_SECRET` for the API and database. `JWT_SECRET` must be set in production; startup exits with an error if it is missing. The local development fallback is not suitable for deployed environments.
 - Redis connection settings (`REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, and optional `REDIS_PASSWORD`) for background analysis.
 - `ANALYSIS_WORKER_POOL_SIZE`, `ANALYSIS_JOB_TIMEOUT`, and `ANALYSIS_JOB_MAX_ATTEMPTS` for analysis processing.
 - `STORAGE_BACKEND`, upload settings, and optional S3 credentials/endpoint for media storage.
