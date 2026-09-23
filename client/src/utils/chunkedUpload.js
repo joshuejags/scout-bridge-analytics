@@ -1,20 +1,12 @@
 import axios from 'axios';
 import { apiUrl } from './api';
 
-const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024; // 5MB, overridden by the server's chunkSizeHint if given
+const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024;
+const DEFAULT_PART_CONCURRENCY = 4;
 
 /**
- * Uploads a File as a sequence of smaller requests instead of one
- * long-lived multipart POST holding the whole file. A dropped connection
- * only costs the current chunk (init/complete are cheap to retry, and
- * chunk requests are themselves idempotent to re-send), and reverse
- * proxies/load balancers that time out long-idle single requests are no
- * longer a concern once no single request runs longer than one chunk's
- * transfer time.
- *
- * meta: { team, opponentTeam, sport, players } — the owning user is
- * derived server-side from the auth token, not sent by the client.
- * onProgress(percent): called after each chunk finishes uploading
+ * Uploads through the Node API in resumable chunks. This remains the
+ * development/local-storage path and works when STORAGE_BACKEND != s3.
  */
 export const uploadFileInChunks = async (file, meta = {}, { onProgress } = {}) => {
   const initRes = await axios.post(apiUrl('/videos/upload/init'), {
@@ -38,3 +30,81 @@ export const uploadFileInChunks = async (file, meta = {}, { onProgress } = {}) =
   const completeRes = await axios.post(apiUrl(`/videos/upload/${uploadId}/complete`));
   return completeRes.data;
 };
+
+/**
+ * Uploads video parts directly from the browser to S3/R2 using presigned
+ * URLs. The Node API only signs the upload and records metadata after S3
+ * completes, so large video bytes never pass through Express.
+ *
+ * Set REACT_APP_DIRECT_S3_UPLOADS=true in the frontend build when the
+ * server uses STORAGE_BACKEND=s3.
+ */
+export const uploadFileDirectToS3 = async (
+  file,
+  meta = {},
+  { onProgress, partConcurrency = DEFAULT_PART_CONCURRENCY } = {}
+) => {
+  const partSize = DEFAULT_CHUNK_SIZE;
+  const partCount = Math.ceil(file.size / partSize);
+
+  const initRes = await axios.post(apiUrl('/videos/upload/presign-multipart/init'), {
+    filename: file.name,
+    partCount,
+    contentType: file.type || 'application/octet-stream',
+  });
+
+  const { uploadId, key, presignedUrls } = initRes.data;
+  if (!uploadId || !key || !Array.isArray(presignedUrls) || presignedUrls.length !== partCount) {
+    throw new Error('Server returned an invalid multipart upload session');
+  }
+
+  const completedParts = new Array(partCount);
+  let completedBytes = 0;
+  let nextPart = 0;
+  const concurrency = Math.max(1, Math.min(Number(partConcurrency) || 1, partCount));
+
+  const uploadPart = async () => {
+    while (true) {
+      const index = nextPart++;
+      if (index >= partCount) return;
+
+      const start = index * partSize;
+      const body = file.slice(start, Math.min(start + partSize, file.size));
+      const response = await axios.put(presignedUrls[index].url, body, {
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        transformRequest: [(data) => data],
+      });
+
+      const etag = response.headers.etag || response.headers.ETag;
+      if (!etag) {
+        throw new Error(
+          'S3 did not expose the multipart ETag. Enable ETag in the bucket CORS ExposeHeaders setting.'
+        );
+      }
+
+      completedParts[index] = {
+        PartNumber: index + 1,
+        ETag: etag,
+      };
+      completedBytes += body.size;
+      if (onProgress) {
+        onProgress(Math.min(100, Math.round((completedBytes / file.size) * 100)));
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: concurrency }, uploadPart));
+
+  const completeRes = await axios.post(apiUrl('/videos/upload/presign-multipart/complete'), {
+    filename: key,
+    uploadId,
+    fileSize: file.size,
+    parts: completedParts,
+    ...meta,
+  });
+
+  return completeRes.data;
+};
+
+export const isDirectS3UploadEnabled =
+  process.env.REACT_APP_DIRECT_S3_UPLOADS === 'true';
