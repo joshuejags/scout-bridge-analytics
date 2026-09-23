@@ -118,7 +118,7 @@ The authoritative list of supported variables and deployment-specific notes is i
 - Redis connection settings (`REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, and optional `REDIS_PASSWORD`) for background analysis.
 - `ANALYSIS_WORKER_POOL_SIZE`, `ANALYSIS_JOB_TIMEOUT`, and `ANALYSIS_JOB_MAX_ATTEMPTS` for analysis processing.
 - `STORAGE_BACKEND`, upload settings, and optional S3 credentials/endpoint for media storage.
-- `REACT_APP_API_URL` and `CLIENT_URL` for client/API URLs.
+- `REACT_APP_API_URL` and `CLIENT_URL` for client/API URLs. `CLIENT_URL` must be set to the frontend HTTPS origin in production; startup rejects a missing or malformed value and uses it for CORS and email links.
 - Optional email, Sentry, and backup settings for deployment integrations.
 
 Do not commit production secrets. See [Deployment](DEPLOYMENT_GUIDE.md) and [Environment configuration](ENV_CONFIGURATION.md) before deploying.
