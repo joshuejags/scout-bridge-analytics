@@ -6,7 +6,7 @@ This guide is for the single-node MongoDB service in `compose.aws.yml`. It docum
 
 ## Before scheduling the upgrade
 
-1. Confirm which database and feature compatibility version (FCV) are running. The MongoDB 8.0 upgrade path requires MongoDB 7.0 first; do not jump directly from 6.0 to 8.0.
+1. Confirm the server is on the latest available 6.0 patch and its feature compatibility version (FCV) is `6.0`. The MongoDB 8.0 upgrade path requires MongoDB 7.0 first; do not jump directly from 6.0 to 8.0.
 2. Review the official MongoDB 7.0 and 8.0 compatibility changes and confirm the Node.js driver version used by Mongoose supports the target server.
 3. Test the application and the full upgrade sequence in an isolated staging deployment using a copy of production data.
 4. Create a fresh backup outside the EC2 instance and verify that it can be restored to an isolated database. A backup that has not been restored is not a verified recovery plan.
@@ -55,20 +55,28 @@ Run commands from the repository directory on the EC2 host. Keep the current dat
    db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 })
    ```
 
-   After the 7.0 binary has passed the staging and production validation period, enable 7.0 features:
-
-   ```javascript
-   db.adminCommand({ setFeatureCompatibilityVersion: "7.0", confirm: true })
-   ```
-
-5. Exit `mongosh` and the container shell. Start the application services and verify sign-in, core API operations, uploads, and analysis before proceeding:
+5. Exit the container shell and start the application services while MongoDB 7.0 is still using FCV 6.0. Verify sign-in, core API operations, uploads, and analysis. Keep FCV at 6.0 during a burn-in period:
 
    ```bash
    docker compose --env-file .env.aws -f compose.aws.yml up -d app analysis-daemon cloudflared
    docker compose --env-file .env.aws -f compose.aws.yml ps
    ```
 
-   Allow a burn-in period and confirm a fresh backup before starting the next major-version step.
+6. After the burn-in succeeds, stop writers again, reconnect to `mongosh`, and enable 7.0 features:
+
+   ```bash
+   docker compose --env-file .env.aws -f compose.aws.yml stop cloudflared app analysis-daemon
+   docker compose --env-file .env.aws -f compose.aws.yml exec mongodb sh
+   mongosh --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin
+   ```
+
+   Then run:
+
+   ```javascript
+   db.adminCommand({ setFeatureCompatibilityVersion: "7.0", confirm: true })
+   ```
+
+7. Start the application services again, verify them, and confirm a fresh backup before beginning the next major-version step.
 
 ## Upgrade from 7.0 to 8.0
 
@@ -78,13 +86,13 @@ Repeat the maintenance window and stop `cloudflared`, `app`, and `analysis-daemo
 MONGODB_IMAGE=mongo:8.0.29-noble
 ```
 
-Pull and recreate only the database service using the commands from the 7.0 step. Confirm that it reports version 8.0 and check its FCV. After validation and a burn-in period on the 8.0 binary, set FCV:
+Pull and recreate only the database service using the commands from the 7.0 step. Confirm that it reports version 8.0 and that FCV remains 7.0. Start the application services with FCV 7.0, verify core behavior, and allow a burn-in period. Then stop writers, reconnect to `mongosh`, and enable 8.0 features:
 
 ```javascript
 db.adminCommand({ setFeatureCompatibilityVersion: "8.0", confirm: true })
 ```
 
-Restart and verify the application services as above. Monitor the app, analysis queue, and database logs closely.
+Restart and verify the application services. Confirm a fresh backup and monitor the app, analysis queue, and database logs closely.
 
 ## Recovery and downgrade cautions
 
