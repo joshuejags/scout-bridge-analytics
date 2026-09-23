@@ -95,8 +95,8 @@ async function retryJob(req, res) {
   const id = req.params.id;
   const video = await Video.findById(id);
   if (!video) return res.status(404).json({ error: 'Not found' });
-  if (video.status === 'processing') {
-    return res.status(409).json({ error: 'Job is currently processing' });
+  if (video.status !== 'failed') {
+    return res.status(409).json({ error: 'Only failed video jobs can be retried' });
   }
   video.status = 'queued';
   video.lastError = null;
