@@ -96,4 +96,10 @@ const videoSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Supports the analysis daemon's oldest-queued claim and admin state views.
+videoSchema.index({ status: 1, createdAt: 1 });
+videoSchema.index({ status: 1, updatedAt: -1 });
+// Supports the user's paginated video list without scanning other users' rows.
+videoSchema.index({ user: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Video', videoSchema);
