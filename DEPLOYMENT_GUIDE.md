@@ -55,7 +55,16 @@
    # Create backup
    mongodump --uri="mongodb+srv://..." --out=backups/pre-production-$(date +%Y%m%d)
    
-   # Run migrations (if any)
+   # Before deploying the unique Analysis.video index, back up the DB,
+   # pause the API and analysis workers, then inspect duplicate analyses.
+   node server/scripts/dedupeAnalyses.js
+   # If duplicates are reported, review the IDs and confirm the backup first.
+   # --apply keeps the newest (createdAt, then _id) analysis per video.
+   node server/scripts/dedupeAnalyses.js --apply
+   # Re-run without --apply; it should report no duplicates before deployment.
+   node server/scripts/dedupeAnalyses.js
+
+   # Run any other migrations required by this release
    npm run migrate:prod
    ```
 
