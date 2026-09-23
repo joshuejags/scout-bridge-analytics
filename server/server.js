@@ -12,6 +12,23 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 // fallback signing key. Local development retains the documented fallback.
 require('./utils/jwt').getJwtSecret();
 
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.CLIENT_URL) {
+    throw new Error('CLIENT_URL must be configured in production.');
+  }
+  let clientUrl;
+  try {
+    clientUrl = new URL(process.env.CLIENT_URL);
+  } catch (_) {
+    throw new Error('CLIENT_URL must be a valid HTTPS origin in production.');
+  }
+  if (clientUrl.protocol !== 'https:' || clientUrl.pathname !== '/' || clientUrl.search || clientUrl.hash) {
+    throw new Error('CLIENT_URL must be a valid HTTPS origin in production.');
+  }
+  // Use one canonical origin for both CORS checks and generated email links.
+  process.env.CLIENT_URL = clientUrl.origin;
+}
+
 const errorTracking = require('./utils/errorTracking');
 errorTracking.init();
 
