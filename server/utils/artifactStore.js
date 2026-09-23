@@ -1,17 +1,22 @@
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const { storeFile, isCloudBackend } = require('./storage');
 const { v4: uuidv4 } = require('uuid');
 
 async function uploadJsonObject(key, obj) {
-  // write to temp file and use storeFile which handles local vs s3
-  const tmpDir = path.join(process.cwd(), 'server', 'tmp');
+  if (!isCloudBackend()) {
+    const root = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads'));
+    const target = path.join(root, key);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify(obj));
+    return { backend: 'local', key, localPath: target };
+  }
+
+  const tmpDir = path.join(process.cwd(), 'tmp');
   if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
   const fname = path.join(tmpDir, `${uuidv4()}.json`);
   fs.writeFileSync(fname, JSON.stringify(obj));
-  const res = await storeFile(fname, key);
-  return res;
+  return storeFile(fname, key);
 }
 
 module.exports = { uploadJsonObject, isCloudBackend };
