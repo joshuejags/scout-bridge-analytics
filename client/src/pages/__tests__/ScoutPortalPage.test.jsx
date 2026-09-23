@@ -56,7 +56,7 @@ describe('ScoutPortalPage', () => {
     axios.patch.mockResolvedValue({
       data: {
         ...boardResponse.targets[0],
-        stage: 'shortlist',
+        stage: 'shortlisted',
         priority: 'medium',
         fitScore: 84,
       },
@@ -74,7 +74,7 @@ describe('ScoutPortalPage', () => {
     expect(screen.getAllByText('Tobi Winger').length).toBeGreaterThan(0);
     expect(screen.getByText('Tracked prospects')).toBeInTheDocument();
 
-    await userEvent.selectOptions(screen.getAllByLabelText('Stage')[1], 'shortlist');
+    await userEvent.selectOptions(screen.getAllByLabelText('Stage')[1], 'shortlisted');
     await userEvent.selectOptions(screen.getAllByLabelText('Priority')[1], 'medium');
     await userEvent.clear(screen.getAllByLabelText('Fit score')[1]);
     await userEvent.type(screen.getAllByLabelText('Fit score')[1], '84');
@@ -84,7 +84,7 @@ describe('ScoutPortalPage', () => {
       expect(axios.patch).toHaveBeenCalledWith(
         expect.stringContaining('/scouting/targets/target-1'),
         expect.objectContaining({
-          stage: 'shortlist',
+          stage: 'shortlisted',
           priority: 'medium',
           fitScore: 84,
         })
