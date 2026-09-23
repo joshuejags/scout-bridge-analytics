@@ -240,7 +240,7 @@ async function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
   if (useBullMQ && bullmqQueue) {
     // BullMQ path: job is persistent and queued in Redis
     try {
-      return await bullmqQueue.submitJob(params);
+      return await bullmqQueue.submitJob(params, { onProgress, onQueued, onDispatch });
     } catch (err) {
       // If BullMQ fails, fall back to in-memory (if enabled)
       if (!FALLBACK_MODE_ENABLED) throw err;
