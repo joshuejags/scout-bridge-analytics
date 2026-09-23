@@ -23,16 +23,52 @@ if (!fs.existsSync(TEMP_DIR)) {
 const sessions = new Map();
 
 // Sessions nobody ever finishes (browser closed mid-upload, network died
-// for good) would otherwise leak a partial file on disk forever.
+// for good) would otherwise leak a partial file on disk forever. The map is
+// process-local, so the sweep also finds expired files left by a prior run.
 const SESSION_TTL_MS = 60 * 60 * 1000; // 1 hour
 const SWEEP_INTERVAL_MS = 15 * 60 * 1000;
-const sweepTimer = setInterval(() => {
+let sweepInProgress = false;
+
+async function sweepExpiredSessions() {
+  if (sweepInProgress) return;
+  sweepInProgress = true;
   const cutoff = Date.now() - SESSION_TTL_MS;
-  for (const [uploadId, session] of sessions) {
-    if (session.createdAt < cutoff) abort(uploadId);
+
+  try {
+    for (const [uploadId, session] of sessions) {
+      if (session.createdAt < cutoff) abort(uploadId);
+    }
+
+    const entries = await fs.promises.readdir(TEMP_DIR, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !/^[a-f0-9]{32}\.part$/.test(entry.name)) continue;
+      const uploadId = entry.name.slice(0, -'.part'.length);
+      if (sessions.has(uploadId)) continue;
+
+      const tempPath = path.join(TEMP_DIR, entry.name);
+      try {
+        const stats = await fs.promises.stat(tempPath);
+        if (stats.mtimeMs < cutoff) await fs.promises.unlink(tempPath);
+      } catch (error) {
+        if (error.code !== 'ENOENT') {
+          console.error(`[chunkedUploads] Failed to inspect stale upload ${entry.name}: ${error.message}`);
+        }
+      }
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error(`[chunkedUploads] Failed to sweep temporary uploads: ${error.message}`);
+    }
+  } finally {
+    sweepInProgress = false;
   }
+}
+
+const sweepTimer = setInterval(() => {
+  sweepExpiredSessions();
 }, SWEEP_INTERVAL_MS);
 sweepTimer.unref(); // don't keep the process alive just for this
+sweepExpiredSessions();
 
 function createSession({ expectedSize, meta }) {
   const uploadId = crypto.randomBytes(16).toString('hex');
