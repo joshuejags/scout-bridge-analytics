@@ -16,7 +16,9 @@ const DashboardSummary = ({ refreshTrigger = 0 }) => {
         const videos = response.data;
         const total = videos.length;
         const processed = videos.filter((video) => video.status === 'analyzed').length;
-        const pending = videos.filter((video) => video.status === 'uploaded' || video.status === 'processing').length;
+        const pending = videos.filter((video) =>
+          video.status === 'uploaded' || video.status === 'queued' || video.status === 'processing'
+        ).length;
         const failed = videos.filter((video) => video.status === 'failed').length;
 
         setSummary({ total, processed, pending, failed });
