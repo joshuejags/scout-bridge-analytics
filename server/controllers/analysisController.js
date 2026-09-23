@@ -52,23 +52,6 @@ async function persistAnalysis(video, result, processingLeaseId = null) {
     if (!leaseIsAlive) throw new Error('Analysis worker lease was lost before persistence');
   }
 
-  // A worker can crash after Analysis.save() but before Video is finalized.
-  // Remove that orphan before creating the replacement so recovered jobs stay
-  // idempotent. The current processing lease is checked immediately above,
-  // making this cleanup safe against a worker that no longer owns the video.
-  const existingAnalysis = await Analysis.findOne({ video: video._id });
-  if (existingAnalysis) {
-    const { deleteAnalysisArtifacts } = require('../utils/artifactStore');
-    try {
-      await deleteAnalysisArtifacts(existingAnalysis._id);
-    } catch (cleanupError) {
-      console.warn(
-        `Failed to clean stale analysis artifacts ${existingAnalysis._id}: ${cleanupError.message}`
-      );
-    }
-    await Analysis.deleteOne({ _id: existingAnalysis._id });
-  }
-
   const teamIds = [video.team, video.opponentTeam].filter(Boolean);
   const rosterQuery = teamIds.length ? { team: { $in: teamIds } } : {};
   const roster = await Player.find(rosterQuery);
@@ -113,7 +96,18 @@ async function persistAnalysis(video, result, processingLeaseId = null) {
     },
   });
 
-  await analysis.save();
+  let analysisCreated = true;
+  try {
+    await analysis.save();
+  } catch (error) {
+    // The unique { video } index makes persistence idempotent across worker
+    // retries. If another attempt already persisted this video's result,
+    // reuse that durable analysis instead of deleting or overwriting it.
+    if (error?.code !== 11000) throw error;
+    analysis = await Analysis.findOne({ video: video._id });
+    if (!analysis) throw error;
+    analysisCreated = false;
+  }
 
   // Offload large per-track trackingData to object storage to avoid
   // bloating the MongoDB documents. Replace the in-document array with
@@ -132,7 +126,7 @@ async function persistAnalysis(video, result, processingLeaseId = null) {
         updated = true;
       }
     }
-    if (updated) await analysis.save();
+    if (updated && analysisCreated) await analysis.save();
   } catch (err) {
     console.warn('artifact offload failed:', err.message);
   }
@@ -161,12 +155,14 @@ async function persistAnalysis(video, result, processingLeaseId = null) {
       finalUpdate
     );
     if (finalized.modifiedCount !== 1) {
-      await Analysis.deleteOne({ _id: analysis._id });
-      try {
-        const { deleteAnalysisArtifacts } = require('../utils/artifactStore');
-        await deleteAnalysisArtifacts(analysis._id);
-      } catch (cleanupError) {
-        console.error(`Failed to clean analysis artifacts after lost lease: ${cleanupError.message}`);
+      if (analysisCreated) {
+        await Analysis.deleteOne({ _id: analysis._id });
+        try {
+          const { deleteAnalysisArtifacts } = require('../utils/artifactStore');
+          await deleteAnalysisArtifacts(analysis._id);
+        } catch (cleanupError) {
+          console.error(`Failed to clean analysis artifacts after lost lease: ${cleanupError.message}`);
+        }
       }
       throw new Error('Analysis worker lease was lost before completion');
     }
