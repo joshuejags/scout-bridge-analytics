@@ -3,7 +3,13 @@ const { body, param } = require('express-validator');
 const authController = require('../controllers/authController');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const validate = require('../middleware/validate');
-const { loginLimiter, registerLimiter, forgotPasswordLimiter } = require('../middleware/rateLimit');
+const {
+  loginLimiter,
+  loginIpLimiter,
+  registerLimiter,
+  forgotPasswordLimiter,
+  forgotPasswordIpLimiter,
+} = require('../middleware/rateLimit');
 
 const router = express.Router();
 
@@ -23,6 +29,7 @@ router.post(
 
 router.post(
   '/login',
+  loginIpLimiter,
   loginLimiter,
   [
     body('email').trim().isEmail().withMessage('A valid email is required').normalizeEmail(),
@@ -67,6 +74,7 @@ router.post('/resend-verification', requireAuth, authController.resendVerificati
 // avoid leaking which emails are registered.
 router.post(
   '/forgot-password',
+  forgotPasswordIpLimiter,
   forgotPasswordLimiter,
   [body('email').trim().isEmail().withMessage('A valid email is required').normalizeEmail()],
   validate,
