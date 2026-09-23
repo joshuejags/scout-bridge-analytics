@@ -39,14 +39,15 @@ Cloudflare's Free plan limits each request body to 100 MB. The client uses 5 MB 
 
 ## 4. Set secrets and start the app
 
-Copy the example file and edit it on the EC2 host:
+Copy the application and tunnel environment examples on the EC2 host:
 
 ```bash
 cp .env.aws.example .env.aws
-chmod 600 .env.aws
+cp .env.tunnel.example .env.tunnel
+chmod 600 .env.aws .env.tunnel
 ```
 
-Replace the placeholders. Use long random values for `JWT_SECRET`, `MONGO_ROOT_PASSWORD`, and `REDIS_PASSWORD`; keep the MongoDB and Redis passwords to letters and numbers so the Mongo connection URI remains valid. Paste the Cloudflare Tunnel token into `CLOUDFLARE_TUNNEL_TOKEN`. Do not commit `.env.aws`.
+Replace the placeholders. Use long random values for `JWT_SECRET`, `MONGO_ROOT_PASSWORD`, and `REDIS_PASSWORD`; keep the MongoDB and Redis passwords to letters and numbers so the Mongo connection URI remains valid. Put the Cloudflare Tunnel token in `TUNNEL_TOKEN` inside `.env.tunnel`. Keep both secret files private and do not commit them.
 
 Build and start the stack:
 
