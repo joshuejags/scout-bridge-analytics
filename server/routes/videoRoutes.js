@@ -107,7 +107,7 @@ router.post(
 router.post(
   '/upload/presign-multipart/init',
   uploadLimiter,
-  [body('filename').trim().notEmpty().withMessage('filename is required'), body('partCount').isInt({ min: 1, max: 10000 }).withMessage('partCount must be a positive integer')],
+  [body('filename').trim().notEmpty().withMessage('filename is required'), body('partCount').isInt({ min: 1, max: 10000 }).withMessage('partCount must be a positive integer'), body('fileSize').isInt({ min: 1 }).withMessage('fileSize is required and must be positive'), body('contentType').optional().isString().isLength({ max: 200 }).withMessage('contentType must be a string')],
   validate,
   videoController.presignMultipartInit
 );
@@ -122,6 +122,13 @@ router.post(
   ],
   validate,
   videoController.completePresignedMultipartUpload
+);
+router.post(
+  '/upload/presign-multipart/:uploadId/abort',
+  uploadLimiter,
+  [param('uploadId').trim().notEmpty().withMessage('uploadId is required')],
+  validate,
+  videoController.abortPresignedMultipartUpload
 );
 
 router.post(
