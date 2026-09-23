@@ -358,56 +358,70 @@ exports.comparePlayers = async (req, res) => {
       return res.status(404).json({ error: `Player(s) not found: ${missing.join(', ')}` });
     }
 
-    const analyses = await Analysis.find({ 'playerData.playerId': { $in: ids } }).populate(
-      'video',
-      'originalName createdAt'
+    const analyses = await Analysis.find({ 'playerData.playerId': { $in: ids } })
+      .select('video playerData actions')
+      .populate('video', 'originalName createdAt')
+      .lean();
+
+    // Group each analysis once for all requested players. The previous code
+    // rescanned every analysis once per requested player.
+    const statsByPlayerId = new Map(
+      ids.map((id) => [
+        id,
+        {
+          matchesPlayed: 0,
+          totalDistance: 0,
+          totalSprints: 0,
+          speedSamples: [],
+          verifiedTracks: 0,
+          actionCounts: { pass: 0, shot: 0, tackle: 0, interception: 0 },
+          matches: [],
+          trendPoints: [],
+        },
+      ])
     );
 
-    // Preserve the order the caller asked for rather than Mongo's $in order.
-    const playersById = new Map(players.map((p) => [String(p._id), p]));
-    const results = ids.map((id) => {
-      const player = playersById.get(id);
-      let matchesPlayed = 0;
-      let totalDistance = 0;
-      let totalSprints = 0;
-      let speedSamples = [];
-      let verifiedTracks = 0;
-      const actionCounts = { pass: 0, shot: 0, tackle: 0, interception: 0 };
-      const matches = [];
-      const trendPoints = [];
+    analyses.forEach((analysis) => {
+      const tracksByPlayer = new Map();
 
-      analyses.forEach((analysis) => {
-        const tracks = analysis.playerData.filter(
-          (pd) => pd.playerId && String(pd.playerId) === id
-        );
-        if (tracks.length === 0) return;
+      (analysis.playerData || []).forEach((track) => {
+        const playerId = track.playerId ? String(track.playerId) : null;
+        if (!playerId || !statsByPlayerId.has(playerId)) return;
+        if (!tracksByPlayer.has(playerId)) tracksByPlayer.set(playerId, []);
+        tracksByPlayer.get(playerId).push(track);
+      });
 
-        matchesPlayed += 1;
+      tracksByPlayer.forEach((tracks, id) => {
+        const stats = statsByPlayerId.get(id);
+        stats.matchesPlayed += 1;
         const trackIds = new Set();
         let matchDistance = 0;
-        tracks.forEach((t) => {
-          matchDistance += t.statistics?.distanceCovered || 0;
-          totalSprints += t.statistics?.sprintCount || 0;
-          if (t.statistics?.averageSpeed) speedSamples.push(t.statistics.averageSpeed);
-          if (t.verified) verifiedTracks += 1;
-          if (t.trackId) trackIds.add(t.trackId);
+        let matchSprints = 0;
+
+        tracks.forEach((track) => {
+          matchDistance += track.statistics?.distanceCovered || 0;
+          matchSprints += track.statistics?.sprintCount || 0;
+          stats.totalSprints += track.statistics?.sprintCount || 0;
+          if (track.statistics?.averageSpeed) stats.speedSamples.push(track.statistics.averageSpeed);
+          if (track.verified) stats.verifiedTracks += 1;
+          if (track.trackId) trackIds.add(track.trackId);
         });
-        totalDistance += matchDistance;
+
+        stats.totalDistance += matchDistance;
 
         let matchActionCount = 0;
-        let matchSprints = 0;
-        analysis.actions.forEach((a) => {
-          if (a.playerId && trackIds.has(a.playerId) && actionCounts[a.type] !== undefined) {
-            actionCounts[a.type] += 1;
+        (analysis.actions || []).forEach((action) => {
+          if (
+            action.playerId &&
+            trackIds.has(action.playerId) &&
+            stats.actionCounts[action.type] !== undefined
+          ) {
+            stats.actionCounts[action.type] += 1;
             matchActionCount += 1;
           }
         });
 
-        tracks.forEach((track) => {
-          matchSprints += track.statistics?.sprintCount || 0;
-        });
-
-        matches.push({
+        stats.matches.push({
           video: analysis.video
             ? { _id: analysis.video._id, originalName: analysis.video.originalName }
             : null,
@@ -415,22 +429,24 @@ exports.comparePlayers = async (req, res) => {
           actionCount: matchActionCount,
           sprints: round2(matchSprints),
         });
-
-        trendPoints.push({
-          label: analysis.video?.originalName || `Match ${trendPoints.length + 1}`,
+        stats.trendPoints.push({
+          label: analysis.video?.originalName || `Match ${stats.trendPoints.length + 1}`,
           distance: round2(matchDistance),
           actions: matchActionCount,
           sprints: round2(matchSprints),
         });
       });
+    });
 
-      const avgSpeed = speedSamples.length
-        ? round2(speedSamples.reduce((a, b) => a + b, 0) / speedSamples.length)
+    // Preserve the order the caller asked for rather than Mongo's $in order.
+    const playersById = new Map(players.map((p) => [String(p._id), p]));
+    const results = ids.map((id) => {
+      const player = playersById.get(id);
+      const stats = statsByPlayerId.get(id);
+      const avgSpeed = stats.speedSamples.length
+        ? round2(stats.speedSamples.reduce((a, b) => a + b, 0) / stats.speedSamples.length)
         : 0;
-
-      const totalActions = Object.values(actionCounts).reduce((a, b) => a + b, 0);
-      const averageDistancePerMatch = matchesPlayed ? round2(totalDistance / matchesPlayed) : 0;
-      const averageSprintsPerMatch = matchesPlayed ? round2(totalSprints / matchesPlayed) : 0;
+      const totalActions = Object.values(stats.actionCounts).reduce((a, b) => a + b, 0);
 
       return {
         player: {
@@ -448,20 +464,20 @@ exports.comparePlayers = async (req, res) => {
           profileSummary: player.profileSummary,
           team: player.team,
         },
-        matchesPlayed,
-        totalDistanceCovered: round2(totalDistance),
-        averageDistancePerMatch,
+        matchesPlayed: stats.matchesPlayed,
+        totalDistanceCovered: round2(stats.totalDistance),
+        averageDistancePerMatch: stats.matchesPlayed ? round2(stats.totalDistance / stats.matchesPlayed) : 0,
         averageSpeed: avgSpeed,
-        totalSprints,
-        averageSprintsPerMatch,
-        actions: actionCounts,
+        totalSprints: stats.totalSprints,
+        averageSprintsPerMatch: stats.matchesPlayed ? round2(stats.totalSprints / stats.matchesPlayed) : 0,
+        actions: stats.actionCounts,
         totalActions,
-        verifiedTracks,
-        matches,
+        verifiedTracks: stats.verifiedTracks,
+        matches: stats.matches,
         trendSeries: {
-          distance: trendPoints.map((point) => ({ label: point.label, value: point.distance })),
-          actions: trendPoints.map((point) => ({ label: point.label, value: point.actions })),
-          sprints: trendPoints.map((point) => ({ label: point.label, value: point.sprints })),
+          distance: stats.trendPoints.map((point) => ({ label: point.label, value: point.distance })),
+          actions: stats.trendPoints.map((point) => ({ label: point.label, value: point.actions })),
+          sprints: stats.trendPoints.map((point) => ({ label: point.label, value: point.sprints })),
         },
       };
     });
@@ -490,10 +506,10 @@ exports.getPlayerProfile = async (req, res) => {
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    const analyses = await Analysis.find({ 'playerData.playerId': id }).populate(
-      'video',
-      'originalName createdAt status sport'
-    );
+    const analyses = await Analysis.find({ 'playerData.playerId': id })
+      .select('video playerData actions')
+      .populate('video', 'originalName createdAt status sport')
+      .lean();
     const summary = aggregatePlayerSummary(id, analyses);
 
     res.json({
