@@ -7,6 +7,8 @@ const { emitEvent } = require('../utils/socket');
 
 const MONGO = process.env.MONGODB_URI || 'mongodb://localhost:27017/scout-bridge-analytics';
 const POLL_INTERVAL = Number(process.env.ANALYSIS_DAEMON_POLL_MS || 2000);
+const SHUTDOWN_TIMEOUT = Number(process.env.SHUTDOWN_TIMEOUT_MS || 30000);
+let shuttingDown = false;
 
 async function processNextJob() {
   // Atomically claim a queued video
@@ -69,7 +71,7 @@ async function processNextJob() {
 async function runDaemon() {
   await mongoose.connect(MONGO);
   console.log('analysis daemon connected to mongo');
-  while (true) {
+  while (!shuttingDown) {
     try {
       const res = await processNextJob();
       if (!res) {
@@ -83,6 +85,9 @@ async function runDaemon() {
 }
 
 if (require.main === module) {
+  process.on('SIGTERM', () => { shutdown('SIGTERM'); });
+  process.on('SIGINT', () => { shutdown('SIGINT'); });
+
   runDaemon().catch((e) => {
     console.error('daemon failed to start', e);
     process.exit(1);
