@@ -6,6 +6,7 @@ const chunkedUploads = require('../utils/chunkedUploads');
 const storage = require('../utils/storage');
 const videoUrlImport = require('../utils/videoUrlImport');
 const { emitEvent } = require('../utils/socket');
+const multipartSessions = require('../utils/multipartUploadSessions');
 
 // Mirrors analysisController.js's THUMBNAILS_ROOT resolution exactly, so
 // the directory deleteVideo cleans up is the same one processAnalysis
@@ -208,15 +209,27 @@ exports.completeChunkedUpload = async (req, res) => {
 
 exports.presignMultipartInit = async (req, res) => {
   try {
-    const { filename, partCount, contentType } = req.body;
+    const { filename, partCount, contentType, fileSize } = req.body;
     const count = Number(partCount);
-    if (!Number.isInteger(count) || count < 1) {
-      return res.status(400).json({ error: 'partCount must be a positive integer' });
+    const size = Number(fileSize);
+    if (!Number.isInteger(count) || count < 1 || count > 10000) {
+      return res.status(400).json({ error: 'partCount must be an integer between 1 and 10000' });
+    }
+    if (!Number.isSafeInteger(size) || size <= 0) {
+      return res.status(400).json({ error: 'fileSize must be a positive integer' });
+    }
+
+    const maxSize = Number(process.env.MAX_FILE_SIZE) || 500 * 1024 * 1024;
+    if (size > maxSize) {
+      return res.status(400).json({ error: `File exceeds maximum allowed size of ${maxSize} bytes` });
     }
 
     const safeName = path.basename(String(filename || '').trim());
     if (!safeName) {
       return res.status(400).json({ error: 'filename is required' });
+    }
+    if (!ALLOWED_EXTENSIONS.includes(path.extname(safeName).toLowerCase())) {
+      return res.status(400).json({ error: 'Only video files are allowed' });
     }
     if (!storage.isCloudBackend()) {
       return res.status(400).json({ error: 'Presigned multipart uploads require STORAGE_BACKEND=s3' });
@@ -224,6 +237,17 @@ exports.presignMultipartInit = async (req, res) => {
 
     const key = `${Date.now()}-${safeName}`;
     const result = await storage.createMultipartPresignedUrls(key, count, contentType);
+    await multipartSessions.createSession(result.uploadId, {
+      uploadId: result.uploadId,
+      key: result.key,
+      userId: String(req.user._id),
+      originalName: safeName,
+      fileSize: size,
+      partCount: count,
+      contentType: contentType || 'application/octet-stream',
+      createdAt: new Date().toISOString(),
+    });
+
     res.status(201).json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -237,18 +261,42 @@ exports.completePresignedMultipartUpload = async (req, res) => {
       return res.status(400).json({ error: 'Presigned multipart uploads require STORAGE_BACKEND=s3' });
     }
 
-    const safeName = path.basename(String(filename || '').trim());
-    if (!safeName) {
-      return res.status(400).json({ error: 'filename is required' });
+    const session = await multipartSessions.getSession(uploadId);
+    if (!session || String(session.userId) !== String(req.user._id)) {
+      return res.status(404).json({ error: 'Unknown or expired upload session' });
     }
 
-    await storage.completeMultipartUpload(filename, uploadId, parts);
+    const safeName = path.basename(String(filename || '').trim());
+    const size = Number(fileSize);
+    if (filename !== session.key || safeName !== session.originalName || size !== session.fileSize) {
+      return res.status(400).json({ error: 'Multipart upload metadata does not match the upload session' });
+    }
+    if (!Array.isArray(parts) || parts.length !== session.partCount) {
+      return res.status(400).json({ error: `Expected exactly ${session.partCount} uploaded parts` });
+    }
+
+    const normalizedParts = parts.map((part) => ({
+      PartNumber: Number(part?.PartNumber),
+      ETag: String(part?.ETag || ''),
+    }));
+    const validParts = normalizedParts.every(
+      (part, index) =>
+        Number.isInteger(part.PartNumber) &&
+        part.PartNumber === index + 1 &&
+        part.ETag.length > 0
+    );
+    if (!validParts) {
+      return res.status(400).json({ error: 'parts must contain sequential PartNumber and ETag values' });
+    }
+
+    await storage.completeMultipartUpload(session.key, session.uploadId, normalizedParts);
+    await multipartSessions.deleteSession(uploadId);
 
     const video = new Video({
-      filename,
-      originalName: safeName,
-      fileSize: Number(fileSize),
-      filePath: filename,
+      filename: session.key,
+      originalName: session.originalName,
+      fileSize: session.fileSize,
+      filePath: session.key,
       storageBackend: 's3',
       uploadedBy: req.user.email,
       user: req.user._id,
@@ -260,10 +308,30 @@ exports.completePresignedMultipartUpload = async (req, res) => {
         : req.body.players
         ? [req.body.players]
         : [],
-      sport: req.body.sport || 'soccer',
+      sport: ALLOWED_SPORTS.includes(req.body.sport) ? req.body.sport : 'soccer',
     });
     await video.save();
     res.status(201).json(video);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.abortPresignedMultipartUpload = async (req, res) => {
+  try {
+    const { uploadId } = req.params;
+    if (!storage.isCloudBackend()) {
+      return res.status(400).json({ error: 'Presigned multipart uploads require STORAGE_BACKEND=s3' });
+    }
+
+    const session = await multipartSessions.getSession(uploadId);
+    if (!session || String(session.userId) !== String(req.user._id)) {
+      return res.status(404).json({ error: 'Unknown or expired upload session' });
+    }
+
+    await storage.abortMultipartUpload(session.key, session.uploadId);
+    await multipartSessions.deleteSession(uploadId);
+    res.status(204).end();
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
