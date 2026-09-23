@@ -302,6 +302,9 @@ exports.getAnalysisByVideo = async (req, res) => {
   try {
     const { videoId } = req.params;
     const analysis = await Analysis.findOne({ video: videoId })
+      .select(
+        'video playerData.playerId playerData.trackId playerData.jerseyNumber playerData.jerseyConfidence playerData.teamColor playerData.thumbnail playerData.verified playerData.statistics actions ballData tacticalData heatmapData summary modelVersion detectionConfig'
+      )
       .populate({ path: 'video', populate: ['team', 'opponentTeam', 'players'] })
       .populate('playerData.playerId')
       .populate('actions.playerId');
