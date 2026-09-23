@@ -482,9 +482,6 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Get video by ID');
-}
-
 // Get video by ID — 404 (not 403) for a video that exists but isn't
 // owned by the requester, so its existence isn't distinguishable from it
 // simply not being there.
