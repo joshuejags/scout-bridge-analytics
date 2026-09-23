@@ -52,7 +52,10 @@ const boardResponse = {
 describe('ScoutPortalPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    axios.get.mockResolvedValue({ data: boardResponse });
+    axios.get.mockImplementation((url) => {
+      if (url.includes('/filter-presets')) return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: boardResponse });
+    });
     axios.patch.mockResolvedValue({
       data: {
         ...boardResponse.targets[0],
