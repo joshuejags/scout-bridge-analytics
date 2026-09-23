@@ -430,8 +430,8 @@ exports.getVideos = async (req, res) => {
 
     if (query) {
       filter.$or = [
-        { originalName: { $regex: query, $options: 'i' } },
-        { filename: { $regex: query, $options: 'i' } },
+        { originalName: { $regex: escapeRegex(query), $options: 'i' } },
+        { filename: { $regex: escapeRegex(query), $options: 'i' } },
       ];
     }
 
@@ -477,6 +477,11 @@ exports.getVideos = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\
+// Get video by ID');
+}
 
 // Get video by ID — 404 (not 403) for a video that exists but isn't
 // owned by the requester, so its existence isn't distinguishable from it
