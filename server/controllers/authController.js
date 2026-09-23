@@ -7,7 +7,7 @@ const TOKEN_EXPIRY = '7d';
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
 
 const signToken = (user) =>
-  jwt.sign({ id: user._id, role: user.role }, getJwtSecret(), {
+  jwt.sign({ id: user._id, role: user.role, tokenVersion: user.tokenVersion || 0 }, getJwtSecret(), {
     expiresIn: TOKEN_EXPIRY,
   });
 
@@ -71,7 +71,7 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+password +tokenVersion');
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -211,13 +211,14 @@ exports.resetPassword = async (req, res) => {
     const user = await User.findOne({
       resetTokenHash: tokenHash,
       resetTokenExpires: { $gt: new Date() },
-    }).select('+resetTokenHash +resetTokenExpires');
+    }).select('+resetTokenHash +resetTokenExpires +tokenVersion');
 
     if (!user) {
       return res.status(400).json({ error: 'Reset link is invalid or has expired' });
     }
 
     user.password = password;
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
     user.resetTokenHash = undefined;
     user.resetTokenExpires = undefined;
     await user.save();
