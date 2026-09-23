@@ -368,6 +368,7 @@ async function getDeadLetterJobs({ limit = 50, offset = 0 } = {}) {
     items: jobs.map((job) => ({
       id: job.id,
       originalJobId: job.data.originalJobId,
+      videoId: job.data.videoId || null,
       originalJobName: job.data.originalJobName,
       attemptsMade: job.data.attemptsMade,
       failedReason: job.data.failedReason || job.failedReason,
