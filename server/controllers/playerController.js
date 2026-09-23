@@ -34,39 +34,39 @@ exports.createPlayer = async (req, res) => {
 
 exports.getPlayers = async (req, res) => {
   try {
+    const paginated = String(req.query.paginated || '').toLowerCase() === 'true';
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 25));
+    const skip = (page - 1) * limit;
     const query = req.query.q?.trim();
     const filters = {};
     const searchClauses = [];
 
     if (query) {
+      const safeQuery = escapeRegex(query);
       searchClauses.push(
-        { name: { $regex: query, $options: 'i' } },
-        { position: { $regex: query, $options: 'i' } },
-        { nationality: { $regex: query, $options: 'i' } },
-        { profileSummary: { $regex: query, $options: 'i' } }
+        { name: { $regex: safeQuery, $options: 'i' } },
+        { position: { $regex: safeQuery, $options: 'i' } },
+        { nationality: { $regex: safeQuery, $options: 'i' } },
+        { profileSummary: { $regex: safeQuery, $options: 'i' } }
       );
     }
 
-    if (req.query.position) {
-      filters.position = { $regex: req.query.position, $options: 'i' };
-    }
+    if (req.query.position) filters.position = { $regex: escapeRegex(req.query.position), $options: 'i' };
 
     const clubQuery = req.query.club?.trim();
     if (clubQuery) {
-      const clubClauses = [{ name: { $regex: clubQuery, $options: 'i' } }, { profileSummary: { $regex: clubQuery, $options: 'i' } }];
-      if (mongoose.Types.ObjectId.isValid(clubQuery)) {
-        clubClauses.push({ team: clubQuery });
-      }
+      const safeClub = escapeRegex(clubQuery);
+      const clubClauses = [
+        { name: { $regex: safeClub, $options: 'i' } },
+        { profileSummary: { $regex: safeClub, $options: 'i' } },
+      ];
+      if (mongoose.Types.ObjectId.isValid(clubQuery)) clubClauses.push({ team: clubQuery });
       searchClauses.push(...clubClauses);
     }
 
-    if (req.query.country) {
-      filters.nationality = { $regex: req.query.country, $options: 'i' };
-    }
-
-    if (req.query.league) {
-      searchClauses.push({ profileSummary: { $regex: req.query.league, $options: 'i' } });
-    }
+    if (req.query.country) filters.nationality = { $regex: escapeRegex(req.query.country), $options: 'i' };
+    if (req.query.league) searchClauses.push({ profileSummary: { $regex: escapeRegex(req.query.league), $options: 'i' } });
 
     if (req.query.ageMin || req.query.ageMax) {
       filters.age = {};
@@ -84,17 +84,35 @@ exports.getPlayers = async (req, res) => {
       if (req.query.weightMax) filters.weightKg.$lte = Number(req.query.weightMax);
     }
 
-    if (searchClauses.length) {
-      filters.$or = searchClauses;
-    }
+    if (searchClauses.length) filters.$or = searchClauses;
 
-    const players = await Player.find(filters).populate('team').sort({ createdAt: -1 });
-    res.json(players);
+    const findQuery = Player.find(filters).populate('team', 'name').sort({ createdAt: -1 });
+    const [players, total] = await Promise.all([
+      (paginated ? findQuery.skip(skip).limit(limit) : findQuery).lean(),
+      paginated ? Player.countDocuments(filters) : Promise.resolve(null),
+    ]);
+
+    if (!paginated) return res.json(players);
+
+    res.json({
+      items: players,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        hasNextPage: page * limit < total,
+        hasPreviousPage: page > 1,
+      },
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
 
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^()|[\]\\]/g, '\\$&');
+};
 exports.getPlayerOverview = async (req, res) => {
   try {
     const players = await Player.find().populate('team').sort({ createdAt: -1 });
