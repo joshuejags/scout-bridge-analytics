@@ -65,9 +65,13 @@ function escapeRegex(value) {
 
 exports.getTeamOverview = async (req, res) => {
   try {
-    const [teams, players, videos, totalVideos, analyzedVideos] = await Promise.all([
-      Team.find().sort({ name: 1 }),
-      Player.find().select('team'),
+    const [teams, rosterCounts, totalPlayers, videos, totalVideos, analyzedVideos] = await Promise.all([
+      Team.find().select('name description').sort({ name: 1 }).lean(),
+      Player.aggregate([
+        { $match: { team: { $ne: null } } },
+        { $group: { _id: '$team', count: { $sum: 1 } } },
+      ]),
+      Player.countDocuments(),
       Video.find()
         .populate('team', 'name')
         .populate('opponentTeam', 'name')
@@ -77,10 +81,8 @@ exports.getTeamOverview = async (req, res) => {
       Video.countDocuments({ status: 'analyzed' }),
     ]);
 
-    const rosterCounts = players.reduce((acc, player) => {
-      const key = player.team ? String(player.team) : null;
-      if (!key) return acc;
-      acc[key] = (acc[key] || 0) + 1;
+    const rosterCountByTeam = rosterCounts.reduce((acc, item) => {
+      acc[String(item._id)] = item.count;
       return acc;
     }, {});
 
@@ -110,7 +112,7 @@ exports.getTeamOverview = async (req, res) => {
           _id: team._id,
           name: team.name,
           description: team.description,
-          rosterCount: rosterCounts[String(team._id)] || 0,
+          rosterCount: rosterCountByTeam[String(team._id)] || 0,
           ownedVideoCount: stats.owned,
           opponentVideoCount: stats.opponent,
           lastVideo: stats.lastVideo
@@ -133,7 +135,7 @@ exports.getTeamOverview = async (req, res) => {
     res.json({
       summary: {
         totalTeams: teams.length,
-        totalPlayers: players.length,
+        totalPlayers,
         totalVideos,
         analyzedVideos,
         teamsWithVideoContext: Object.keys(videoStats.byTeam).length,
