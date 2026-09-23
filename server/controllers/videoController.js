@@ -479,7 +479,9 @@ exports.getVideos = async (req, res) => {
 };
 
 function escapeRegex(value) {
-  return value.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Get video by ID');
 }
 
