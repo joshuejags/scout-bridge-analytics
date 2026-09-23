@@ -263,20 +263,13 @@ async function submitJob(params, { onProgress, onQueued, onDispatch } = {}) {
   }
 
   if (useBullMQ && bullmqQueue) {
-    // BullMQ path: job is persistent and queued in Redis
-    try {
-      return await bullmqQueue.submitJob(params, { onProgress, onQueued, onDispatch });
-    } catch (err) {
-      // If BullMQ fails, fall back to in-memory (if enabled)
-      if (!FALLBACK_MODE_ENABLED) throw err;
-      console.warn(`[analysisWorkerPool] BullMQ submission failed, falling back: ${err.message}`);
-      useBullMQ = false;
-      return submitJobInMemory(params, { onProgress, onQueued, onDispatch });
-    }
-  } else {
-    // In-memory path (fallback or when Redis unavailable)
-    return submitJobInMemory(params, { onProgress, onQueued, onDispatch });
+    // Once BullMQ is active, propagate failures. The job may already be queued
+    // or running, so an in-memory retry could execute the same analysis twice.
+    return bullmqQueue.submitJob(params, { onProgress, onQueued, onDispatch });
   }
+
+  // In-memory path selected during initialization when Redis is unavailable.
+  return submitJobInMemory(params, { onProgress, onQueued, onDispatch });
 }
 
 function submitJobInMemory(params, { onProgress, onQueued, onDispatch } = {}) {
