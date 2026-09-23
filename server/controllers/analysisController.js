@@ -126,6 +126,8 @@ async function persistAnalysis(video, result) {
 
 exports.processAnalysis = async (req, res) => {
   const { videoId } = req.params;
+  const MAX_ACTIVE_PER_USER = Number(process.env.ANALYSIS_MAX_ACTIVE_PER_USER || 3);
+  const MAX_GLOBAL_QUEUED = Number(process.env.ANALYSIS_MAX_GLOBAL_QUEUED || 50);
   let video;
   try {
     video = await Video.findById(videoId);
@@ -143,15 +145,50 @@ exports.processAnalysis = async (req, res) => {
       // status says analyzed but no analysis doc — fall through and reprocess
     }
 
-    // Stale processing/queued state: allow retry by clearing the flag and continuing.
-    if (video.status === 'processing' || video.status === 'queued') {
-      console.warn(`Video ${videoId} was stuck in '${video.status}'; retrying.`);
+    // Idempotent while a job is already active: never create a second
+    // analysis for the same video when a user double-clicks/retries.
+    if (video.status === 'queued' || video.status === 'processing') {
+      return res.status(202).json({
+        message: 'Analysis already queued',
+        videoId: video._id,
+        status: video.status,
+      });
     }
 
-    // Mark as queued and respond 202 immediately; the queued->processing
-    // transition happens in onDispatch below, once a worker actually picks
-    // this job up (see utils/analysisWorkerPool.js) rather than assuming one
-    // is free right now.
+    // Protect the shared worker pool from one account consuming all slots.
+    const ownerId = video.user || req.user?._id;
+    const activeFilter = {
+      user: ownerId,
+      status: { $in: ['queued', 'processing'] },
+    };
+    const activeForUser = await Video.countDocuments(activeFilter);
+    if (activeForUser >= MAX_ACTIVE_PER_USER) {
+      return res.status(429).json({
+        error: 'Analysis capacity for this account is currently full.',
+        code: 'ANALYSIS_USER_CAPACITY',
+        active: activeForUser,
+        limit: MAX_ACTIVE_PER_USER,
+        retryAfterSeconds: 60,
+      });
+    }
+
+    // Protect the whole installation from an unbounded database-backed
+    // queue. This is intentionally separate from BullMQ's worker count:
+    // queued videos are claimed by the analysis daemon before they reach
+    // the Python worker pool.
+    const queuedCount = await Video.countDocuments({ status: 'queued' });
+    if (queuedCount >= MAX_GLOBAL_QUEUED) {
+      return res.status(429).json({
+        error: 'Analysis queue is at capacity. Please try again later.',
+        code: 'ANALYSIS_GLOBAL_CAPACITY',
+        queued: queuedCount,
+        limit: MAX_GLOBAL_QUEUED,
+        retryAfterSeconds: 120,
+      });
+    }
+
+    // Mark as queued and respond 202 immediately; the daemon atomically
+    // claims the video and dispatches it to BullMQ/Python workers.
     video.status = 'queued';
     await video.save();
   } catch (error) {
