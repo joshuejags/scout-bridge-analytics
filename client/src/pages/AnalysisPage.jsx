@@ -25,32 +25,54 @@ const AnalysisPage = () => {
   const [jobStatus, setJobStatus] = useState(null);
 
   useEffect(() => {
-    let timer;
+    let timer = null;
+    let cancelled = false;
+
     const fetchAnalysis = async () => {
       try {
         const statusRes = await axios.get(apiUrl(`/analysis/${videoId}/status`));
-        setJobStatus(statusRes.data);
-        if (statusRes.data.status !== 'analyzed') {
+        if (cancelled) return;
+
+        const status = statusRes.data;
+        setJobStatus(status);
+
+        if (status.status === 'failed') {
+          setLoading(false);
+          if (timer) clearInterval(timer);
+          return;
+        }
+
+        if (status.status !== 'analyzed') {
           setLoading(false);
           return;
         }
+
         const [analysisRes, playersRes] = await Promise.all([
           axios.get(apiUrl(`/analysis/${videoId}`)),
           axios.get(apiUrl('/players')),
         ]);
+        if (cancelled) return;
+
         setAnalysis(analysisRes.data);
         setPlayers(playersRes.data);
         setSaveDraft(buildInitialReportDraft(analysisRes.data));
-      } catch (err) {
-        setError(err.response?.data?.error || 'Failed to load analysis');
-      } finally {
         setLoading(false);
+        if (timer) clearInterval(timer);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err.response?.data?.error || 'Failed to load analysis');
+        setLoading(false);
+        if (timer) clearInterval(timer);
       }
     };
 
     fetchAnalysis();
     timer = setInterval(fetchAnalysis, 3000);
-    return () => clearInterval(timer);
+
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
   }, [videoId]);
 
   const actionCounts = useMemo(
@@ -351,7 +373,7 @@ const AnalysisPage = () => {
             <p className="card-subtitle">Important events and highlights from the clip.</p>
           </div>
         </div>
-        {analysis.summary?.highlightedMoments?.length === 0 ? (
+        {(analysis.summary?.highlightedMoments || []).length === 0 ? (
           <p className="empty-state">No standout moments detected in this clip.</p>
         ) : (
           <div className="analysis-moment-grid">
