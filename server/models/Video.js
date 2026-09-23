@@ -70,6 +70,13 @@ const videoSchema = new mongoose.Schema(
     // Timestamp set atomically when the analysis daemon claims this video.
     // Used to recover jobs left processing after a worker crash/restart.
     processingStartedAt: { type: Date, default: null },
+    // Unique lease token for the daemon attempt currently processing this video.
+    // Final writes must match it so a stale worker can never overwrite a newer attempt.
+    processingLeaseId: { type: String, default: null },
+    // Refreshed periodically while the worker is alive. Recovery uses this
+    // heartbeat rather than assuming a long-running analysis is dead merely
+    // because its original start time is old.
+    processingHeartbeatAt: { type: Date, default: null },
     // Set whenever status transitions to 'failed' — either a real analysis
     // error, or (see analysisController.reconcileOrphanedJobs) a job lost
     // to a server restart while queued/processing. Cleared on success, so
