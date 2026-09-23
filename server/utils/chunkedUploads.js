@@ -90,7 +90,16 @@ async function finalize(uploadId, finalFilename) {
   const localPath = path.join(UPLOAD_DIR, finalFilename);
   fs.renameSync(session.tempPath, localPath);
   sessions.delete(uploadId);
-  return storage.storeFile(localPath, finalFilename);
+  try {
+    return await storage.storeFile(localPath, finalFilename);
+  } catch (error) {
+    await fs.promises.unlink(localPath).catch((cleanupError) => {
+      if (cleanupError.code !== 'ENOENT') {
+        console.error('[chunkedUploads] Failed to clean up an unstored upload:', cleanupError.message);
+      }
+    });
+    throw error;
+  }
 }
 
 function abort(uploadId) {
