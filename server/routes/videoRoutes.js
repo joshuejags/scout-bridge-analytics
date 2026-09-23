@@ -1,10 +1,27 @@
 const express = require('express');
 const multer = require('multer');
+const fs = require('fs');
 const path = require('path');
-const { body, param } = require('express-validator');
+const { body, param, validationResult } = require('express-validator');
 const videoController = require('../controllers/videoController');
 const validate = require('../middleware/validate');
 const { requireRole } = require('../middleware/auth');
+
+const validateVideoUploadMetadata = async (req, res, next) => {
+  const result = validationResult(req);
+  if (result.isEmpty()) return next();
+
+  if (req.file?.path) {
+    await fs.promises.unlink(req.file.path).catch((error) => {
+      if (error.code !== 'ENOENT') {
+        console.error('[video-upload] Failed to remove rejected upload:', error.message);
+      }
+    });
+  }
+
+  const errors = result.array();
+  return res.status(400).json({ error: errors[0].msg, errors });
+};
 const { uploadLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
@@ -64,7 +81,7 @@ router.post(
   uploadLimiter,
   upload.single('video'),
   uploadMetaValidators,
-  validate,
+  validateVideoUploadMetadata,
   videoController.uploadVideo
 );
 
