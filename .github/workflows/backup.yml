@@ -1,5 +1,8 @@
 name: Database Backup
 
+permissions:
+  contents: read
+
 # Runs server/scripts/backupDatabase.js on a schedule: mongodump piped
 # straight into S3, then prunes backups older than BACKUP_RETENTION_DAYS.
 # Inert without configuration — needs these repo secrets to actually do
@@ -21,7 +24,7 @@ on:
 
 jobs:
   backup:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4

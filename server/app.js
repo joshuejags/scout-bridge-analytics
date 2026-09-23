@@ -32,7 +32,7 @@ app.use(
 // haven't configured it.
 app.use(cors(process.env.CLIENT_URL ? { origin: process.env.CLIENT_URL } : {}));
 app.use(express.json());
-app.use(express.urlencoded({ limit: '500mb', extended: true }));
+app.use(express.urlencoded({ limit: '100kb', extended: true, parameterLimit: 1000 }));
 
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || 'uploads');
 const clientBuildDir = path.resolve(__dirname, '../client/build');
@@ -86,9 +86,6 @@ app.get('/api/health', async (req, res) => {
 
   res.status(healthy ? 200 : 503).json({
     status: healthy ? 'ok' : 'degraded',
-    database: database ? 'connected' : 'disconnected',
-    redis: redis ? 'connected' : 'disconnected',
-    queue,
     timestamp: new Date().toISOString(),
   });
 });
@@ -142,7 +139,7 @@ app.use((err, req, res, next) => {
   // the branches above are normal client-input rejections, not crashes.
   errorTracking.captureException(err);
   console.error(err);
-  res.status(500).json({ error: err.message });
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 module.exports = app;

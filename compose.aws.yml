@@ -15,7 +15,7 @@ services:
       start_period: 20s
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4.11-alpine
     restart: unless-stopped
     command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD}\""]
     environment:
@@ -83,7 +83,7 @@ services:
       - analysis_tmp_data:/app/server/tmp_analysis
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.9.1
     restart: unless-stopped
     env_file:
       - .env.tunnel
