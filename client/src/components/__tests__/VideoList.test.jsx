@@ -129,7 +129,7 @@ describe('VideoList real-time analysis updates', () => {
   });
 
   it('shows a queued badge for a video queued by another connected client', async () => {
-    axios.get.mockResolvedValue({ data: [baseVideo] });
+    axios.get.mockResolvedValue({ data: { items: [baseVideo], pagination: { page: 1, limit: 25, total: 1, totalPages: 1, hasNextPage: false, hasPreviousPage: false } } });
     renderList();
 
     await waitFor(() => expect(screen.getByText('match1.mp4')).toBeInTheDocument());
