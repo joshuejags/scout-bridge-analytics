@@ -86,6 +86,7 @@ describe('SavedReportsPage', () => {
         ],
       })
       .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [] })
       .mockResolvedValueOnce({ data: new Blob(['# report']) });
     axios.patch.mockResolvedValue({
       data: {
