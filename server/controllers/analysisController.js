@@ -494,16 +494,47 @@ exports.mergePlayerTracks = async (req, res) => {
     // Keep the merged result compact: large tracks are written back to the
     // same artifact storage mechanism used by the analysis worker.
     const threshold = Number(process.env.TRACKING_OFFLOAD_THRESHOLD || 500);
+    const artifactKeyFromPointer = (value) => {
+      if (!value || typeof value !== 'object') return null;
+      const pointer = value.s3 || value.key;
+      if (!pointer) return null;
+      return String(pointer).replace(/^s3:\/\/[^/]+\//, '');
+    };
+
+    const previousSourceArtifact = artifactKeyFromPointer(source.trackingData);
+    const previousTargetArtifact = artifactKeyFromPointer(target.trackingData);
+    let replacementArtifact = null;
+
     if (combined.length > threshold) {
       const key = `artifacts/analysis/${analysis._id}/player-${target.trackId || targetIdx}-tracking.json`;
       await uploadJsonObject(key, combined);
       const bucket = process.env.S3_BUCKET || null;
       target.trackingData = { s3: bucket ? `s3://${bucket}/${key}` : key };
+      replacementArtifact = key;
     } else {
       target.trackingData = combined;
     }
 
     await analysis.save();
+
+    // The database now references the merged representation, so obsolete
+    // source/target artifacts can be removed without risking a broken
+    // analysis if the MongoDB write fails.
+    const staleArtifacts = [previousSourceArtifact, previousTargetArtifact]
+      .filter(Boolean)
+      .filter((key, index, keys) => keys.indexOf(key) === index)
+      .filter((key) => key !== replacementArtifact);
+
+    if (staleArtifacts.length) {
+      const { deleteJsonObject } = require('../utils/artifactStore');
+      await Promise.all(
+        staleArtifacts.map((key) =>
+          deleteJsonObject(key).catch((err) => {
+            console.warn(`artifact cleanup failed for ${key}: ${err.message}`);
+          })
+        )
+      );
+    }
     const populated = await Analysis.findById(analysisId).populate('playerData.playerId');
     res.json(populated);
   } catch (error) {
