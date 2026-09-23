@@ -76,6 +76,7 @@ describe('AnalysisPage action breakdown', () => {
 
   it('renders no breakdown badges when there are no actions', async () => {
     axios.get.mockImplementation((url) => {
+      if (url.includes('/status')) return Promise.resolve({ data: { status: 'analyzed', progress: 100 } });
       if (url.includes('/analysis/')) return Promise.resolve({ data: { ...baseAnalysis, actions: [] } });
       return Promise.resolve({ data: [] });
     });
@@ -135,6 +136,7 @@ describe('AnalysisPage player stats table', () => {
 
   it('shows a fallback message instead of an empty table when there is no player data', async () => {
     axios.get.mockImplementation((url) => {
+      if (url.includes('/status')) return Promise.resolve({ data: { status: 'analyzed', progress: 100 } });
       if (url.includes('/analysis/')) return Promise.resolve({ data: { ...baseAnalysis, playerData: [] } });
       return Promise.resolve({ data: [] });
     });
@@ -225,6 +227,7 @@ describe('AnalysisPage tactical shape panel', () => {
 
   it('omits the tactical panel when tacticalData is entirely absent (older analyses)', async () => {
     axios.get.mockImplementation((url) => {
+      if (url.includes('/status')) return Promise.resolve({ data: { status: 'analyzed', progress: 100 } });
       if (url.includes('/analysis/')) return Promise.resolve({ data: baseAnalysis });
       return Promise.resolve({ data: [] });
     });
@@ -279,6 +282,7 @@ describe('AnalysisPage saved reports workflow', () => {
 
   it('prefills and submits the saved report form', async () => {
     axios.get.mockImplementation((url) => {
+      if (url.includes('/status')) return Promise.resolve({ data: { status: 'analyzed', progress: 100 } });
       if (url.includes('/analysis/')) return Promise.resolve({ data: { ...baseAnalysis, video: { _id: 'vid1', originalName: 'match.mp4', sport: 'soccer' } } });
       return Promise.resolve({ data: [] });
     });
