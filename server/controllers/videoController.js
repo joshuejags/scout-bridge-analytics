@@ -38,6 +38,28 @@ async function cleanupStoredUpload(stored, fallbackLocalPath) {
   }
 }
 
+async function cleanupUrlImportArtifacts(videoId) {
+  const prefix = `${videoId}.`;
+  try {
+    const entries = await fs.promises.readdir(UPLOAD_DIR, { withFileTypes: true });
+    await Promise.all(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.startsWith(prefix))
+        .map((entry) =>
+          fs.promises.unlink(path.join(UPLOAD_DIR, entry.name)).catch((error) => {
+            if (error.code !== 'ENOENT') {
+              console.error(`[video-import] Failed to remove temporary file ${entry.name}: ${error.message}`);
+            }
+          })
+        )
+    );
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error(`[video-import] Failed to inspect temporary files for ${videoId}: ${error.message}`);
+    }
+  }
+}
+
 // Every video a non-admin user lists or fetches is scoped to their own
 // uploads — admins see everything (needed to manage the app, and the only
 // way to reach videos uploaded before the `user` field existed, which have
@@ -438,6 +460,7 @@ async function runUrlImport(videoId, url) {
     const video = await Video.findById(videoId);
     if (!video) {
       await cleanupStoredUpload(stored, downloadedPath);
+      await cleanupUrlImportArtifacts(videoIdStr);
       return; // deleted while the download was still running
     }
 
@@ -455,7 +478,10 @@ async function runUrlImport(videoId, url) {
 
     emitEvent('video:import:complete', { videoId: videoIdStr });
   } catch (error) {
-    if (!saved) await cleanupStoredUpload(stored, downloadedPath);
+    if (!saved) {
+      await cleanupStoredUpload(stored, downloadedPath);
+      await cleanupUrlImportArtifacts(videoIdStr);
+    }
     console.error(`[video-import] Failed for video ${videoIdStr}: ${error.message}`);
     await Video.findByIdAndUpdate(videoId, { status: 'failed', lastError: error.message }).catch((e) => {
       console.error(`[video-import] Also failed to mark video ${videoIdStr} as failed: ${e.message}`);
