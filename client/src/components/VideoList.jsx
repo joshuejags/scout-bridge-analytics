@@ -181,7 +181,13 @@ const VideoList = ({ refreshTrigger = 0 }) => {
         }
       }
     } catch (processingError) {
-      const errorMessage = processingError.response?.data?.error || 'Video processing failed.';
+      const data = processingError.response?.data;
+      let errorMessage = data?.error || 'Video processing failed.';
+      if (processingError.response?.status === 429 && data?.code === 'ANALYSIS_USER_CAPACITY') {
+        errorMessage = `Your analysis capacity is full (${data.active}/${data.limit} active). Try again after one finishes.`;
+      } else if (processingError.response?.status === 429 && data?.code === 'ANALYSIS_GLOBAL_CAPACITY') {
+        errorMessage = `The shared analysis queue is full (${data.queued}/${data.limit} queued). Please try again shortly.`;
+      }
       setError(errorMessage);
       setStatusMessage(null);
       setProcessingId(null);
