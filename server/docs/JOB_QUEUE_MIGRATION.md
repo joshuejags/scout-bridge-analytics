@@ -56,10 +56,10 @@ This marks the video record `queued` and clears its last error. The analysis dae
 | `REDIS_PORT` | `6379` | Redis port |
 | `REDIS_DB` | `0` | Redis database |
 | `REDIS_PASSWORD` | unset | Optional Redis password |
-| `DISABLE_FALLBACK_MODE` | `false` outside production | Set to `true` to reject in-memory fallback in development too |
+| `DISABLE_FALLBACK_MODE` | `false` | Set to `true` to reject in-memory fallback in development too; production already disables fallback by default |
 | `ANALYSIS_WORKER_POOL_SIZE` | `2` | Concurrent analysis workers |
 | `ANALYSIS_JOB_MAX_ATTEMPTS` | `3` | BullMQ attempts before dead-letter copy |
-| `ANALYSIS_JOB_TIMEOUT` | `1800000` | Job timeout in milliseconds |
+| `ANALYSIS_JOB_TIMEOUT` | `1800000` | Maximum time the submitter waits for completion before treating the job as timed out (milliseconds) |
 | `ANALYSIS_QUEUE_MAX` | `20` | In-memory fallback queue limit |
 
 Production deployments should provide a reachable Redis service. The queue's local defaults are for development; they are not a managed production Redis configuration.
