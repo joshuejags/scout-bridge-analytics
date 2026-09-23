@@ -16,9 +16,12 @@ const requireAuth = async (req, res, next) => {
 
   try {
     const payload = jwt.verify(token, getJwtSecret());
-    const user = await User.findById(payload.id);
+    const user = await User.findById(payload.id).select('+tokenVersion');
     if (!user) {
       return res.status(401).json({ error: 'User no longer exists' });
+    }
+    if (Number(payload.tokenVersion || 0) !== Number(user.tokenVersion || 0)) {
+      return res.status(401).json({ error: 'Session has been invalidated' });
     }
     req.user = user;
     next();
