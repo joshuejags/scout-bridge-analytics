@@ -217,8 +217,8 @@ async function pipeObjectToResponse(key, res) {
   result.Body.pipe(res);
 }
 
-async function readObject(key) {
-  if (!isCloudBackend()) {
+async function readObject(key, { backend } = {}) {
+  if (!isBackendCloud(backend)) {
     const root = path.resolve(process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads'));
     return fs.promises.readFile(path.join(root, key));
   }
