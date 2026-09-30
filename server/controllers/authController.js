@@ -5,6 +5,9 @@ const { getJwtSecret } = require('../utils/jwt');
 
 const TOKEN_EXPIRY = '7d';
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000';
+const normalizeRole = (role) => User.normalizeRole(role);
+const ALLOWED_PUBLIC_ROLES = ['player', 'scout', 'team'];
+const isPrivilegedRole = (role) => ['admin', 'root_admin', 'super_admin'].includes(normalizeRole(role));
 
 const signToken = (user) =>
   jwt.sign({ id: user._id, role: user.role, tokenVersion: user.tokenVersion || 0 }, getJwtSecret(), {
@@ -22,19 +25,36 @@ const toPublicUser = (user) => ({
 
 exports.register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
-    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'Name, email, and password are required' });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const isFirstUser = (await User.estimatedDocumentCount()) === 0;
+    const requestedRole = normalizeRole(role);
+
+    if (requestedRole && !(ALLOWED_PUBLIC_ROLES.includes(requestedRole) || isPrivilegedRole(requestedRole))) {
+      return res.status(400).json({ error: 'Invalid account type selected' });
+    }
+
+    if (requestedRole === 'admin' && !isFirstUser) {
+      return res.status(403).json({ error: 'Admin roles must be assigned by an existing administrator' });
+    }
+
+    const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       return res.status(409).json({ error: 'An account with that email already exists' });
     }
 
     // Bootstrap: the very first account on a fresh install becomes admin,
     // since there is otherwise no way to ever satisfy a requireRole('admin')
-    // check. Every subsequent registration defaults to 'scout' (see User
-    // schema) and must be promoted by an existing admin.
-    const isFirstUser = (await User.estimatedDocumentCount()) === 0;
-    const user = new User({ name, email, password, role: isFirstUser ? 'admin' : 'scout' });
+    // check. Every subsequent registration defaults to the selected public
+    // role ('scout', 'team', or 'player') unless an admin explicitly
+    // promotes the account later.
+    const effectiveRole = isFirstUser ? 'admin' : requestedRole || 'scout';
+    const user = new User({ name, email: normalizedEmail, password, role: effectiveRole });
 
     const verifyToken = user.createVerifyToken();
     await user.save();
@@ -104,11 +124,17 @@ exports.listUsers = async (req, res) => {
 exports.setUserRole = async (req, res) => {
   try {
     const { role } = req.body;
+    const normalizedRole = normalizeRole(role);
+
+    if (!['admin', 'scout', 'team', 'player'].includes(normalizedRole)) {
+      return res.status(400).json({ error: 'Invalid role supplied' });
+    }
+
     const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-    user.role = role;
+    user.role = normalizedRole;
     await user.save();
     res.json(toPublicUser(user));
   } catch (error) {

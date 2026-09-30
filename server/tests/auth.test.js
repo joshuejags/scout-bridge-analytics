@@ -26,18 +26,39 @@ describe('POST /api/auth/register', () => {
     expect(res.body.user.role).toBe('admin');
   });
 
-  it('makes subsequent users scouts, not admins', async () => {
+  it('makes subsequent users scouts by default, unless a role is provided', async () => {
     await request(app).post('/api/auth/register').send({
       name: 'First User',
       email: 'first@example.com',
       password: 'password123',
     });
-    const res = await request(app).post('/api/auth/register').send({
+
+    const defaultRes = await request(app).post('/api/auth/register').send({
       name: 'Second User',
       email: 'second@example.com',
       password: 'password123',
     });
-    expect(res.body.user.role).toBe('scout');
+    expect(defaultRes.body.user.role).toBe('scout');
+
+    const teamRes = await request(app).post('/api/auth/register').send({
+      name: 'Team User',
+      email: 'team-user@example.com',
+      password: 'password123',
+      role: 'team',
+    });
+    expect(teamRes.body.user.role).toBe('team');
+  });
+
+  it('rejects unsupported account types during signup', async () => {
+    const res = await request(app).post('/api/auth/register').send({
+      name: 'Bad Role User',
+      email: 'bad-role@example.com',
+      password: 'password123',
+      role: 'mentor',
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/invalid account type/i);
   });
 
   it('rejects a duplicate email with 409', async () => {
