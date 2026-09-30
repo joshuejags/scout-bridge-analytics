@@ -5,6 +5,15 @@ const crypto = require('crypto');
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+const normalizeRole = (role) => {
+  if (!role) return role;
+  const value = String(role).trim().toLowerCase().replace(/[-_\s]+/g, '_');
+  if (['root_admin', 'root-admin', 'super_admin', 'super-admin'].includes(value)) {
+    return 'admin';
+  }
+  return value;
+};
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -17,7 +26,7 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
     password: { type: String, required: true, minlength: 8, select: false },
-    role: { type: String, enum: ['admin', 'scout', 'team', 'player'], default: 'scout' },
+    role: { type: String, enum: ['admin', 'root_admin', 'scout', 'team', 'player'], default: 'scout' },
     // Incremented after credential resets so existing JWTs can be revoked.
     tokenVersion: { type: Number, default: 0, select: false },
 
@@ -77,6 +86,13 @@ userSchema.pre('save', async function hashPassword(next) {
   next();
 });
 
+userSchema.pre('validate', function normalizeRoleBeforeValidation(next) {
+  if (this.role) {
+    this.role = normalizeRole(this.role);
+  }
+  next();
+});
+
 userSchema.methods.comparePassword = function comparePassword(candidate) {
   return bcrypt.compare(candidate, this.password);
 };
@@ -104,5 +120,6 @@ userSchema.methods.createResetToken = function createResetToken() {
 };
 
 userSchema.statics.hashToken = hashToken;
+userSchema.statics.normalizeRole = normalizeRole;
 
 module.exports = mongoose.model('User', userSchema);

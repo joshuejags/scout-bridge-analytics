@@ -10,6 +10,7 @@ const RegisterPage = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('scout');
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -24,7 +25,7 @@ const RegisterPage = () => {
 
     setSubmitting(true);
     try {
-      await register(name, email, password);
+      await register(name, email, password, role);
       navigate('/', { replace: true });
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed');
@@ -72,6 +73,15 @@ const RegisterPage = () => {
             minLength={8}
             autoComplete="new-password"
           />
+        </div>
+
+        <div className="form-row">
+          <label htmlFor="role">Account type</label>
+          <select id="role" value={role} onChange={(e) => setRole(e.target.value)}>
+            <option value="scout">Scout</option>
+            <option value="team">Team</option>
+            <option value="player">Player</option>
+          </select>
         </div>
 
         <button type="submit" disabled={submitting}>
